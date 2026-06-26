@@ -121,11 +121,14 @@ Start the Vite dev server:
 npm run dev
 ```
 
-For full API support locally (Cloudflare Worker runtime + D1), run in a separate terminal:
+For full API support locally (Cloudflare Worker runtime + D1), run in a separate terminal after building:
 
 ```bash
-npx wrangler pages dev dist --d1 DB=bishopric-hub-db
+npm run build
+npx wrangler pages dev dist --d1 DB=YOUR_DATABASE_NAME
 ```
+
+Replace `YOUR_DATABASE_NAME` with the `database_name` value from your `wrangler.jsonc`.
 
 ---
 
@@ -182,6 +185,9 @@ npx wrangler d1 execute bishopric-hub-db --remote --file=migrations/XXXX_name.sq
 - `wrangler.jsonc` is gitignored — it contains your database ID and must not be committed
 - Data import/seed migrations (`*_import.sql`, `*_seed.sql`) are gitignored — they may contain member names and ward-specific event details
 - The `scripts/` directory is gitignored for the same reason
+- `.env` and `.env.*` files are gitignored — never commit API keys or secrets
+- Data exports (`*.csv`, `exports/`, `data-export/`) are gitignored — CSV/JSON dumps may contain member data
+- Ward-specific image assets should not be committed to a public repo
 
 ---
 

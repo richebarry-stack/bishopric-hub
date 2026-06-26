@@ -5,13 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:full": "wrangler pages dev --d1 DB=bishopric-hub-db -- vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "wrangler pages dev dist --d1 DB=bishopric-hub-db",
-    "db:init": "wrangler d1 execute bishopric-hub-db --local --file=migrations/0001_schema.sql",
-    "db:seed": "wrangler d1 execute bishopric-hub-db --local --file=scripts/seed.sql",
-    "db:import": "bash scripts/import-coda.sh > scripts/import-data.sql && wrangler d1 execute bishopric-hub-db --local --file=scripts/import-data.sql",
     "deploy": "npm run build && wrangler pages deploy dist"
   },
   "dependencies": {
