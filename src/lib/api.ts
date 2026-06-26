@@ -26,6 +26,12 @@ export const api = {
     register: (data: { name: string; email: string; password: string; role: string }) =>
       request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   },
+  syncConduct: () => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    return request('/sync-conduct', { method: 'POST', body: JSON.stringify({ today }) });
+  },
   list: <T>(table: string) => request<T[]>(`/${table}`),
   get: <T>(table: string, id: number) => request<T>(`/${table}/${id}`),
   create: <T>(table: string, data: Record<string, unknown>) =>

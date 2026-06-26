@@ -16,7 +16,7 @@ const NAV_ITEMS = [
   { path: '/bishopric-meetings', label: 'Bishopric Meetings', icon: '▦' },
   { path: '/babies', label: 'Babies', icon: '★' },
   { path: '/out-of-town', label: 'Out of Town', icon: '⇢' },
-  { path: '/assignments', label: 'Assignments', icon: '⟳' },
+  { path: '/assignments', label: 'Bishopric Assignments', icon: '⟳' },
   { path: '/important-links', label: 'Important Links', icon: '⇗' },
   { path: '/users', label: 'Users', icon: '⊕' },
 ];

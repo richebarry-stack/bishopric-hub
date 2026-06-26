@@ -29,7 +29,7 @@ export default function Assignments() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Rotating Bishopric Assignments</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Bishopric Assignments</h1>
         <button onClick={() => setEditing({ ...EMPTY })} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>
       </div>
 

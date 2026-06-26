@@ -19,12 +19,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.auth.me().then(({ user }) => {
       setUser(user);
       setLoading(false);
+      if (user) api.syncConduct().catch(() => {});
     }).catch(() => setLoading(false));
   }, []);
 
   const login = async (email: string, password: string) => {
     const { user } = await api.auth.login(email, password);
     setUser(user);
+    api.syncConduct().catch(() => {});
   };
 
   const logout = async () => {
