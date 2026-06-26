@@ -7,15 +7,19 @@ import { SHARE_WITH_OPTIONS } from '../lib/constants';
 
 const TODAY_PREFIX = new Date().toISOString().slice(0, 10);
 
-function formatDateTime(iso: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const h = d.getHours();
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(h12)}:${pad(d.getMinutes())} ${ampm}`;
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// Parse date parts directly from the string — avoids UTC timezone shift from new Date('YYYY-MM-DD')
+function formatDate(dates: string): string {
+  if (!dates) return '';
+  const m = dates.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return dates;
+  return `${MONTHS[parseInt(m[2], 10) - 1]} ${parseInt(m[3], 10)}, ${m[1]}`;
+}
+
+// Extract YYYY-MM-DD for a date input — slicing avoids any timezone conversion
+function toDateInput(dates: string): string {
+  return dates ? dates.slice(0, 10) : '';
 }
 
 function isUpcoming(dates: string): boolean {
@@ -74,7 +78,7 @@ function EventTable({ rows, onEdit, onDelete, defaultSortKey, defaultAsc }: {
         <thead>
           <tr className="border-b border-gray-100 bg-gray-50">
             <Th col="name" label="Event" />
-            <Th col="dates" label="Date/Time" />
+            <Th col="dates" label="Date" />
             <Th col="notes" label="Notes" />
             <Th col="announce_in_sacrament" label="Announce" className="text-center" />
             <th className="px-3 py-2"></th>
@@ -84,7 +88,7 @@ function EventTable({ rows, onEdit, onDelete, defaultSortKey, defaultAsc }: {
           {sorted.map(r => (
             <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => onEdit(r)}>
               <td className="px-3 py-2 font-medium text-gray-900">{r.name}</td>
-              <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{formatDateTime(r.dates)}</td>
+              <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{formatDate(r.dates)}</td>
               <td className="px-3 py-2 text-gray-600">{r.notes}</td>
               <td className="px-3 py-2 text-center">{r.announce_in_sacrament ? '✓' : ''}</td>
               <td className="px-3 py-2">
@@ -145,7 +149,7 @@ export default function Calendaring() {
         {editing && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
             <Input label="Event Name" value={editing.name || ''} onChange={v => setEditing({ ...editing, name: v })} required />
-            <Input label="Date/Time" value={editing.dates || ''} onChange={v => setEditing({ ...editing, dates: v })} type="datetime-local" />
+            <Input label="Date" value={toDateInput(editing.dates || '')} onChange={v => setEditing({ ...editing, dates: v })} type="date" />
             <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} />
             <Select label="Share With" value={editing.share_with || ''} onChange={v => setEditing({ ...editing, share_with: v })} options={SHARE_WITH_OPTIONS} />
             <Checkbox label="Announce in sacrament meeting" checked={!!editing.announce_in_sacrament} onChange={v => setEditing({ ...editing, announce_in_sacrament: v ? 1 : 0 })} />

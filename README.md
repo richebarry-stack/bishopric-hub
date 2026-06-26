@@ -102,14 +102,21 @@ Then insert the user:
 npx wrangler d1 execute bishopric-hub-db --remote --command="INSERT INTO users (name, email, password_hash, role) VALUES ('Your Name', 'your@email.com', 'PASTE_HASH_HERE', 'admin');"
 ```
 
-### 6. Deploy
+### 6. Configure D1 binding in Cloudflare dashboard
+
+For GitHub Actions deployment (see [Deployment](#deployment)), the D1 binding must be set in the Cloudflare dashboard:
+
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com) → **Workers & Pages** → **bishopric-hub** → **Settings** → **Bindings**
+2. Add a D1 Database binding: Variable name `DB`, Database = your database name
+
+### 7. Deploy
 
 ```bash
 npm run build
 npx wrangler pages deploy dist --branch main
 ```
 
-Cloudflare will print a deployment URL. On subsequent deploys the same command updates the live site.
+Cloudflare will print a deployment URL. After this first manual deploy, push to `master` on GitHub to trigger automatic deployments (once you complete the GitHub Actions setup in [Deployment](#deployment)).
 
 ---
 
@@ -133,6 +140,25 @@ Replace `YOUR_DATABASE_NAME` with the `database_name` value from your `wrangler.
 ---
 
 ## Deployment
+
+### Automatic deployment via GitHub Actions (recommended)
+
+Every push to `master` automatically builds and deploys via `.github/workflows/deploy.yml`. One-time setup:
+
+1. **Create a Cloudflare API token**
+   - Go to [Cloudflare Dashboard](https://dash.cloudflare.com) → **My Profile** → **API Tokens** → **Create Token**
+   - Use the **Edit Cloudflare Workers** template, or create a custom token with **Cloudflare Pages: Edit** permission
+   - Copy the token value
+
+2. **Find your Cloudflare Account ID**
+   - Any Cloudflare dashboard page → right sidebar shows **Account ID**
+
+3. **Add secrets to GitHub**
+   - Go to your repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+   - Add `CLOUDFLARE_API_TOKEN` (the token from step 1)
+   - Add `CLOUDFLARE_ACCOUNT_ID` (from step 2)
+
+After that, every `git push` deploys automatically. No local build step needed.
 
 ### Manual deployment
 
