@@ -10,6 +10,10 @@ wrangler.jsonc
 # Data import/seed scripts — may contain personal ward data
 scripts/
 
+# Data import migrations — contain ward member names and event details
+migrations/*_import.sql
+migrations/*_seed.sql
+
 # Logs
 logs
 *.log

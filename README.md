@@ -166,6 +166,12 @@ Migrations live in `migrations/` and are numbered sequentially (`0001_schema.sql
 npx wrangler d1 execute bishopric-hub-db --remote --file=migrations/XXXX_name.sql
 ```
 
+### Schema vs. data migrations
+
+**Schema migrations** (`*_schema.sql`, `*_add_*.sql`, etc.) define tables and columns and are committed to the repo.
+
+**Data import migrations** (files ending in `_import.sql` or `_seed.sql`) contain ward-specific data — member names, events, callings — and are **gitignored**. These are generated locally (or by Claude) when importing from external sources and are not shared. Run them against your own database but do not commit them.
+
 ---
 
 ## Security Notes
@@ -174,6 +180,8 @@ npx wrangler d1 execute bishopric-hub-db --remote --file=migrations/XXXX_name.sq
 - Cloudflare D1 encrypts data at rest and in transit (TLS) by default
 - Sessions use HTTP-only cookies with a 30-day expiry
 - `wrangler.jsonc` is gitignored — it contains your database ID and must not be committed
+- Data import/seed migrations (`*_import.sql`, `*_seed.sql`) are gitignored — they may contain member names and ward-specific event details
+- The `scripts/` directory is gitignored for the same reason
 
 ---
 
