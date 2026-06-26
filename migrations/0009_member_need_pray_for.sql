@@ -1,0 +1,1 @@
+ALTER TABLE member_needs ADD COLUMN pray_for INTEGER DEFAULT 0;

@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN church_role TEXT NOT NULL DEFAULT '';

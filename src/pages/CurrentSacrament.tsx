@@ -1,0 +1,749 @@
+import { useState, useRef, useEffect } from 'react';
+import { useTable } from '../lib/useTable';
+import type {
+  SacramentSpeaker, Prayer, SacramentMusic, SacramentTheme, SacramentAnnouncement, SacramentAgendaNote,
+  CallingPipeline, SacramentWardBusiness,
+} from '../lib/api';
+// CallingPipeline is used only in the page shell (toAgendaCalling); SacramentWardBusiness for snapshot table
+import { SPEAKER_TYPES } from '../lib/constants';
+import { renderRichText } from '../lib/richText';
+
+// ─── module-level constants ───────────────────────────────────────────────────
+
+const INPUT_CLS = 'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500';
+
+// 'speakers' removed — each speaker is now its own movable item interleaved with rest_special
+const FIXED_ORDER = [
+  'conducting', 'chorister', 'organist', 'opening_hymn', 'opening_prayer',
+  'announcements', 'thanksgivings', 'sustainings', 'stake_business',
+  'sacrament_hymn', 'rest_special', 'closing_hymn', 'closing_prayer',
+] as const;
+type FixedKind = typeof FIXED_ORDER[number];
+const ANCHOR: Record<FixedKind, number> = {
+  conducting:     1,
+  chorister:      2,
+  organist:       3,
+  opening_hymn:   4,
+  opening_prayer: 5,
+  announcements:  6,
+  thanksgivings:  6.4,
+  sustainings:    6.7,
+  stake_business: 7,
+  sacrament_hymn: 8,
+  rest_special:   9,
+  closing_hymn:   10,
+  closing_prayer: 11,
+};
+const LABEL: Record<FixedKind, string> = {
+  conducting:     'Conducting', chorister: 'Chorister', organist: 'Organist',
+  opening_hymn:   'Opening Hymn', opening_prayer: 'Opening Prayer',
+  announcements:  'Announcements & Ward Business',
+  thanksgivings:  'To Be Thanked',
+  sustainings:    'To Be Sustained',
+  stake_business: 'Stake Business',
+  sacrament_hymn: 'Sacrament Hymn',
+  rest_special:   'Rest / Special Music',
+  closing_hymn:   'Closing Hymn', closing_prayer: 'Closing Prayer',
+};
+
+// rest_special anchor position — speakers default to just before it
+const REST_POS = ANCHOR['rest_special']; // = 9
+
+// Optional one-off agenda items — not shown unless user opts in
+const OPTIONAL_ITEMS = {
+  child_blessing: { label: 'Child Blessing', pos: 5.5 },  // after opening_prayer
+  confirmation:   { label: 'Confirmation',   pos: 8.3 },  // after sacrament hymn
+  ordination:     { label: 'Ordination',     pos: 8.6 },  // after confirmation
+} as const;
+type OptionalKind = keyof typeof OPTIONAL_ITEMS;
+
+// ─── utility ──────────────────────────────────────────────────────────────────
+
+function upcomingSunday(): string {
+  const d = new Date();
+  const add = (7 - d.getDay()) % 7;
+  d.setDate(d.getDate() + add);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const dk = (d: string) => (d ? d.slice(0, 10) : '');
+
+// ─── sub-component types ──────────────────────────────────────────────────────
+
+type SpeakerRow   = { id?: number; speaker: string; speaker_type: string; topic: string; accepted: string; position: number };
+type AnnounceRow  = { id?: number; title: string; notes: string };
+type NoteRow      = { id?: number; content: string; position: number };
+type AgendaCalling = { member: string; calling: string; organization: string };
+
+// ─── top-level sub-components ─────────────────────────────────────────────────
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 py-2.5 border-b border-gray-100">
+      <div className="w-full sm:w-48 shrink-0 sm:pt-2 text-xs font-bold uppercase tracking-wide text-gray-400">{label}</div>
+      <div className="flex-1 min-w-0">{children}</div>
+    </div>
+  );
+}
+
+function SimpleField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <Row label={label}>
+      <input className={INPUT_CLS} value={value} onChange={e => onChange(e.target.value)} />
+    </Row>
+  );
+}
+
+function TextareaField({ label, value, onChange, rows = 2 }: { label: string; value: string; onChange: (v: string) => void; rows?: number }) {
+  return (
+    <Row label={label}>
+      <textarea className={INPUT_CLS} rows={rows} value={value} onChange={e => onChange(e.target.value)} />
+    </Row>
+  );
+}
+
+function SpeakerItem({
+  index, row, onUpdate, onMoveUp, onMoveDown, onRemove, canMoveUp, canMoveDown,
+}: {
+  index: number;
+  row: SpeakerRow;
+  onUpdate: (patch: Partial<SpeakerRow>) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onRemove: () => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 py-2.5 border-b border-gray-100">
+      <div className="w-full sm:w-48 shrink-0 sm:pt-2 flex items-center gap-1">
+        <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Speaker {index + 1}</span>
+        <div className="flex items-center gap-0.5 ml-auto sm:ml-1">
+          <button type="button" onClick={onMoveUp} disabled={!canMoveUp}
+            className="text-gray-300 hover:text-gray-600 disabled:opacity-20 px-1 leading-none text-sm" title="Move up">↑</button>
+          <button type="button" onClick={onMoveDown} disabled={!canMoveDown}
+            className="text-gray-300 hover:text-gray-600 disabled:opacity-20 px-1 leading-none text-sm" title="Move down">↓</button>
+        </div>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="rounded-md border border-gray-200 p-2 relative">
+          <button type="button" onClick={onRemove}
+            className="absolute top-1 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
+          <input className={INPUT_CLS + ' mb-1 pr-6'} placeholder="Speaker name" value={row.speaker}
+            onChange={e => onUpdate({ speaker: e.target.value })} />
+          <div className="grid grid-cols-2 gap-2">
+            <select className={INPUT_CLS} value={row.speaker_type}
+              onChange={e => onUpdate({ speaker_type: e.target.value })}>
+              {SPEAKER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <input className={INPUT_CLS} placeholder="Topic" value={row.topic}
+              onChange={e => onUpdate({ topic: e.target.value })} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NoteItem({
+  content, onContentChange, onMoveUp, onMoveDown, onRemove,
+}: {
+  content: string;
+  onContentChange: (v: string) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 py-2.5 border-b border-gray-100 bg-amber-50/40 -mx-2 px-2 rounded">
+      <div className="w-full sm:w-48 shrink-0 sm:pt-2 flex items-center gap-1">
+        <span className="text-xs font-bold uppercase tracking-wide text-amber-500">Agenda Item</span>
+        <div className="flex items-center gap-0.5 ml-auto sm:ml-0">
+          <button type="button" onClick={onMoveUp} title="Move up" className="text-gray-400 hover:text-gray-700 px-1 leading-none">↑</button>
+          <button type="button" onClick={onMoveDown} title="Move down" className="text-gray-400 hover:text-gray-700 px-1 leading-none">↓</button>
+        </div>
+      </div>
+      <div className="flex-1 min-w-0 flex items-start gap-2">
+        <textarea className={INPUT_CLS} rows={2} placeholder="Additional note…" value={content} onChange={e => onContentChange(e.target.value)} />
+        <button type="button" onClick={onRemove} className="text-gray-300 hover:text-red-500 text-lg leading-none pt-1">×</button>
+      </div>
+    </div>
+  );
+}
+
+const stripMd = (s: string) => s.replace(/\*\*(.*?)\*\*/g, '$1');
+
+function CallingsList({ label, callings, script }: {
+  label: string;
+  callings: AgendaCalling[];
+  script?: string;
+}) {
+  if (callings.length === 0) return null;
+  return (
+    <Row label={label}>
+      <div className="space-y-0.5">
+        {callings.map((c, i) => (
+          <p key={i} className="text-sm text-gray-800">
+            {renderRichText(c.member)}{c.calling ? ` — ${c.calling}` : ''}
+            {c.organization ? <span className="text-xs text-gray-400"> ({c.organization})</span> : null}
+          </p>
+        ))}
+        {script && (
+          <p className="text-xs text-gray-500 italic mt-2 leading-relaxed whitespace-pre-line">{script}</p>
+        )}
+      </div>
+    </Row>
+  );
+}
+
+function OptionalItem({ label, value, onChange, onRemove }: {
+  label: string; value: string;
+  onChange: (v: string) => void; onRemove: () => void;
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 py-2.5 border-b border-gray-100 bg-indigo-50/40 -mx-2 px-2 rounded">
+      <div className="w-full sm:w-48 shrink-0 sm:pt-2 flex items-center gap-1">
+        <span className="text-xs font-bold uppercase tracking-wide text-indigo-500">{label}</span>
+        <button type="button" onClick={onRemove}
+          className="ml-auto text-gray-300 hover:text-red-500 text-sm leading-none" title="Remove">×</button>
+      </div>
+      <div className="flex-1 min-w-0">
+        <input className={INPUT_CLS} placeholder="Name…" value={value} onChange={e => onChange(e.target.value)} />
+      </div>
+    </div>
+  );
+}
+
+function AnnouncementsSection({ rows, setRows }: { rows: AnnounceRow[]; setRows: React.Dispatch<React.SetStateAction<AnnounceRow[]>> }) {
+  return (
+    <Row label={LABEL.announcements}>
+      <div className="space-y-2">
+        {rows.length === 0 && <p className="text-xs text-gray-300 italic">None</p>}
+        {rows.map((r, i) => (
+          <div key={i} className="rounded-md border border-gray-200 p-2 relative">
+            <button type="button" onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))}
+              className="absolute top-1 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
+            <input className={INPUT_CLS + ' mb-1'} placeholder="Title" value={r.title}
+              onChange={e => setRows(rs => rs.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))} />
+            <textarea className={INPUT_CLS} rows={1} placeholder="Details (optional)" value={r.notes}
+              onChange={e => setRows(rs => rs.map((x, idx) => idx === i ? { ...x, notes: e.target.value } : x))} />
+          </div>
+        ))}
+        <button type="button" onClick={() => setRows(rs => [...rs, { title: '', notes: '' }])}
+          className="text-xs text-blue-600 hover:text-blue-800">+ Add announcement</button>
+      </div>
+    </Row>
+  );
+}
+
+// ─── AgendaEditor ─────────────────────────────────────────────────────────────
+
+interface EditorProps {
+  date: string;
+  speakers: ReturnType<typeof useTable<SacramentSpeaker>>;
+  prayers: ReturnType<typeof useTable<Prayer>>;
+  music: ReturnType<typeof useTable<SacramentMusic>>;
+  themes: ReturnType<typeof useTable<SacramentTheme>>;
+  announcements: ReturnType<typeof useTable<SacramentAnnouncement>>;
+  notes: ReturnType<typeof useTable<SacramentAgendaNote>>;
+  thanksgivings: AgendaCalling[];
+  sustainings: AgendaCalling[];
+  onSaveSnapshot: (sustainings: AgendaCalling[], thanksgivings: AgendaCalling[]) => Promise<void>;
+}
+
+function AgendaEditor({ date, speakers, prayers, music, themes, announcements, notes, thanksgivings, sustainings, onSaveSnapshot }: EditorProps) {
+  const existingTheme  = themes.rows.find(t => dk(t.meeting_date) === date);
+  const existingMusic  = music.rows.find(m => dk(m.meeting_date) === date);
+  const existingSpeakers = speakers.rows
+    .filter(s => dk(s.meeting_date) === date)
+    .sort((a, b) => (a.speaking_order || 0) - (b.speaking_order || 0));
+  const existingAnnouncements = announcements.rows.filter(a => dk(a.meeting_date) === date);
+  const existingNotes  = notes.rows.filter(n => dk(n.meeting_date) === date);
+  const openingExisting = prayers.rows.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Opening');
+  const closingExisting = prayers.rows.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Closing');
+
+  const [conducting,    setConducting]    = useState(existingTheme?.conducting    || '');
+  const [stakeBusiness, setStakeBusiness] = useState(existingTheme?.stake_business || '');
+  const [chorister,     setChorister]     = useState(existingMusic?.chorister     || '');
+  const [organist,      setOrganist]      = useState(existingMusic?.organist      || '');
+  const [openingHymn,   setOpeningHymn]   = useState(existingMusic?.opening_hymn  || '');
+  const [sacramentHymn, setSacramentHymn] = useState(existingMusic?.sacrament_hymn || '');
+  const [restSpecial,   setRestSpecial]   = useState(existingMusic?.rest_special   || '');
+  const [closingHymn,   setClosingHymn]   = useState(existingMusic?.closing_hymn  || '');
+  const [openingPrayer, setOpeningPrayer] = useState(openingExisting?.name || '');
+  const [closingPrayer, setClosingPrayer] = useState(closingExisting?.name || '');
+  const [childBlessing, setChildBlessing] = useState<string | null>(existingMusic?.child_blessing ?? null);
+  const [confirmation,  setConfirmation]  = useState<string | null>(existingMusic?.confirmation  ?? null);
+  const [ordination,    setOrdination]    = useState<string | null>(existingMusic?.ordination    ?? null);
+  const [copied, setCopied] = useState(false);
+
+  // Each speaker gets its own float position so it can interleave with rest_special.
+  // If position is saved in DB, use it; otherwise place all before rest_special by default.
+  const [speakerRows, setSpeakerRows] = useState<SpeakerRow[]>(() => {
+    const total = existingSpeakers.length;
+    return existingSpeakers.map((s, i) => ({
+      id: s.id,
+      speaker:      s.speaker      || '',
+      speaker_type: s.speaker_type || 'Adult Speaker',
+      topic:        s.topic        || '',
+      accepted:     s.accepted     || '',
+      // If position was persisted, use it. Otherwise evenly space before rest_special.
+      position: s.position != null ? s.position : REST_POS - 1 + (i + 1) / (total + 1),
+    }));
+  });
+
+  const [announceRows, setAnnounceRows] = useState<AnnounceRow[]>(
+    existingAnnouncements.map(a => ({ id: a.id, title: a.title || '', notes: a.notes || '' }))
+  );
+  const [noteRows, setNoteRows] = useState<NoteRow[]>(
+    existingNotes.map((n, i) => ({ id: n.id, content: n.content || '', position: n.position ?? 11.5 + i }))
+  );
+  const [saving, setSaving]   = useState(false);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+
+  const isSavingRef   = useRef(false);
+  const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleSaveRef = useRef<() => Promise<void>>(async () => {});
+
+  // Merged ordered list: fixed anchors + individual speakers + free notes + optional ordinance items
+  type MergedItem =
+    | { kind: FixedKind;    pos: number }
+    | { kind: 'speaker';    pos: number; speakerIndex: number }
+    | { kind: 'note';       pos: number; noteIndex:   number }
+    | { kind: 'optional';   pos: number; optKind: OptionalKind };
+
+  const merged: MergedItem[] = [
+    ...FIXED_ORDER.map(k => ({ kind: k, pos: ANCHOR[k] } as MergedItem)),
+    ...speakerRows.map((s, i) => ({ kind: 'speaker' as const, pos: s.position, speakerIndex: i })),
+    ...noteRows.map((n, i)    => ({ kind: 'note'    as const, pos: n.position, noteIndex:   i })),
+    ...(childBlessing !== null ? [{ kind: 'optional' as const, pos: OPTIONAL_ITEMS.child_blessing.pos, optKind: 'child_blessing' as OptionalKind }] : []),
+    ...(confirmation  !== null ? [{ kind: 'optional' as const, pos: OPTIONAL_ITEMS.confirmation.pos,   optKind: 'confirmation'   as OptionalKind }] : []),
+    ...(ordination    !== null ? [{ kind: 'optional' as const, pos: OPTIONAL_ITEMS.ordination.pos,     optKind: 'ordination'     as OptionalKind }] : []),
+  ].sort((a, b) => a.pos - b.pos);
+
+  // Move a speaker or note up/down in the merged list using bisection positioning
+  const moveItem = (
+    findFn: (item: MergedItem) => boolean,
+    updateFn: (newPos: number) => void,
+    dir: -1 | 1,
+  ) => {
+    const mi = merged.findIndex(findFn);
+    const ti = mi + dir;
+    if (ti < 0 || ti >= merged.length) return;
+    const neighbor = merged[ti];
+    let newPos: number;
+    if (dir < 0) {
+      const above = merged[ti - 1];
+      newPos = above ? (above.pos + neighbor.pos) / 2 : neighbor.pos - 1;
+    } else {
+      const below = merged[ti + 1];
+      newPos = below ? (neighbor.pos + below.pos) / 2 : neighbor.pos + 1;
+    }
+    updateFn(newPos);
+  };
+
+  const moveSpeaker = (si: number, dir: -1 | 1) =>
+    moveItem(
+      r => r.kind === 'speaker' && (r as { speakerIndex: number }).speakerIndex === si,
+      pos => setSpeakerRows(rs => rs.map((r, i) => i === si ? { ...r, position: pos } : r)),
+      dir,
+    );
+
+  const moveNote = (ni: number, dir: -1 | 1) =>
+    moveItem(
+      r => r.kind === 'note' && (r as { noteIndex: number }).noteIndex === ni,
+      pos => setNoteRows(ns => ns.map((n, i) => i === ni ? { ...n, position: pos } : n)),
+      dir,
+    );
+
+  const addSpeaker = () => {
+    // Place after the last speaker (or just before rest_special if none exist)
+    const existing = speakerRows.map(s => s.position);
+    const maxSpk = existing.length ? Math.max(...existing) : REST_POS - 1;
+    const nextFixed = merged.find(r => r.pos > maxSpk && r.kind !== 'speaker' && r.kind !== 'note');
+    const cap = nextFixed ? nextFixed.pos : maxSpk + 2;
+    setSpeakerRows(rs => [...rs, { speaker: '', speaker_type: 'Adult Speaker', topic: '', accepted: '', position: (maxSpk + cap) / 2 }]);
+  };
+
+  const addNote = () => {
+    const maxPos = Math.max(FIXED_ORDER.length, ...noteRows.map(n => n.position), 0);
+    setNoteRows(ns => [...ns, { content: '', position: maxPos + 1 }]);
+  };
+
+  const handleSave = async () => {
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+    setSaving(true);
+    try {
+      const themeFields = { meeting_date: date, conducting, stake_business: stakeBusiness };
+      if (existingTheme) await themes.update(existingTheme.id, themeFields);
+      else if (conducting || stakeBusiness) await themes.create(themeFields);
+
+      const musicFields = { meeting_date: date, chorister, organist, opening_hymn: openingHymn, sacrament_hymn: sacramentHymn, rest_special: restSpecial, closing_hymn: closingHymn, child_blessing: childBlessing, confirmation, ordination };
+      const hasMusic = !!(chorister || organist || openingHymn || sacramentHymn || restSpecial || closingHymn || childBlessing !== null || confirmation !== null || ordination !== null);
+      if (existingMusic) await music.update(existingMusic.id, musicFields);
+      else if (hasMusic) await music.create(musicFields);
+
+      const syncPrayer = async (lbl: string, name: string, existing?: Prayer) => {
+        if (name.trim()) {
+          const d = { meeting_date: date, name, opening_closing: lbl };
+          if (existing) await prayers.update(existing.id, d); else await prayers.create(d);
+        } else if (existing) await prayers.remove(existing.id);
+      };
+      await syncPrayer('Opening', openingPrayer, openingExisting);
+      await syncPrayer('Closing', closingPrayer, closingExisting);
+
+      // Sort speakers by position to assign speaking_order and persist position
+      const keepSpk = speakerRows
+        .filter(r => r.speaker.trim())
+        .sort((a, b) => a.position - b.position);
+      const keepSpkIds = new Set(keepSpk.filter(r => r.id).map(r => r.id));
+      for (const s of existingSpeakers) if (!keepSpkIds.has(s.id)) await speakers.remove(s.id);
+      for (let i = 0; i < keepSpk.length; i++) {
+        const r = keepSpk[i];
+        const d = { meeting_date: date, speaker: r.speaker, speaker_type: r.speaker_type || 'Adult Speaker', topic: r.topic, accepted: r.accepted, speaking_order: i + 1, position: r.position };
+        if (r.id) await speakers.update(r.id, d); else await speakers.create(d);
+      }
+
+      const keepAnn = announceRows.filter(r => r.title.trim());
+      const keepAnnIds = new Set(keepAnn.filter(r => r.id).map(r => r.id));
+      for (const a of existingAnnouncements) if (!keepAnnIds.has(a.id)) await announcements.remove(a.id);
+      for (const r of keepAnn) {
+        const d = { meeting_date: date, title: r.title, notes: r.notes };
+        if (r.id) await announcements.update(r.id, d); else await announcements.create(d);
+      }
+
+      const keepNotes = noteRows.filter(r => r.content.trim());
+      const keepNoteIds = new Set(keepNotes.filter(r => r.id).map(r => r.id));
+      for (const n of existingNotes) if (!keepNoteIds.has(n.id)) await notes.remove(n.id);
+      for (const r of keepNotes) {
+        const d = { meeting_date: date, content: r.content, position: r.position };
+        if (r.id) await notes.update(r.id, d); else await notes.create(d);
+      }
+
+      await onSaveSnapshot(sustainings, thanksgivings);
+
+      setSavedAt(new Date().toLocaleTimeString());
+    } finally {
+      isSavingRef.current = false;
+      setSaving(false);
+    }
+  };
+
+  // Keep ref current so the debounced callback always calls the latest closure
+  handleSaveRef.current = handleSave;
+
+  const generateText = (): string => {
+    const dateLabel = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    });
+    const lines: string[] = [`Sacrament Meeting — ${dateLabel}`, ''];
+    for (const item of merged) {
+      if (item.kind === 'speaker') {
+        const r = speakerRows[item.speakerIndex];
+        if (!r.speaker.trim()) continue;
+        const num = speakerDisplayIndex(item.speakerIndex) + 1;
+        let line = `Speaker ${num}: ${r.speaker}`;
+        if (r.speaker_type && r.speaker_type !== 'Adult Speaker') line += ` (${r.speaker_type})`;
+        if (r.topic) line += ` — "${r.topic}"`;
+        lines.push(line);
+        continue;
+      }
+      if (item.kind === 'note') {
+        const c = noteRows[item.noteIndex].content.trim();
+        if (c) lines.push(`Note: ${c}`);
+        continue;
+      }
+      if (item.kind === 'optional') {
+        const val = item.optKind === 'child_blessing' ? childBlessing : item.optKind === 'confirmation' ? confirmation : ordination;
+        if (val) lines.push(`${OPTIONAL_ITEMS[item.optKind].label}: ${val}`);
+        continue;
+      }
+      switch (item.kind as FixedKind) {
+        case 'conducting':     if (conducting)    lines.push(`Conducting: ${conducting}`); break;
+        case 'chorister':      if (chorister)     lines.push(`Chorister: ${chorister}`); break;
+        case 'organist':       if (organist)      lines.push(`Organist: ${organist}`); break;
+        case 'opening_hymn':   if (openingHymn)   lines.push(`Opening Hymn: ${openingHymn}`); break;
+        case 'opening_prayer': if (openingPrayer) lines.push(`Opening Prayer: ${openingPrayer}`); break;
+        case 'announcements':
+          if (announceRows.some(r => r.title.trim())) {
+            lines.push('Announcements:');
+            for (const r of announceRows) if (r.title.trim()) lines.push(`  • ${r.title}`);
+          }
+          break;
+        case 'thanksgivings':
+          if (thanksgivings.length) {
+            lines.push('To Be Thanked:');
+            for (const c of thanksgivings) lines.push(`  • ${stripMd(c.member)}${c.calling ? ` — ${c.calling}` : ''}`);
+          }
+          break;
+        case 'sustainings':
+          if (sustainings.length) {
+            lines.push('To Be Sustained:');
+            for (const c of sustainings) lines.push(`  • ${stripMd(c.member)}${c.calling ? ` — ${c.calling}` : ''}`);
+          }
+          break;
+        case 'stake_business': if (stakeBusiness) lines.push(`Stake Business: ${stakeBusiness}`); break;
+        case 'sacrament_hymn': if (sacramentHymn) lines.push(`Sacrament Hymn: ${sacramentHymn}`); break;
+        case 'rest_special':   if (restSpecial)   lines.push(`Rest / Special Music: ${restSpecial}`); break;
+        case 'closing_hymn':   if (closingHymn)   lines.push(`Closing Hymn: ${closingHymn}`); break;
+        case 'closing_prayer': if (closingPrayer) lines.push(`Closing Prayer: ${closingPrayer}`); break;
+      }
+    }
+    return lines.join('\n');
+  };
+
+  const copyText = async () => {
+    await navigator.clipboard.writeText(generateText());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const exportPDF = () => {
+    const dateLabel = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    });
+    const bodyLines = generateText().split('\n').map(l => {
+      if (!l.trim()) return '<br>';
+      if (l.startsWith('  •')) return `<p style="margin:0.15rem 0 0.15rem 1.5rem">• ${l.trim().slice(1).trim()}</p>`;
+      const ci = l.indexOf(':');
+      if (ci > -1) return `<p style="margin:0.3rem 0"><strong>${l.slice(0, ci)}:</strong>${l.slice(ci + 1)}</p>`;
+      return `<p style="margin:0.3rem 0">${l}</p>`;
+    }).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${dateLabel} — Sacrament Meeting</title>
+<style>body{font-family:Georgia,serif;max-width:580px;margin:2rem auto;color:#111;font-size:13pt}h1{font-size:1.1rem;text-align:center;border-bottom:1px solid #ccc;padding-bottom:0.6rem;margin-bottom:1.2rem}@media print{@page{margin:1.5cm}}</style>
+</head><body><h1>Sacrament Meeting<br>${dateLabel}</h1>${bodyLines}<script>window.print();<\/script></body></html>`;
+    const w = window.open('', '_blank');
+    if (w) { w.document.write(html); w.document.close(); }
+  };
+
+  const triggerAutoSave = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => handleSaveRef.current(), 600);
+  };
+
+  // Count how many speakers appear before each speaker for display numbering
+  const speakerDisplayIndex = (si: number): number => {
+    const myPos = speakerRows[si].position;
+    return speakerRows.filter(s => s.position < myPos).length;
+  };
+
+  return (
+    <div className="max-w-3xl">
+      <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6" onBlur={triggerAutoSave}>
+        {merged.map((item, mi) => {
+          if (item.kind === 'speaker') {
+            const si = item.speakerIndex;
+            return (
+              <SpeakerItem
+                key={`speaker-${si}`}
+                index={speakerDisplayIndex(si)}
+                row={speakerRows[si]}
+                onUpdate={patch => setSpeakerRows(rs => rs.map((r, i) => i === si ? { ...r, ...patch } : r))}
+                onMoveUp={() => moveSpeaker(si, -1)}
+                onMoveDown={() => moveSpeaker(si, 1)}
+                onRemove={() => setSpeakerRows(rs => rs.filter((_, i) => i !== si))}
+                canMoveUp={mi > 0}
+                canMoveDown={mi < merged.length - 1}
+              />
+            );
+          }
+          if (item.kind === 'optional') {
+            const { optKind } = item;
+            const val = optKind === 'child_blessing' ? childBlessing! : optKind === 'confirmation' ? confirmation! : ordination!;
+            const setter = optKind === 'child_blessing' ? setChildBlessing : optKind === 'confirmation' ? setConfirmation : setOrdination;
+            return (
+              <OptionalItem key={`opt-${optKind}`}
+                label={OPTIONAL_ITEMS[optKind].label}
+                value={val}
+                onChange={setter}
+                onRemove={() => setter(null)}
+              />
+            );
+          }
+          if (item.kind === 'note') {
+            const ni = item.noteIndex;
+            return (
+              <NoteItem
+                key={`note-${ni}`}
+                content={noteRows[ni].content}
+                onContentChange={v => setNoteRows(ns => ns.map((n, i) => i === ni ? { ...n, content: v } : n))}
+                onMoveUp={() => moveNote(ni, -1)}
+                onMoveDown={() => moveNote(ni, 1)}
+                onRemove={() => setNoteRows(ns => ns.filter((_, i) => i !== ni))}
+              />
+            );
+          }
+          const kind = item.kind as FixedKind;
+          switch (kind) {
+            case 'conducting':     return <SimpleField   key={kind} label={LABEL[kind]} value={conducting}    onChange={setConducting}    />;
+            case 'chorister':      return <SimpleField   key={kind} label={LABEL[kind]} value={chorister}     onChange={setChorister}     />;
+            case 'organist':       return <SimpleField   key={kind} label={LABEL[kind]} value={organist}      onChange={setOrganist}      />;
+            case 'opening_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={openingHymn}   onChange={setOpeningHymn}   />;
+            case 'opening_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={openingPrayer} onChange={setOpeningPrayer} />;
+            case 'thanksgivings':
+              return <CallingsList key={kind} label={LABEL[kind]} callings={thanksgivings}
+                script={"[Name] has been released as [position]. Those who would like to express thanks for [his or her] service may show it by the uplifted hand."} />;
+            case 'sustainings':
+              return <CallingsList key={kind} label={LABEL[kind]} callings={sustainings}
+                script={"[Name] has been called as [position]. Those in favor of sustaining [him or her] may show it by the uplifted hand. [Pause briefly.] Those opposed, if any, may also show it. [Pause briefly.]"} />;
+            case 'stake_business': return <TextareaField key={kind} label={LABEL[kind]} value={stakeBusiness} onChange={setStakeBusiness} />;
+            case 'sacrament_hymn': return <SimpleField   key={kind} label={LABEL[kind]} value={sacramentHymn} onChange={setSacramentHymn} />;
+            case 'rest_special':   return <SimpleField   key={kind} label={LABEL[kind]} value={restSpecial}   onChange={setRestSpecial}   />;
+            case 'closing_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={closingHymn}   onChange={setClosingHymn}   />;
+            case 'closing_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={closingPrayer} onChange={setClosingPrayer} />;
+            case 'announcements':  return <AnnouncementsSection key={kind} rows={announceRows} setRows={setAnnounceRows} />;
+          }
+        })}
+        <div className="pt-3 flex flex-wrap gap-x-4 gap-y-2">
+          <button type="button" onClick={addSpeaker} className="text-sm text-blue-600 hover:text-blue-800">+ Add speaker</button>
+          <button type="button" onClick={addNote}    className="text-sm text-blue-600 hover:text-blue-800">+ Add agenda item</button>
+          {childBlessing === null && (
+            <button type="button" onClick={() => setChildBlessing('')} className="text-sm text-indigo-500 hover:text-indigo-700">+ Child Blessing</button>
+          )}
+          {confirmation === null && (
+            <button type="button" onClick={() => setConfirmation('')} className="text-sm text-indigo-500 hover:text-indigo-700">+ Confirmation</button>
+          )}
+          {ordination === null && (
+            <button type="button" onClick={() => setOrdination('')} className="text-sm text-indigo-500 hover:text-indigo-700">+ Ordination</button>
+          )}
+        </div>
+      </div>
+
+      <div className="sticky bottom-0 mt-4 flex items-center justify-between gap-3 bg-gray-50/90 backdrop-blur py-3">
+        <div className="flex items-center gap-2">
+          <button onClick={copyText}
+            className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100">
+            {copied ? 'Copied!' : 'Copy Text'}
+          </button>
+          <button onClick={exportPDF}
+            className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100">
+            Export PDF
+          </button>
+        </div>
+        <div className="flex items-center gap-3">
+          {savedAt && <span className="text-xs text-green-600">Saved at {savedAt}</span>}
+          <button onClick={handleSave} disabled={saving}
+            className="px-5 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save to Sacrament Planning'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page shell ───────────────────────────────────────────────────────────────
+
+function toAgendaCalling(c: CallingPipeline): AgendaCalling {
+  return { member: c.member, calling: c.calling || '', organization: c.organization || '' };
+}
+
+function parseSnapshot(json: string): AgendaCalling[] {
+  try { const r = JSON.parse(json); return Array.isArray(r) ? r : []; } catch { return []; }
+}
+
+export default function CurrentSacrament() {
+  const [date, setDate] = useState<string>(upcomingSunday());
+
+  const speakers      = useTable<SacramentSpeaker>('sacrament-speakers');
+  const prayers       = useTable<Prayer>('prayers');
+  const music         = useTable<SacramentMusic>('sacrament-music');
+  const themes        = useTable<SacramentTheme>('sacrament-themes');
+  const announcements = useTable<SacramentAnnouncement>('sacrament-announcements');
+  const notes         = useTable<SacramentAgendaNote>('sacrament-agenda-notes');
+  const callings      = useTable<CallingPipeline>('calling-pipeline');
+  const wardBusiness  = useTable<SacramentWardBusiness>('sacrament-ward-business');
+
+  const today = new Date().toISOString().slice(0, 10);
+  const isCurrentDate = date >= today;
+
+  const wardBusinessForDate = wardBusiness.rows.find(r => dk(r.meeting_date) === date);
+
+  // For current/upcoming dates use live calling-pipeline data.
+  // For past dates use the snapshot saved when the agenda was last saved.
+  const displayThanksgivings: AgendaCalling[] = isCurrentDate
+    ? callings.rows.filter(c => c.status === '8. Need to thank at pulpit').map(toAgendaCalling)
+    : parseSnapshot(wardBusinessForDate?.thanksgivings_snapshot ?? '[]');
+
+  const displaySustainingsList: AgendaCalling[] = isCurrentDate
+    ? callings.rows.filter(c => c.status === '4. Called & accepted').map(toAgendaCalling)
+    : parseSnapshot(wardBusinessForDate?.sustainings_snapshot ?? '[]');
+
+  // When viewing the current week, lock any past meeting dates that have no snapshot yet
+  // by saving empty snapshots for them, so future live data doesn't bleed through.
+  const autoSavedRef = useRef(false);
+  useEffect(() => {
+    if (!isCurrentDate) return;
+    if (wardBusiness.isLoading || speakers.isLoading || music.isLoading || themes.isLoading) return;
+    if (autoSavedRef.current) return;
+    autoSavedRef.current = true;
+
+    const savedDates = new Set(wardBusiness.rows.map(r => dk(r.meeting_date)));
+    const pastDates = new Set<string>();
+    for (const r of [...speakers.rows, ...music.rows, ...themes.rows, ...notes.rows]) {
+      const d = dk(r.meeting_date);
+      if (d && d < today) pastDates.add(d);
+    }
+    for (const d of pastDates) {
+      if (!savedDates.has(d)) {
+        wardBusiness.create({ meeting_date: d, sustainings_snapshot: '[]', thanksgivings_snapshot: '[]' });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCurrentDate, wardBusiness.isLoading, speakers.isLoading, music.isLoading, themes.isLoading]);
+
+  const onSaveSnapshot = async (s: AgendaCalling[], t: AgendaCalling[]) => {
+    const data = {
+      meeting_date: date,
+      sustainings_snapshot: JSON.stringify(s),
+      thanksgivings_snapshot: JSON.stringify(t),
+    };
+    if (wardBusinessForDate) {
+      await wardBusiness.update(wardBusinessForDate.id, data);
+    } else {
+      await wardBusiness.create(data);
+    }
+  };
+
+  const loading = speakers.isLoading || prayers.isLoading || music.isLoading || themes.isLoading
+    || announcements.isLoading || notes.isLoading || callings.isLoading || wardBusiness.isLoading;
+
+  const shiftSunday = (weeks: number) => {
+    const d = new Date(date + 'T12:00:00');
+    d.setDate(d.getDate() + weeks * 7);
+    setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  };
+
+  const label = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  return (
+    <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <h1 className="text-2xl font-bold text-gray-900">Current Sacrament Meeting</h1>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setDate(upcomingSunday())} className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50">Next Sunday</button>
+          <button onClick={() => shiftSunday(-1)} className="px-2 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50">‹</button>
+          <button onClick={() => shiftSunday(1)} className="px-2 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50">›</button>
+          <span className="font-semibold text-gray-800 ml-1">{label}</span>
+          {!isCurrentDate && !wardBusinessForDate && (
+            <span className="text-xs text-amber-600 italic ml-2">(no saved snapshot)</span>
+          )}
+        </div>
+      </div>
+
+      {loading ? (
+        <p className="text-gray-400 text-sm">Loading…</p>
+      ) : (
+        <AgendaEditor
+          key={date}
+          date={date}
+          speakers={speakers} prayers={prayers} music={music} themes={themes}
+          announcements={announcements} notes={notes}
+          thanksgivings={displayThanksgivings} sustainings={displaySustainingsList}
+          onSaveSnapshot={onSaveSnapshot}
+        />
+      )}
+    </div>
+  );
+}

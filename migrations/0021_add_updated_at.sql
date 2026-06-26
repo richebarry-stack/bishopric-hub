@@ -1,0 +1,10 @@
+ALTER TABLE rotating_assignments ADD COLUMN updated_at TEXT;
+ALTER TABLE out_of_town ADD COLUMN updated_at TEXT;
+ALTER TABLE prayers ADD COLUMN updated_at TEXT;
+ALTER TABLE sacrament_music ADD COLUMN updated_at TEXT;
+ALTER TABLE sacrament_themes ADD COLUMN updated_at TEXT;
+ALTER TABLE calendaring ADD COLUMN updated_at TEXT;
+ALTER TABLE babies ADD COLUMN updated_at TEXT;
+ALTER TABLE members_without_callings ADD COLUMN updated_at TEXT;
+ALTER TABLE sacrament_announcements ADD COLUMN updated_at TEXT;
+ALTER TABLE prayer_others ADD COLUMN updated_at TEXT;

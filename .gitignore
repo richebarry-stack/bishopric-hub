@@ -1,0 +1,36 @@
+# Cloudflare config — contains your D1 database_id; copy wrangler.jsonc.example and fill in your values
+wrangler.jsonc
+
+# Wrangler local dev state (local SQLite, cache)
+.wrangler/
+
+# Claude Code project config
+.claude/
+
+# Data import/seed scripts — may contain personal ward data
+scripts/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

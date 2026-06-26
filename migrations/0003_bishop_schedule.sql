@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS "bishop-schedule" (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date TEXT NOT NULL,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  title TEXT NOT NULL,
+  notes TEXT DEFAULT ''
+);
