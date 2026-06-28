@@ -221,7 +221,12 @@ function OptionalItem({ label, value, onChange, onRemove }: {
   );
 }
 
-function AnnouncementsSection({ rows, setRows }: { rows: AnnounceRow[]; setRows: React.Dispatch<React.SetStateAction<AnnounceRow[]>> }) {
+function AnnouncementsSection({ rows, setRows, onCopyPrior, priorCount }: {
+  rows: AnnounceRow[];
+  setRows: React.Dispatch<React.SetStateAction<AnnounceRow[]>>;
+  onCopyPrior?: () => void;
+  priorCount?: number;
+}) {
   return (
     <Row label={LABEL.announcements}>
       <div className="space-y-2">
@@ -236,8 +241,16 @@ function AnnouncementsSection({ rows, setRows }: { rows: AnnounceRow[]; setRows:
               onChange={e => setRows(rs => rs.map((x, idx) => idx === i ? { ...x, notes: e.target.value } : x))} />
           </div>
         ))}
-        <button type="button" onClick={() => setRows(rs => [...rs, { title: '', notes: '' }])}
-          className="text-xs text-blue-600 hover:text-blue-800">+ Add announcement</button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button type="button" onClick={() => setRows(rs => [...rs, { title: '', notes: '' }])}
+            className="text-xs text-blue-600 hover:text-blue-800">+ Add announcement</button>
+          {onCopyPrior && (priorCount ?? 0) > 0 && (
+            <button type="button" onClick={onCopyPrior}
+              className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded px-2 py-0.5">
+              + Copy {priorCount} from prior week
+            </button>
+          )}
+        </div>
       </div>
     </Row>
   );
@@ -309,6 +322,27 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
   const [announceRows, setAnnounceRows] = useState<AnnounceRow[]>(
     existingAnnouncements.map(a => ({ id: a.id, title: a.title || '', notes: a.notes || '' }))
   );
+
+  // Prior-week copy: only active for the upcoming Sunday (today if Sunday, else next Sunday this week)
+  const priorDate = (() => {
+    const d = new Date(date + 'T12:00:00');
+    d.setDate(d.getDate() - 7);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+  const isCurrent = date === upcomingSunday();
+  const priorAnnouncements = isCurrent
+    ? announcements.rows.filter(a => dk(a.meeting_date) === priorDate && a.title?.trim())
+    : [];
+  const priorNewCount = priorAnnouncements.filter(
+    a => !announceRows.some(r => r.title.trim().toLowerCase() === a.title.trim().toLowerCase())
+  ).length;
+  const handleCopyPrior = () => {
+    const existing = new Set(announceRows.map(r => r.title.trim().toLowerCase()));
+    const toAdd = priorAnnouncements
+      .filter(a => !existing.has(a.title.trim().toLowerCase()))
+      .map(a => ({ title: a.title, notes: a.notes || '' }));
+    if (toAdd.length > 0) setAnnounceRows(rs => [...rs, ...toAdd]);
+  };
   const [noteRows, setNoteRows] = useState<NoteRow[]>(
     existingNotes.map((n, i) => ({ id: n.id, content: n.content || '', position: n.position ?? 11.5 + i }))
   );
@@ -658,7 +692,8 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
                   </Row>
                 );
               }
-              return <AnnouncementsSection key={kind} rows={announceRows} setRows={setAnnounceRows} />;
+              return <AnnouncementsSection key={kind} rows={announceRows} setRows={setAnnounceRows}
+                onCopyPrior={handleCopyPrior} priorCount={priorNewCount} />;
             case 'thanksgivings':  return viewerMode ? null : <CallingsList key={kind} label={LABEL[kind]} callings={thanksgivings}
               script={"[Name] has been released as [position]. Those who would like to express thanks for [his or her] service may show it by the uplifted hand."} />;
             case 'sustainings':    return viewerMode ? null : <CallingsList key={kind} label={LABEL[kind]} callings={sustainings}
