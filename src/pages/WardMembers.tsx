@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTable } from '../lib/useTable';
+import { toast } from '../lib/toast';
 
 interface WardMember {
   id: number;
@@ -148,7 +149,7 @@ export default function WardMembers() {
     const name = newName.trim();
     if (!name || saving) return;
     if (rows.some(r => r.name.toLowerCase() === name.toLowerCase())) {
-      alert('This member already exists.');
+      toast.error('This member already exists.');
       return;
     }
     setSaving(true);

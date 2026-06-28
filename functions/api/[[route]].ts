@@ -77,7 +77,7 @@ const WC_READABLE = new Set([
   'wc-meetings',
   'sacrament-speakers', 'prayers', 'sacrament-music', 'sacrament-themes',
   'sacrament-agenda-notes', 'sacrament-announcements', 'sacrament-ward-business',
-  'babies', 'missionary-pipeline', 'calling-pipeline',
+  'babies', 'missionary-pipeline',
 ]);
 
 // Church role → hub mapping (duplicated from frontend constants for backend use)
@@ -631,8 +631,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const newRow = await db.prepare('SELECT * FROM member_needs WHERE id = ?').bind(result.meta.last_row_id).first();
         return json(newRow, 201);
       }
-      if (recordId && (method === 'GET' || method === 'PUT' || method === 'DELETE')) {
-        const row = await db.prepare('SELECT shared_with_wc FROM member_needs WHERE id = ?').bind(recordId).first<{ shared_with_wc: number }>();
+      const needId = routeParts[1];
+      if (needId && (method === 'GET' || method === 'PUT' || method === 'DELETE')) {
+        const row = await db.prepare('SELECT shared_with_wc FROM member_needs WHERE id = ?').bind(needId).first<{ shared_with_wc: number }>();
         if (!row || !row.shared_with_wc) return json({ error: 'Forbidden' }, 403);
         if (method === 'PUT') {
           const body = await request.json() as Record<string, unknown>;
@@ -640,23 +641,56 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           body.updated_at = new Date().toISOString();
           const keys = Object.keys(body);
           await db.prepare(`UPDATE member_needs SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`)
-            .bind(...keys.map(k => body[k]), recordId).run();
-          const updated = await db.prepare('SELECT * FROM member_needs WHERE id = ?').bind(recordId).first();
+            .bind(...keys.map(k => body[k]), needId).run();
+          const updated = await db.prepare('SELECT * FROM member_needs WHERE id = ?').bind(needId).first();
           return json(updated);
         }
         // GET single and DELETE fall through to generic TABLES handler (record is confirmed scoped)
       }
     } else if (WC_FULL_CRUD.has(tbl)) {
-      // tasks: WC users only see items shared with Ward Council
-      if (tbl === 'tasks' && method === 'GET' && !routeParts[1]) {
-        const results = await db.prepare(
-          "SELECT * FROM tasks WHERE share_with LIKE '%Ward Council%' ORDER BY done ASC, id DESC"
-        ).all();
-        return json(results.results);
+      // tasks: WC users only see/modify items shared with Ward Council
+      if (tbl === 'tasks') {
+        if (method === 'GET' && !routeParts[1]) {
+          const results = await db.prepare(
+            "SELECT * FROM tasks WHERE share_with LIKE '%Ward Council%' ORDER BY done ASC, id DESC"
+          ).all();
+          return json(results.results);
+        }
+        if (routeParts[1] && (method === 'GET' || method === 'PUT' || method === 'DELETE')) {
+          const taskRow = await db.prepare('SELECT share_with FROM tasks WHERE id = ?').bind(routeParts[1]).first<{ share_with: string }>();
+          if (!taskRow || !taskRow.share_with?.includes('Ward Council')) return json({ error: 'Forbidden' }, 403);
+        }
+        if (method === 'POST') {
+          const body = await request.json() as Record<string, unknown>;
+          if (!String(body.share_with || '').includes('Ward Council')) {
+            body.share_with = body.share_with ? body.share_with + ',Ward Council' : 'Ward Council';
+          }
+          delete body.id;
+          const keys = Object.keys(body);
+          const result = await db.prepare(
+            `INSERT INTO tasks (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
+          ).bind(...keys.map(k => body[k])).run();
+          const newRow = await db.prepare('SELECT * FROM tasks WHERE id = ?').bind(result.meta.last_row_id).first();
+          return json(newRow, 201);
+        }
       }
       // fall through to generic TABLES handler — full CRUD allowed
     } else if (WC_READABLE.has(tbl)) {
       if (method !== 'GET') return json({ error: 'Forbidden' }, 403);
+      // sacrament-themes: strip ward_business and stake_business for WC users
+      if (tbl === 'sacrament-themes') {
+        if (!routeParts[1]) {
+          const results = await db.prepare(
+            'SELECT id, meeting_date, theme, references_text, conducting, meeting_link, updated_at FROM sacrament_themes ORDER BY meeting_date DESC'
+          ).all();
+          return json(results.results);
+        }
+        const row = await db.prepare(
+          'SELECT id, meeting_date, theme, references_text, conducting, meeting_link, updated_at FROM sacrament_themes WHERE id = ?'
+        ).bind(routeParts[1]).first();
+        if (!row) return json({ error: 'Not found' }, 404);
+        return json(row);
+      }
       // fall through to generic TABLES handler for read
     } else {
       return json({ error: 'Forbidden' }, 403);

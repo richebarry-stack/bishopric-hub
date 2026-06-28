@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation, Outlet } from 'react-router-dom';
+import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 import { SECURITY_QUESTIONS } from '../lib/constants';
@@ -55,6 +55,7 @@ export const CAL_NAV_ITEMS = [
 
 const NAV_ORDER_KEY = (userId: number) => `nav_order_${userId}`;
 const WC_NAV_ORDER_KEY = (userId: number) => `wc_nav_order_${userId}`;
+export const LAST_VISITED_KEY = 'last_visited_page';
 
 function loadOrder(userId: number): string[] {
   try {
@@ -269,13 +270,29 @@ export default function Layout() {
   const [showRename, setShowRename] = useState(false);
   const [navLabels, setNavLabels] = useState<Record<string, string>>({});
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout, selectedHub, chooseHub } = useAuth();
 
+  const HUB_DEFAULT: Record<string, string> = {
+    yc: '/youth-activities',
+    wc: '/',
+    bh: '/',
+    cal: '/calendaring',
+  };
+
+  const switchHub = (hub: string) => {
+    chooseHub(hub as Parameters<typeof chooseHub>[0]);
+    navigate(HUB_DEFAULT[hub] ?? '/');
+  };
+
   const isCal = user?.hub === 'cal';
-  const isYc = user?.hub === 'yc';
-  const isWc = selectedHub === 'wc' || user?.hub === 'wc';
+  const isYc = user?.hub === 'yc' || selectedHub === 'yc';
+  const isWc = !isYc && (selectedHub === 'wc' || user?.hub === 'wc');
   const isAdmin = user?.role === 'admin';
   const canSwitchHub = user?.hub === 'both';
+  const canSwitchToYc = (user?.hub === 'both' || user?.hub === 'wc') && !isYc;
+  const canSwitchToBh = canSwitchHub && (isWc || isYc);
+  const canSwitchToWc = (canSwitchHub || (user?.hub === 'wc' && isYc)) && !isWc;
 
   useEffect(() => {
     if (!isWc && !isCal) {
@@ -287,7 +304,13 @@ export default function Layout() {
     }
   }, [isWc, isCal]);
 
-  const getLabel = (item: { path: string; label: string }) => navLabels[item.path] ?? item.label;
+  useEffect(() => {
+    if (location.pathname !== '/') {
+      localStorage.setItem(LAST_VISITED_KEY, location.pathname);
+    }
+  }, [location.pathname]);
+
+  const getLabel = (item: { path: string; label: string }) => isWc ? item.label : (navLabels[item.path] ?? item.label);
 
   const saveLabels = async (labels: Record<string, string>) => {
     await api.navLabels.set(labels);
@@ -364,16 +387,27 @@ export default function Layout() {
             {isCal ? 'Calendar Hub' : isYc ? 'Youth Council Hub' : isWc ? 'Ward Council Hub' : 'Bishopric Hub'}
           </h1>
           {user && <p className={`text-xs mt-1 ${isCal ? 'text-violet-600' : isYc ? 'text-amber-600' : isWc ? 'text-emerald-600' : 'text-gray-500'}`}>{user.name}</p>}
-          {canSwitchHub && (
-            <button
-              onClick={() => chooseHub(isWc ? 'bh' : 'wc')}
-              className={`mt-2 w-full text-xs px-2 py-1 rounded border transition-colors ${
-                isWc
-                  ? 'border-emerald-300 text-emerald-700 hover:bg-emerald-100'
-                  : 'border-gray-300 text-gray-600 hover:bg-gray-100'
-              }`}>
-              Switch to {isWc ? 'Bishopric Hub' : 'Ward Council Hub'} →
-            </button>
+          {(canSwitchToBh || canSwitchToWc || canSwitchToYc) && (
+            <div className="mt-2 flex flex-col gap-1">
+              {canSwitchToBh && (
+                <button onClick={() => switchHub('bh')}
+                  className="w-full text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors">
+                  Switch to Bishopric Hub →
+                </button>
+              )}
+              {canSwitchToWc && (
+                <button onClick={() => switchHub('wc')}
+                  className="w-full text-xs px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-100 transition-colors">
+                  Switch to Ward Council Hub →
+                </button>
+              )}
+              {canSwitchToYc && (
+                <button onClick={() => switchHub('yc')}
+                  className="w-full text-xs px-2 py-1 rounded border border-amber-300 text-amber-700 hover:bg-amber-100 transition-colors">
+                  Switch to Youth Council Hub →
+                </button>
+              )}
+            </div>
           )}
         </div>
         <nav className="p-2 overflow-y-auto flex-1">

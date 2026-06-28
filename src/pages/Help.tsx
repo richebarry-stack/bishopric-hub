@@ -329,6 +329,8 @@ const FULL_SECTIONS: Section[] = [
   },
 ];
 
+declare const __APP_VERSION__: string;
+
 export default function Help() {
   const { user } = useAuth();
   const isViewer = user?.role === 'viewer';
@@ -345,6 +347,72 @@ export default function Help() {
         <p className="text-sm text-gray-500">Click any section to expand it.</p>
       </div>
       <Accordion sections={sections} />
+
+      <div className="mt-8 border-t border-gray-100 pt-6">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">Version History</h2>
+        <div className="space-y-4">
+          {([
+            {
+              date: 'Jun 28, 2026',
+              items: [
+                'Toast notifications replace browser alerts for save errors',
+                'Interview Pipeline: overdue row highlighting, interview-type filter, bulk status update, unsaved-changes indicator',
+                'Calling Pipeline: Timeline view showing days in current status',
+                'Tasks: due-date field with overdue/due-soon indicators; assignee filter',
+                'Member Needs: last-updated date column',
+                'Sacrament agenda: auto-save unsaved indicator; prayer saves correctly when navigating away; print stylesheet expands all text fields',
+                'Dashboard: last-visited quick-return link; due-date indicators on pending tasks',
+                'Youth age cutoff corrected to September 1 of the year a member turns 18',
+                'WC hub: ward business, stake business, and calling data correctly hidden',
+                'YC hub access added for Ward Council and Bishopric users',
+                'Hub switching navigates to the default page for that hub',
+                'Version number displayed in Help',
+              ],
+            },
+            {
+              date: 'Jun 27, 2026',
+              items: [
+                'Age column added to Annual Youth and Semi-Annual Youth interview tables',
+                'Copy announcements from prior week button in Current Sacrament',
+                'Ward business and stake business hidden from Ward Council hub view',
+              ],
+            },
+            {
+              date: 'Jun 26, 2026',
+              items: [
+                'Future sacrament meetings locked from editing until the current week',
+                'Dashboard panels resizable; ward business moved to its own field',
+                'Ward Members page added',
+                'Speakers & Prayers history page added with age display and notes',
+                'Member name normalization on import',
+              ],
+            },
+            {
+              date: 'Earlier',
+              items: [
+                'Auto-fill sacrament conducting from monthly assignments (sync-conduct)',
+                'GitHub Actions continuous deploy workflow',
+                'Calendar date timezone fix',
+                'Initial release: Dashboard, Calling Pipeline, Interview Pipeline, Sacrament Planning, Current Sacrament, Tasks, Member Needs, Missionary Pipeline, Calendaring, Babies, Out of Town, Bishop Schedule, Assignments, Prayer List, Important Links, Users',
+              ],
+            },
+          ] as { date: string; items: string[] }[]).map(({ date, items }) => (
+            <div key={date}>
+              <p className="text-xs font-semibold text-gray-500 mb-1">{date}</p>
+              <ul className="space-y-0.5">
+                {items.map(item => (
+                  <li key={item} className="text-xs text-gray-600 flex gap-2">
+                    <span className="text-gray-300 shrink-0">·</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-6 text-xs text-gray-400">Build: {__APP_VERSION__}</p>
     </div>
   );
 }

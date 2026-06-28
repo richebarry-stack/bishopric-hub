@@ -32,6 +32,7 @@ import WcDashboard from './pages/WcDashboard';
 import WcMeetings from './pages/WcMeetings';
 import WcWins from './pages/WcWins';
 import WcDiscussionTopics from './pages/WcDiscussionTopics';
+import ToastContainer from './components/Toast';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 0, retry: 1 } },
@@ -162,6 +163,7 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <AppRoutes />
+          <ToastContainer />
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>

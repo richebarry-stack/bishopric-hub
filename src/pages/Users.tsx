@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth';
 import Modal from '../components/Modal';
 import { Input, Select } from '../components/FormFields';
 import { CHURCH_ROLES, BISHOPRIC_CALLINGS, WC_CALLINGS, YC_CALLINGS, CAL_CALLINGS, hubForChurchRole, HUB_LABELS } from '../lib/constants';
+import { toast } from '../lib/toast';
 
 const API = '/api/users';
 const DATALIST_ID = 'church-roles-list';
@@ -88,7 +89,7 @@ export default function Users() {
       await Promise.all([refetchRegs(), queryClient.invalidateQueries({ queryKey: ['users'] })]);
       setRegEdits(prev => { const n = { ...prev }; delete n[req.id]; return n; });
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Approval failed');
+      toast.error(err instanceof Error ? err.message : 'Approval failed');
     }
     setRegLoading(prev => { const n = { ...prev }; delete n[req.id]; return n; });
   };
@@ -100,7 +101,7 @@ export default function Users() {
       await api.registrationRequests.reject(req.id);
       refetchRegs();
     } catch {
-      alert('Failed to reject request');
+      toast.error('Failed to reject request');
     }
     setRegLoading(prev => { const n = { ...prev }; delete n[req.id]; return n; });
   };
@@ -139,7 +140,7 @@ export default function Users() {
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const roleMutation = useMutation({
@@ -148,7 +149,7 @@ export default function Users() {
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const hubMutation = useMutation({
@@ -157,7 +158,7 @@ export default function Users() {
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const churchRoleMutation = useMutation({
@@ -166,7 +167,7 @@ export default function Users() {
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const resetMutation = useMutation({
@@ -177,7 +178,7 @@ export default function Users() {
       return { name, temp_password: data.temp_password };
     },
     onSuccess: (data) => setTempPassword({ name: data.name, password: data.temp_password }),
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const profileMutation = useMutation({

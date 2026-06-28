@@ -18,9 +18,9 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>(null!);
 
 function resolveHub(user: User, stored: Hub | null): Hub {
-  if (user.hub === 'wc') return 'wc';
   if (user.hub === 'yc') return 'yc';
   if (user.hub === 'cal') return 'cal';
+  if (user.hub === 'wc') return stored === 'yc' ? 'yc' : 'wc';
   return stored ?? 'bh';
 }
 

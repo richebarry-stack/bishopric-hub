@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTable } from '../lib/useTable';
 import { useAuth } from '../lib/auth';
 import type { Task } from '../lib/api';
@@ -6,7 +6,17 @@ import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
 import { SHARE_WITH_OPTIONS } from '../lib/constants';
 
-const EMPTY: Partial<Task> = { task: '', assigned_to: '', done: 0, share_with: '' };
+const EMPTY: Partial<Task> = { task: '', assigned_to: '', done: 0, share_with: '', due_date: '' };
+
+const TODAY = new Date().toISOString().slice(0, 10);
+const IN_3_DAYS = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+
+function dueSoonClass(due: string | undefined): string {
+  if (!due) return '';
+  if (due < TODAY) return 'text-red-600 font-semibold';
+  if (due <= IN_3_DAYS) return 'text-amber-600 font-semibold';
+  return 'text-gray-400';
+}
 
 function parseShareWith(s: string | undefined): string[] {
   if (!s) return [];
@@ -47,6 +57,9 @@ export default function Tasks() {
   const [editing, setEditing] = useState<Partial<Task> | null>(null);
   const [showDone, setShowDone] = useState(false);
   const [filter, setFilter] = useState('');
+  const [assigneeFilter, setAssigneeFilter] = useState('');
+
+  const assigneeOptions = useMemo(() => [...new Set(rows.map(r => r.assigned_to).filter(Boolean))].sort(), [rows]);
 
   const openNew = () => setEditing({ ...EMPTY, share_with: isWc ? 'Ward Council' : '' });
 
@@ -57,6 +70,7 @@ export default function Tasks() {
 
   const filtered = visibleRows.filter(r => {
     if (!showDone && r.done) return false;
+    if (assigneeFilter && r.assigned_to !== assigneeFilter) return false;
     if (filter) {
       const q = filter.toLowerCase();
       return r.task?.toLowerCase().includes(q) || r.assigned_to?.toLowerCase().includes(q);
@@ -89,6 +103,11 @@ export default function Tasks() {
       <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Search action items..."
           className="rounded-md border border-gray-300 px-3 py-2 text-sm flex-1" />
+        <select value={assigneeFilter} onChange={e => setAssigneeFilter(e.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm">
+          <option value="">All assignees</option>
+          {assigneeOptions.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
         <label className="flex items-center gap-2 text-sm text-gray-600">
           <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)} className="rounded" />
           Show completed
@@ -105,7 +124,11 @@ export default function Tasks() {
                 <p className={`text-sm ${t.done ? 'line-through text-gray-400' : 'text-gray-900'}`}>{t.task}</p>
                 <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5 flex-wrap">
                   {t.assigned_to && <span>{t.assigned_to}</span>}
-                  {t.created_date && <span>{t.created_date}</span>}
+                  {t.due_date && (
+                    <span className={dueSoonClass(t.due_date)}>
+                      Due {t.due_date < TODAY ? 'overdue' : t.due_date}
+                    </span>
+                  )}
                   {parseShareWith(t.share_with).map(v => (
                     <span key={v} className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">{v}</span>
                   ))}
@@ -123,6 +146,7 @@ export default function Tasks() {
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
             <Textarea label="Task" value={editing.task || ''} onChange={v => setEditing({ ...editing, task: v })} />
             <Input label="Assigned To" value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} />
+            <Input label="Due Date" value={(editing.due_date || '').slice(0, 10)} onChange={v => setEditing({ ...editing, due_date: v })} type="date" />
             <ShareWithCheckboxes
               value={editing.share_with || ''}
               onChange={v => setEditing({ ...editing, share_with: v })}

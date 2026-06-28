@@ -4,6 +4,7 @@ import { api, type User } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import Modal from '../components/Modal';
 import { Input } from '../components/FormFields';
+import { toast } from '../lib/toast';
 
 
 const API = '/api/users';
@@ -104,7 +105,7 @@ export default function WardCouncilMembers() {
       return { name, temp_password: data.temp_password };
     },
     onSuccess: (data) => setTempPassword({ name: data.name, password: data.temp_password }),
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteMutation = useMutation({
@@ -113,7 +114,7 @@ export default function WardCouncilMembers() {
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['wc-users'] }),
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   if (isLoading) return <p className="text-gray-400 text-sm">Loading…</p>;

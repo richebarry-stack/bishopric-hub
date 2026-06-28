@@ -1,18 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
+import { toast } from './toast';
 
-export function useTable<T extends { id: number }>(tableName: string) {
+export function useTable<T extends { id: number }>(tableName: string, options?: { enabled?: boolean }) {
   const queryClient = useQueryClient();
   const queryKey = [tableName];
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey,
     queryFn: () => api.list<T>(tableName),
+    enabled: options?.enabled !== false,
   });
 
   const onError = (err: Error) => {
     console.error(`[${tableName}] mutation failed:`, err);
-    alert(`Save failed: ${err.message}`);
+    toast.error(`Save failed: ${err.message}`);
   };
 
   const createMutation = useMutation({

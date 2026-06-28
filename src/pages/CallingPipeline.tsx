@@ -83,7 +83,7 @@ export default function CallingPipeline() {
   const [editingMwc, setEditingMwc] = useState<Partial<MemberWithoutCalling> | null>(null);
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [groupBy, setGroupBy] = useState<'status' | 'org' | 'sustained'>('status');
+  const [groupBy, setGroupBy] = useState<'status' | 'org' | 'sustained' | 'timeline'>('status');
   const [orgStatusFilter, setOrgStatusFilter] = useState<Set<string>>(
     () => new Set(CALLING_STATUSES.filter(s => s !== '5. Sustained'))
   );
@@ -224,7 +224,7 @@ export default function CallingPipeline() {
           {CALLING_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <div className="flex rounded-md border border-gray-300 overflow-hidden self-start sm:self-auto">
-          {([['status', 'By Status'], ['org', 'By Org'], ['sustained', 'Needs Set Apart']] as const).map(([g, label]) => (
+          {([['status', 'By Status'], ['org', 'By Org'], ['sustained', 'Needs Set Apart'], ['timeline', 'Timeline']] as const).map(([g, label]) => (
             <button key={g} onClick={() => setGroupBy(g)}
               className={`px-3 py-2 text-xs font-medium transition-colors border-r last:border-r-0 border-gray-300 ${
                 groupBy === g ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
@@ -250,7 +250,7 @@ export default function CallingPipeline() {
         </div>
       )}
 
-      {!isLoading && actionRows.length > 0 && groupBy !== 'sustained' && (
+      {!isLoading && actionRows.length > 0 && groupBy !== 'sustained' && groupBy !== 'timeline' && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
           <h2 className="text-sm font-bold uppercase tracking-widest text-amber-700 mb-3">
             Needs Action ({actionRows.length})
@@ -271,6 +271,58 @@ export default function CallingPipeline() {
               {sustainedRows.length === 0
                 ? <p className="text-gray-400 text-sm">No sustained callings.</p>
                 : renderGroupedByOrg(sustainedRows)}
+            </>
+          );
+        })()
+      : groupBy === 'timeline' ? (() => {
+          const now = Date.now();
+          const daysAgo = (ts: string) => {
+            if (!ts) return null;
+            const diff = Math.floor((now - new Date(ts).getTime()) / 86400000);
+            return diff;
+          };
+          const MAX_DAYS = 60;
+          return (
+            <>
+              <h2 className="text-lg font-bold text-gray-800 mb-1 border-b border-gray-200 pb-2">Time in Current Status</h2>
+              <p className="text-xs text-gray-400 mb-4">Each bar shows days since last status update. Sorted oldest first within each status.</p>
+              {groupByStatus(filtered).map(([status, items]) => {
+                const sorted = [...items].sort((a, b) => (a.updated_at || '').localeCompare(b.updated_at || ''));
+                return (
+                  <div key={status} className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-500 mb-2 flex items-center gap-2">
+                      <StatusBadge status={status} colors={CALLING_STATUS_COLORS} />
+                      <span>({items.length})</span>
+                    </h3>
+                    <div className="space-y-1.5">
+                      {sorted.map(r => {
+                        const days = daysAgo(r.updated_at);
+                        const pct = days !== null ? Math.min(days / MAX_DAYS, 1) : 0;
+                        const barColor = days === null ? 'bg-gray-200'
+                          : days >= 30 ? 'bg-red-400'
+                          : days >= 14 ? 'bg-amber-400'
+                          : 'bg-green-400';
+                        return (
+                          <div key={r.id} className="flex items-center gap-3 cursor-pointer group" onClick={() => setEditing(r)}>
+                            <div className="w-36 shrink-0 text-sm text-gray-700 truncate group-hover:text-blue-600">{r.member}</div>
+                            <div className="flex-1 relative h-5 bg-gray-100 rounded overflow-hidden">
+                              <div className={`h-full ${barColor} rounded transition-all`} style={{ width: `${pct * 100}%` }} />
+                            </div>
+                            <div className="w-16 text-right text-xs text-gray-500 shrink-0">
+                              {days !== null ? `${days}d` : '—'}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="flex items-center gap-4 mt-4 text-xs text-gray-500">
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-green-400 inline-block"/>0–13 days</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-400 inline-block"/>14–29 days</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-400 inline-block"/>30+ days</span>
+              </div>
             </>
           );
         })()

@@ -11,6 +11,7 @@ import {
   DEFAULT_CONFIG, FONT_SIZE_LABELS, FONT_SIZE_CLASS,
   loadDashboardConfig, saveDashboardConfig,
 } from '../lib/dashboardConfig';
+import { NAV_ITEMS, LAST_VISITED_KEY } from '../components/Layout';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const ACTION_STATUSES = new Set(['3. Approved and assigned', '7. Need to release']);
@@ -283,6 +284,13 @@ export default function Dashboard() {
   const topCount = [cfg.bishopricMeeting.visible, cfg.healthNeeds.visible, cfg.supportNeeds.visible, cfg.missionaries.visible].filter(Boolean).length;
   const bottomCount = [cfg.tasks.visible, cfg.callings.visible, cfg.events.visible].filter(Boolean).length;
 
+  const lastVisited = useMemo(() => {
+    const path = localStorage.getItem(LAST_VISITED_KEY);
+    if (!path) return null;
+    const item = NAV_ITEMS.find(n => n.path === path);
+    return item ? { path: item.path, label: item.label } : null;
+  }, []);
+
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 7rem)' }}>
 
@@ -291,7 +299,11 @@ export default function Dashboard() {
       )}
 
       <div className="flex items-center justify-between mb-3">
-        <span />
+        {lastVisited ? (
+          <Link to={lastVisited.path} className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1">
+            ← {lastVisited.label}
+          </Link>
+        ) : <span />}
         {user?.role === 'admin' && (
           <button onClick={() => setShowSettings(true)}
             className="text-xs text-gray-400 hover:text-gray-700 flex items-center gap-1 px-2 py-1 rounded border border-gray-200 hover:bg-gray-50">
@@ -422,14 +434,22 @@ export default function Dashboard() {
               <div className="flex-1 overflow-y-auto px-4 py-2 min-h-0">
                 {pendingTasks.length === 0
                   ? <p className="text-xs text-gray-400 py-2">All done!</p>
-                  : pendingTasks.map(t => (
-                    <div key={t.id} className="flex items-baseline justify-between py-1 gap-2">
-                      <span className={`${FONT_SIZE_CLASS[cfg.tasks.fontSize]} text-gray-800 truncate`}>{t.task}</span>
-                      {cfg.tasks.showAssignedTo && t.assigned_to && (
-                        <span className="text-xs text-gray-400 whitespace-nowrap">{t.assigned_to}</span>
-                      )}
-                    </div>
-                  ))
+                  : pendingTasks.map(t => {
+                    const isOverdue = t.due_date && t.due_date < TODAY;
+                    const isDueSoon = !isOverdue && t.due_date && t.due_date <= new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+                    return (
+                      <div key={t.id} className="flex items-baseline justify-between py-1 gap-2">
+                        <span className={`${FONT_SIZE_CLASS[cfg.tasks.fontSize]} text-gray-800 truncate`}>{t.task}</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {isOverdue && <span className="text-xs text-red-600 font-semibold whitespace-nowrap">overdue</span>}
+                          {isDueSoon && <span className="text-xs text-amber-600 font-semibold whitespace-nowrap">{t.due_date}</span>}
+                          {cfg.tasks.showAssignedTo && t.assigned_to && (
+                            <span className="text-xs text-gray-400 whitespace-nowrap">{t.assigned_to}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
                 }
               </div>
             </div>

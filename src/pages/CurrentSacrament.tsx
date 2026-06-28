@@ -348,6 +348,7 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
   );
   const [saving, setSaving]   = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [dirty, setDirty]     = useState(false);
 
   const isSavingRef   = useRef(false);
   const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -471,7 +472,7 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
 
       await onSaveSnapshot(sustainings, thanksgivings);
 
-      setSavedAt(new Date().toLocaleTimeString());
+      setSavedAt(new Date().toLocaleTimeString()); setDirty(false);
     } finally {
       isSavingRef.current = false;
       setSaving(false);
@@ -486,7 +487,7 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
       const musicFields = { meeting_date: date, chorister, organist, opening_hymn: openingHymn, sacrament_hymn: sacramentHymn, rest_special: restSpecial, closing_hymn: closingHymn };
       if (existingMusic) await music.update(existingMusic.id, musicFields);
       else await music.create(musicFields);
-      setSavedAt(new Date().toLocaleTimeString());
+      setSavedAt(new Date().toLocaleTimeString()); setDirty(false);
     } finally {
       isSavingRef.current = false;
       setSaving(false);
@@ -495,6 +496,16 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
 
   // Keep ref current so the debounced callback always calls the latest closure
   handleSaveRef.current = handleSave;
+
+  // If user navigates away while a debounced save is pending, fire it immediately
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        handleSaveRef.current();
+      }
+    };
+  }, []);
 
   const generateText = (): string => {
     const dateLabel = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
@@ -583,6 +594,7 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
 
   const triggerAutoSave = () => {
     if (viewerMode) return;
+    setDirty(true);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => handleSaveRef.current(), 600);
   };
@@ -730,13 +742,9 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
           </button>
         </div>
         <div className="flex items-center gap-3">
-          {savedAt && <span className="text-xs text-green-600">Saved at {savedAt}</span>}
-          {!viewerMode && (
-            <button onClick={handleSave} disabled={saving}
-              className="px-5 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-              {saving ? 'Saving…' : 'Save to Sacrament Planning'}
-            </button>
-          )}
+          {dirty && !saving && <span className="text-xs text-amber-600">Unsaved changes…</span>}
+          {saving && <span className="text-xs text-gray-400">Saving…</span>}
+          {savedAt && !dirty && !saving && <span className="text-xs text-green-600">Saved at {savedAt}</span>}
           {viewerMode === 'music' && (
             <button onClick={handleMusicSave} disabled={saving}
               className="px-5 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
@@ -776,7 +784,7 @@ export default function CurrentSacrament() {
   const themes        = useTable<SacramentTheme>('sacrament-themes');
   const announcements = useTable<SacramentAnnouncement>('sacrament-announcements');
   const notes         = useTable<SacramentAgendaNote>('sacrament-agenda-notes');
-  const callings      = useTable<CallingPipeline>('calling-pipeline');
+  const callings      = useTable<CallingPipeline>('calling-pipeline', { enabled: !isWcContext });
   const wardBusiness  = useTable<SacramentWardBusiness>('sacrament-ward-business');
 
   const today = new Date().toISOString().slice(0, 10);

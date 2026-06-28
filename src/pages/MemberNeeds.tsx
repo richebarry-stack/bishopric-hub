@@ -37,6 +37,7 @@ function NeedTable({ rows, onEdit, onDelete, onTogglePray }: {
             <th className="text-left px-3 py-2 font-medium text-gray-600">What</th>
             <th className="text-left px-3 py-2 font-medium text-gray-600">Next Steps</th>
             <th className="text-left px-3 py-2 font-medium text-gray-600">Notes</th>
+            <th className="text-left px-3 py-2 font-medium text-gray-600 whitespace-nowrap">Updated</th>
             <th className="px-3 py-2"></th>
           </tr>
         </thead>
@@ -54,6 +55,9 @@ function NeedTable({ rows, onEdit, onDelete, onTogglePray }: {
               <td className="px-3 py-2 text-gray-700">{r.what}</td>
               <td className="px-3 py-2 text-gray-600">{r.next_steps}</td>
               <td className="px-3 py-2 text-gray-500">{r.notes}</td>
+              <td className="px-3 py-2 text-gray-400 text-xs whitespace-nowrap">
+                {r.updated_at ? new Date(r.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+              </td>
               <td className="px-3 py-2">
                 <button onClick={e => { e.stopPropagation(); onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
               </td>

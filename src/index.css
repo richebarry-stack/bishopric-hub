@@ -3,3 +3,27 @@
 body {
   margin: 0;
 }
+
+@media print {
+  /* Expand textareas so all content is visible */
+  textarea {
+    height: auto !important;
+    min-height: unset !important;
+    overflow: visible !important;
+    resize: none;
+    border: none !important;
+    background: transparent !important;
+  }
+  /* Make text inputs look like plain text */
+  input[type="text"],
+  input:not([type]) {
+    border: none !important;
+    background: transparent !important;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  /* Hide interactive chrome */
+  button {
+    display: none !important;
+  }
+}

@@ -41,11 +41,13 @@ function formatRecommendDate(dateStr: string): string {
 
 type SortKey = 'member' | 'age' | 'status' | 'assigned_to' | 'date_recommend_expires' | 'next_interview_date' | 'last_interview_datetime' | 'comments';
 
-function InterviewTable({ rows, onEdit, onDelete, ageMap }: {
+function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSelect }: {
   rows: InterviewType[];
   onEdit: (r: InterviewType) => void;
   onDelete: (id: number) => void;
   ageMap?: Map<string, number>;
+  selected: Set<number>;
+  onToggleSelect: (id: number) => void;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('member');
   const [sortAsc, setSortAsc] = useState(true);
@@ -80,6 +82,7 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap }: {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100 bg-gray-50">
+            <th className="px-3 py-2 w-8"></th>
             <Th col="member" label="Member" />
             {ageMap && <Th col="age" label="Age" />}
             <Th col="status" label="Status" />
@@ -94,8 +97,13 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap }: {
         <tbody>
           {sorted.map(r => {
             const rowColor = recommendRowClass(r.date_recommend_expires);
+            const overdueInterview = !rowColor && isPast(r.next_interview_date);
             return (
-            <tr key={r.id} className={`border-b border-gray-50 cursor-pointer hover:brightness-95 ${rowColor || 'hover:bg-gray-50'}`} onClick={() => onEdit(r)}>
+            <tr key={r.id} className={`border-b border-gray-50 cursor-pointer hover:brightness-95 ${overdueInterview ? 'bg-rose-50' : rowColor || 'hover:bg-gray-50'}`} onClick={() => onEdit(r)}>
+              <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                <input type="checkbox" checked={selected.has(r.id)} onChange={() => onToggleSelect(r.id)}
+                  className="rounded border-gray-300 text-blue-600" />
+              </td>
               <td className="px-3 py-2 font-medium text-gray-900">{r.member}</td>
               {ageMap && <td className="px-3 py-2 text-gray-600 text-center">{ageMap.get(r.member.toLowerCase()) ?? '—'}</td>}
               <td className="px-3 py-2"><StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} /></td>
@@ -121,13 +129,24 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap }: {
 
 const YOUTH_TYPES = new Set(['Annual Youth', 'Semi-Annual Youth']);
 
-function computeAge(birthDate: string): number {
+function computeAge(birthDate: string, asOf?: Date): number {
   const bd = new Date(birthDate.slice(0, 10) + 'T12:00:00');
-  const now = new Date();
-  let age = now.getFullYear() - bd.getFullYear();
-  const m = now.getMonth() - bd.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < bd.getDate())) age--;
+  const ref = asOf ?? new Date();
+  let age = ref.getFullYear() - bd.getFullYear();
+  const m = ref.getMonth() - bd.getMonth();
+  if (m < 0 || (m === 0 && ref.getDate() < bd.getDate())) age--;
   return age;
+}
+
+// Returns current age if the member is still youth-eligible, otherwise null.
+// Youth eligibility ends September 1 of the year they turn 18, so members
+// who turn 18 any time during the year remain youth through August.
+function computeYouthAge(birthDate: string): number | null {
+  const bd = new Date(birthDate.slice(0, 10) + 'T12:00:00');
+  const ageOutDate = new Date(bd.getFullYear() + 18, 8, 1); // Sep 1 of 18th year
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (today >= ageOutDate) return null;
+  return computeAge(birthDate);
 }
 
 export default function InterviewPipeline() {
@@ -137,6 +156,9 @@ export default function InterviewPipeline() {
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [assignedFilter, setAssignedFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState('');
 
   const assignedOptions = useMemo(() => {
     const names = [...new Set(rows.map(r => r.assigned_to).filter(Boolean))].sort();
@@ -146,11 +168,25 @@ export default function InterviewPipeline() {
   const filtered = rows.filter(r => {
     if (statusFilter && r.status !== statusFilter) return false;
     if (assignedFilter && r.assigned_to !== assignedFilter) return false;
+    if (typeFilter && r.type_of_interview !== typeFilter) return false;
     if (filter) {
       const q = filter.toLowerCase();
       return r.member?.toLowerCase().includes(q) || r.type_of_interview?.toLowerCase().includes(q);
     }
     return true;
+  });
+
+  const handleBulkStatus = async () => {
+    if (!bulkStatus || selected.size === 0) return;
+    await Promise.all([...selected].map(id => update(id, { status: bulkStatus })));
+    setSelected(new Set());
+    setBulkStatus('');
+  };
+
+  const toggleSelect = (id: number) => setSelected(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
   });
 
   const handleSave = async () => {
@@ -165,7 +201,10 @@ export default function InterviewPipeline() {
   const ageMap = useMemo(() => {
     const m = new Map<string, number>();
     for (const wm of wardMembers) {
-      if (wm.birth_date) m.set(wm.name.toLowerCase(), computeAge(wm.birth_date));
+      if (wm.birth_date) {
+        const age = computeYouthAge(wm.birth_date);
+        if (age !== null) m.set(wm.name.toLowerCase(), age);
+      }
     }
     return m;
   }, [wardMembers]);
@@ -190,9 +229,14 @@ export default function InterviewPipeline() {
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+      <div className="flex flex-col sm:flex-row gap-2 mb-2">
         <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Search member..."
           className="rounded-md border border-gray-300 px-3 py-2 text-sm flex-1" />
+        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm">
+          <option value="">All types</option>
+          {INTERVIEW_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
           className="rounded-md border border-gray-300 px-3 py-2 text-sm">
           <option value="">All statuses</option>
@@ -205,11 +249,26 @@ export default function InterviewPipeline() {
         </select>
       </div>
 
+      {selected.size > 0 && (
+        <div className="flex items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-md px-3 py-2 text-sm">
+          <span className="text-blue-700 font-medium">{selected.size} selected</span>
+          <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)}
+            className="rounded border border-blue-300 px-2 py-1 text-sm bg-white">
+            <option value="">Set status…</option>
+            {INTERVIEW_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <button onClick={handleBulkStatus} disabled={!bulkStatus}
+            className="px-3 py-1 bg-blue-600 text-white rounded text-sm disabled:opacity-40 hover:bg-blue-700">Apply</button>
+          <button onClick={() => setSelected(new Set())} className="ml-auto text-blue-500 hover:text-blue-700">Clear</button>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-3 mb-4 text-xs">
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-100 border border-amber-300 inline-block" />Expires within 1 month</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-yellow-50 border border-yellow-300 inline-block" />Expires within 2 months</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-orange-100 border border-orange-300 inline-block" />Expired within 1 month</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-100 border border-red-300 inline-block" />Expired over 1 month ago</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-rose-50 border border-rose-300 inline-block" />Interview overdue</span>
       </div>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
@@ -221,7 +280,8 @@ export default function InterviewPipeline() {
                 <span className="text-gray-400 font-normal normal-case tracking-normal">({typeRows.length})</span>
               </h2>
               <InterviewTable rows={typeRows} onEdit={setEditing} onDelete={remove}
-                ageMap={YOUTH_TYPES.has(type) ? ageMap : undefined} />
+                ageMap={YOUTH_TYPES.has(type) ? ageMap : undefined}
+                selected={selected} onToggleSelect={toggleSelect} />
             </div>
           ))}
           {grouped.length === 0 && <p className="text-gray-400 text-sm text-center py-8">No interviews found</p>}

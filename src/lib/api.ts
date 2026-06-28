@@ -105,6 +105,7 @@ export interface CallingPipeline {
   set_apart_recorded: number;
   organization: string;
   type: string; // 'Calling' | 'Release'
+  updated_at: string;
 }
 
 export interface InterviewPipeline {
@@ -127,6 +128,7 @@ export interface Task {
   created_date: string;
   done: number;
   share_with: string;
+  due_date: string;
 }
 
 export interface RotatingAssignment {
@@ -257,6 +259,7 @@ export interface MemberNeed {
   next_steps: string;
   pray_for: number;
   shared_with_wc: number;
+  updated_at: string;
 }
 
 export interface CalendarEvent {
