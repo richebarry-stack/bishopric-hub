@@ -3,7 +3,7 @@ import { useTable } from '../lib/useTable';
 import type { MemberNeed, MissionaryPipeline, PrayerOther } from '../lib/api';
 
 const ACTIVE_MISSIONARY_STATUSES = new Set([
-  '1-Considering', '2-Papers Started', '3-Papers Completed', '4-Call Accepted',
+  '1-Considering', '2-Papers Started', '3-Papers Submitted', '4-Call Accepted',
 ]);
 
 function PrayerToggle({ active, onToggle }: { active: boolean; onToggle: () => void }) {

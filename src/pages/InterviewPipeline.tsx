@@ -18,6 +18,27 @@ function isPast(d: string): boolean {
   return !!s && s < TODAY;
 }
 
+function recommendRowClass(dateStr: string): string {
+  if (!dateStr) return '';
+  const [year, month] = dateStr.slice(0, 7).split('-').map(Number);
+  if (!year || !month) return '';
+  const expiry = new Date(year, month, 0); // last day of that month
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const days = (expiry.getTime() - today.getTime()) / 86400000;
+  if (days < -30) return 'bg-red-100';      // expired > 1 month ago
+  if (days < 0)   return 'bg-orange-100';   // expired within 1 month
+  if (days <= 30) return 'bg-amber-100';    // expires within 1 month
+  if (days <= 62) return 'bg-yellow-50';    // expires within 2 months
+  return '';
+}
+
+function formatRecommendDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const [year, month] = dateStr.slice(0, 7).split('-').map(Number);
+  if (!year || !month) return dateStr.slice(0, 10);
+  return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
 type SortKey = 'member' | 'status' | 'assigned_to' | 'date_recommend_expires' | 'next_interview_date' | 'last_interview_datetime' | 'comments';
 
 function InterviewTable({ rows, onEdit, onDelete }: {
@@ -63,13 +84,15 @@ function InterviewTable({ rows, onEdit, onDelete }: {
           </tr>
         </thead>
         <tbody>
-          {sorted.map(r => (
-            <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => onEdit(r)}>
+          {sorted.map(r => {
+            const rowColor = recommendRowClass(r.date_recommend_expires);
+            return (
+            <tr key={r.id} className={`border-b border-gray-50 cursor-pointer hover:brightness-95 ${rowColor || 'hover:bg-gray-50'}`} onClick={() => onEdit(r)}>
               <td className="px-3 py-2 font-medium text-gray-900">{r.member}</td>
               <td className="px-3 py-2"><StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} /></td>
               <td className="px-3 py-2 text-gray-600">{r.assigned_to}</td>
-              <td className={`px-3 py-2 font-mono text-sm ${isPast(r.date_recommend_expires) ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
-                {(r.date_recommend_expires || '').slice(0, 10)}
+              <td className="px-3 py-2 text-sm font-medium text-gray-700">
+                {formatRecommendDate(r.date_recommend_expires)}
               </td>
               <td className={`px-3 py-2 font-mono text-sm ${isPast(r.next_interview_date) ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
                 {(r.next_interview_date || '').slice(0, 10)}
@@ -80,7 +103,7 @@ function InterviewTable({ rows, onEdit, onDelete }: {
                 <button onClick={e => { e.stopPropagation(); onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
               </td>
             </tr>
-          ))}
+          );})}
         </tbody>
       </table>
     </div>
@@ -151,6 +174,13 @@ export default function InterviewPipeline() {
           <option value="">All assigned</option>
           {assignedOptions.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
+      </div>
+
+      <div className="flex flex-wrap gap-3 mb-4 text-xs">
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-100 border border-amber-300 inline-block" />Expires within 1 month</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-yellow-50 border border-yellow-300 inline-block" />Expires within 2 months</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-orange-100 border border-orange-300 inline-block" />Expired within 1 month</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-100 border border-red-300 inline-block" />Expired over 1 month ago</span>
       </div>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (

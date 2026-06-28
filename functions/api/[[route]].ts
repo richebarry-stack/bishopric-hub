@@ -1,11 +1,15 @@
 interface Env {
   DB: D1Database;
+  RECOVERY_KEY?: string;
 }
 
 interface Session {
   id: string;
   user_id: number;
   expires_at: string;
+  role: string;
+  church_role: string;
+  hub: string;
 }
 
 const TABLES: Record<string, { name: string; orderBy?: string }> = {
@@ -30,6 +34,12 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'sacrament-agenda-notes': { name: 'sacrament_agenda_notes', orderBy: 'position ASC' },
   'sacrament-ward-business': { name: 'sacrament_ward_business', orderBy: 'meeting_date DESC' },
   'important-links': { name: 'important_links', orderBy: 'id ASC' },
+  'ward-members': { name: 'ward_members', orderBy: 'name ASC' },
+  'youth-activities': { name: 'youth_activities', orderBy: 'date ASC' },
+  'wc-meetings': { name: 'wc_meetings', orderBy: 'date ASC' },
+  'wc-wins': { name: 'wc_wins', orderBy: 'date DESC' },
+  'wc-family-needs': { name: 'wc_family_needs', orderBy: 'id ASC' },
+  'wc-discussion-topics': { name: 'wc_discussion_topics', orderBy: 'meeting_date DESC, organization ASC' },
 };
 
 function json(data: unknown, status = 200) {
@@ -52,9 +62,56 @@ async function getSession(request: Request, db: D1Database): Promise<Session | n
   if (!match) return null;
   const sessionId = match[1];
   const session = await db.prepare(
-    'SELECT * FROM sessions WHERE id = ? AND expires_at > datetime("now")'
+    `SELECT s.id, s.user_id, s.expires_at, u.role, u.church_role, u.hub
+     FROM sessions s JOIN users u ON u.id = s.user_id
+     WHERE s.id = ? AND s.expires_at > datetime("now")`
   ).bind(sessionId).first<Session>();
   return session;
+}
+
+const WC_FULL_CRUD = new Set([
+  'wc-wins', 'wc-family-needs', 'wc-discussion-topics',
+  'tasks', 'calendaring', 'youth-activities',
+]);
+const WC_READABLE = new Set([
+  'wc-meetings',
+  'sacrament-speakers', 'prayers', 'sacrament-music', 'sacrament-themes',
+  'sacrament-agenda-notes', 'sacrament-announcements', 'sacrament-ward-business',
+  'babies', 'missionary-pipeline', 'calling-pipeline',
+]);
+
+// Church role → hub mapping (duplicated from frontend constants for backend use)
+const BISHOPRIC_CALLINGS = new Set([
+  'Bishop', 'First Counselor', 'Second Counselor', 'Clerk',
+  'Executive Secretary', 'Assistant Executive Secretary', 'Assistant Clerk', 'High Councilor',
+]);
+const YC_CALLINGS = new Set([
+  // Advisers
+  'Builders of Faith Adviser', 'Builders of Faith Second Adviser',
+  'Messengers of Hope Adviser', 'Messengers of Hope Second Adviser',
+  'Gatherers of Light Adviser', 'Gatherers of Light Second Adviser',
+  'Priests Quorum Adviser', 'Priests Quorum Second Adviser',
+  'Teachers Quorum Adviser', 'Teachers Quorum Second Adviser',
+  'Deacons Quorum Adviser', 'Deacons Quorum Second Adviser',
+  'Young Women Secretary',
+  // Young Women class presidencies
+  'Builders of Faith President', 'Builders of Faith First Counselor', 'Builders of Faith Second Counselor', 'Builders of Faith Secretary',
+  'Messengers of Hope President', 'Messengers of Hope First Counselor', 'Messengers of Hope Second Counselor', 'Messengers of Hope Secretary',
+  'Gatherers of Light President', 'Gatherers of Light First Counselor', 'Gatherers of Light Second Counselor', 'Gatherers of Light Secretary',
+  // Priests Quorum presidency
+  'Priests Quorum First Assistant', 'Priests Quorum Second Assistant', 'Priests Quorum Secretary',
+  // Teachers Quorum presidency
+  'Teachers Quorum President', 'Teachers Quorum First Counselor', 'Teachers Quorum Second Counselor', 'Teachers Quorum Secretary',
+  // Deacons Quorum presidency
+  'Deacons Quorum President', 'Deacons Quorum First Counselor', 'Deacons Quorum Second Counselor', 'Deacons Quorum Secretary',
+]);
+const CAL_CALLINGS = new Set(['Music Coordinator', 'Ward Bulletin Specialist']);
+
+function hubForChurchRole(role: string): string {
+  if (BISHOPRIC_CALLINGS.has(role)) return 'both';
+  if (YC_CALLINGS.has(role)) return 'yc';
+  if (CAL_CALLINGS.has(role)) return 'cal';
+  return 'wc';
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -70,17 +127,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const { email, password } = await request.json() as { email: string; password: string };
       const hash = await hashPassword(password);
       const user = await db.prepare(
-        'SELECT id, name, email, role, must_reset_password FROM users WHERE email = ? AND password_hash = ?'
-      ).bind(email, hash).first<{ id: number; name: string; email: string; role: string; must_reset_password: number }>();
+        'SELECT id, name, email, role, church_role, hub, must_reset_password FROM users WHERE email = ? AND password_hash = ?'
+      ).bind(email, hash).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number }>();
       if (!user) return json({ error: 'Invalid credentials' }, 401);
 
       const sessionId = crypto.randomUUID();
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      await db.prepare('UPDATE users SET last_login = ? WHERE id = ?').bind(new Date().toISOString(), user.id).run();
       await db.prepare(
         'INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)'
       ).bind(sessionId, user.id, expiresAt).run();
 
-      return new Response(JSON.stringify({ user: { id: user.id, name: user.name, email: user.email, role: user.role, must_reset_password: !!user.must_reset_password } }), {
+      const sq = await db.prepare('SELECT user_id FROM security_questions WHERE user_id = ?').bind(user.id).first();
+      return new Response(JSON.stringify({ user: { id: user.id, name: user.name, email: user.email, role: user.role, church_role: user.church_role, hub: user.hub ?? 'both', must_reset_password: !!user.must_reset_password, has_security_questions: !!sq } }), {
         headers: {
           'Content-Type': 'application/json',
           'Set-Cookie': `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`,
@@ -105,10 +164,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const session = await getSession(request, db);
       if (!session) return json({ user: null });
       const user = await db.prepare(
-        'SELECT id, name, email, role, must_reset_password FROM users WHERE id = ?'
-      ).bind(session.user_id).first<{ id: number; name: string; email: string; role: string; must_reset_password: number }>();
+        'SELECT id, name, email, role, church_role, hub, must_reset_password FROM users WHERE id = ?'
+      ).bind(session.user_id).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number }>();
       if (!user) return json({ user: null });
-      return json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, must_reset_password: !!user.must_reset_password } });
+      const sq2 = await db.prepare('SELECT user_id FROM security_questions WHERE user_id = ?').bind(user.id).first();
+      return json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, church_role: user.church_role, hub: user.hub ?? 'both', must_reset_password: !!user.must_reset_password, has_security_questions: !!sq2 } });
     }
 
     if (routeParts[1] === 'change-password' && method === 'POST') {
@@ -126,6 +186,83 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ ok: true });
     }
 
+    // Public: get security questions for an email (for forgot-password flow)
+    if (routeParts[1] === 'security-questions' && method === 'GET') {
+      const email = url.searchParams.get('email');
+      if (!email) return json({ error: 'Email required' }, 400);
+      const user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: number }>();
+      if (!user) return json({ error: 'No account found for that email' }, 404);
+      const sq = await db.prepare('SELECT question1, question2 FROM security_questions WHERE user_id = ?').bind(user.id).first<{ question1: string; question2: string }>();
+      if (!sq) return json({ error: 'This account has no security questions set up' }, 404);
+      return json({ question1: sq.question1, question2: sq.question2 });
+    }
+
+    // Authenticated: save/update security questions
+    if (routeParts[1] === 'security-questions' && method === 'POST') {
+      const session = await getSession(request, db);
+      if (!session) return json({ error: 'Unauthorized' }, 401);
+      const { question1, answer1, question2, answer2 } = await request.json() as { question1: string; answer1: string; question2: string; answer2: string };
+      if (!question1 || !answer1 || !question2 || !answer2) return json({ error: 'All fields required' }, 400);
+      if (question1 === question2) return json({ error: 'Questions must be different' }, 400);
+      const a1hash = await hashPassword(answer1.trim().toLowerCase());
+      const a2hash = await hashPassword(answer2.trim().toLowerCase());
+      const now = new Date().toISOString();
+      await db.prepare(`
+        INSERT INTO security_questions (user_id, question1, answer1_hash, question2, answer2_hash, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+          question1 = excluded.question1, answer1_hash = excluded.answer1_hash,
+          question2 = excluded.question2, answer2_hash = excluded.answer2_hash,
+          updated_at = excluded.updated_at
+      `).bind(session.user_id, question1, a1hash, question2, a2hash, now).run();
+      return json({ ok: true });
+    }
+
+    // Public: verify answers and reset password
+    if (routeParts[1] === 'reset-by-questions' && method === 'POST') {
+      const { email, answer1, answer2, new_password } = await request.json() as { email: string; answer1: string; answer2: string; new_password: string };
+      if (!new_password || new_password.length < 6) return json({ error: 'Password must be at least 6 characters' }, 400);
+      const user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: number }>();
+      if (!user) return json({ error: 'No account found for that email' }, 404);
+      const sq = await db.prepare('SELECT answer1_hash, answer2_hash FROM security_questions WHERE user_id = ?').bind(user.id).first<{ answer1_hash: string; answer2_hash: string }>();
+      if (!sq) return json({ error: 'This account has no security questions set up' }, 404);
+      const a1hash = await hashPassword(answer1.trim().toLowerCase());
+      const a2hash = await hashPassword(answer2.trim().toLowerCase());
+      if (a1hash !== sq.answer1_hash || a2hash !== sq.answer2_hash) return json({ error: 'One or more answers are incorrect' }, 400);
+      const newHash = await hashPassword(new_password);
+      await db.prepare('UPDATE users SET password_hash = ?, must_reset_password = 0 WHERE id = ?').bind(newHash, user.id).run();
+      await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id).run();
+      return json({ ok: true });
+    }
+
+    if (routeParts[1] === 'emergency-reset' && method === 'POST') {
+      const { email, new_password, recovery_key } = await request.json() as { email: string; new_password: string; recovery_key: string };
+      if (!env.RECOVERY_KEY || recovery_key !== env.RECOVERY_KEY) return json({ error: 'Invalid recovery key' }, 403);
+      const user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: number }>();
+      if (!user) return json({ error: 'User not found' }, 404);
+      if (!new_password || new_password.length < 6) return json({ error: 'Password must be at least 6 characters' }, 400);
+      const newHash = await hashPassword(new_password);
+      await db.prepare('UPDATE users SET password_hash = ?, must_reset_password = 0 WHERE id = ?').bind(newHash, user.id).run();
+      await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id).run();
+      return json({ ok: true });
+    }
+
+    // Public: submit a registration request (no session required)
+    if (routeParts[1] === 'register-request' && method === 'POST') {
+      const { name, email, password, church_role } = await request.json() as { name: string; email: string; password: string; church_role: string };
+      if (!name || !email || !password || !church_role) return json({ error: 'All fields are required' }, 400);
+      if (password.length < 6) return json({ error: 'Password must be at least 6 characters' }, 400);
+      const existing = await db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)').bind(email).first();
+      if (existing) return json({ error: 'An account with this email already exists' }, 409);
+      const alreadyPending = await db.prepare('SELECT id FROM registration_requests WHERE LOWER(email) = LOWER(?)').bind(email).first();
+      if (alreadyPending) return json({ error: 'A request for this email is already awaiting approval' }, 409);
+      const hash = await hashPassword(password);
+      await db.prepare(
+        'INSERT INTO registration_requests (name, email, church_role, password_hash, requested_at) VALUES (?, ?, ?, ?, ?)'
+      ).bind(name, email, church_role, hash, new Date().toISOString()).run();
+      return json({ ok: true });
+    }
+
     if (routeParts[1] === 'register' && method === 'POST') {
       const session = await getSession(request, db);
       if (!session) return json({ error: 'Unauthorized' }, 401);
@@ -137,7 +274,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       try {
         await db.prepare(
           'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)'
-        ).bind(name, email, hash, role || 'editor').run();
+        ).bind(name, email, hash, role || 'user').run();
         return json({ ok: true });
       } catch {
         return json({ error: 'User already exists' }, 400);
@@ -155,23 +292,62 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const session = await getSession(request, db);
     if (!session) return json({ error: 'Unauthorized' }, 401);
 
+    // WC admins: only reset-password and profile mutations on WC users
+    const isWcAdmin = session.hub === 'wc' && session.role === 'admin';
+    if (isWcAdmin && method !== 'GET') {
+      const wcAllowed = routeParts[2] === 'reset-password' || routeParts[2] === 'profile';
+      if (!wcAllowed) return json({ error: 'Forbidden' }, 403);
+      const targetId = Number(routeParts[1]);
+      const target = await db.prepare("SELECT hub FROM users WHERE id = ?").bind(targetId).first<{ hub: string }>();
+      if (!target || !['wc', 'both'].includes(target.hub)) return json({ error: 'Forbidden' }, 403);
+    }
+
+    // Non-admins: read-only access to user list
+    if (session.role !== 'admin' && method !== 'GET') {
+      return json({ error: 'Forbidden' }, 403);
+    }
+
     if (method === 'GET') {
-      const users = await db.prepare('SELECT id, name, email, role, church_role FROM users ORDER BY id ASC').all();
+      // WC-hub users only see WC users
+      if (session.hub === 'wc') {
+        const users = await db.prepare("SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE hub IN ('wc','both') ORDER BY name ASC").all();
+        return json(users.results);
+      }
+      const filterHub = url.searchParams.get('hub');
+      const users = filterHub === 'wc'
+        ? await db.prepare("SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE hub IN ('wc','both') ORDER BY name ASC").all()
+        : await db.prepare('SELECT id, name, email, role, church_role, hub, last_login FROM users ORDER BY name ASC').all();
       return json(users.results);
     }
 
     if (method === 'POST') {
       const { name, email, password, role, church_role } = await request.json() as { name: string; email: string; password: string; role: string; church_role?: string };
       const hash = await hashPassword(password);
+      const newHub = hubForChurchRole(church_role || '');
+      const newRole = role === 'admin' ? 'admin' : 'user';
       try {
         const result = await db.prepare(
-          'INSERT INTO users (name, email, password_hash, role, church_role) VALUES (?, ?, ?, ?, ?)'
-        ).bind(name, email, hash, role || 'editor', church_role || '').run();
-        const newUser = await db.prepare('SELECT id, name, email, role, church_role FROM users WHERE id = ?').bind(result.meta.last_row_id).first();
+          'INSERT INTO users (name, email, password_hash, role, church_role, hub) VALUES (?, ?, ?, ?, ?, ?)'
+        ).bind(name, email, hash, newRole, church_role || '', newHub).run();
+        const newUser = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE id = ?').bind(result.meta.last_row_id).first();
         return json(newUser, 201);
       } catch {
         return json({ error: 'User already exists' }, 400);
       }
+    }
+
+    if (method === 'PUT' && routeParts[1] && routeParts[2] === 'hub') {
+      const caller = await db.prepare('SELECT role FROM users WHERE id = ?').bind(session.user_id).first<{ role: string }>();
+      if (caller?.role !== 'admin') return json({ error: 'Admin only' }, 403);
+      const userId = Number(routeParts[1]);
+      const { hub } = await request.json() as { hub: string };
+      if (!['both', 'wc', 'cal'].includes(hub)) return json({ error: 'Invalid hub' }, 400);
+      const target = await db.prepare('SELECT church_role FROM users WHERE id = ?').bind(userId).first<{ church_role: string }>();
+      const requiredHub = target?.church_role ? hubForChurchRole(target.church_role) : null;
+      if (requiredHub && requiredHub !== hub) return json({ error: `Users with the calling "${target!.church_role}" must be assigned to the ${requiredHub === 'both' ? 'Bishopric' : requiredHub === 'cal' ? 'Calendar' : 'Ward Council'} hub.` }, 400);
+      await db.prepare('UPDATE users SET hub = ? WHERE id = ?').bind(hub, userId).run();
+      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE id = ?').bind(userId).first();
+      return json(updated);
     }
 
     if (method === 'PUT' && routeParts[1] && routeParts[2] === 'church-role') {
@@ -179,8 +355,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (caller?.role !== 'admin') return json({ error: 'Admin only' }, 403);
       const userId = Number(routeParts[1]);
       const { church_role } = await request.json() as { church_role: string };
-      await db.prepare('UPDATE users SET church_role = ? WHERE id = ?').bind(church_role ?? '', userId).run();
-      const updated = await db.prepare('SELECT id, name, email, role, church_role FROM users WHERE id = ?').bind(userId).first();
+      const newHub = hubForChurchRole(church_role || '');
+      await db.prepare('UPDATE users SET church_role = ?, hub = ? WHERE id = ?').bind(church_role ?? '', newHub, userId).run();
+      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE id = ?').bind(userId).first();
       return json(updated);
     }
 
@@ -203,7 +380,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (!updates.length) return json({ error: 'Nothing to update' }, 400);
       vals.push(targetId);
       await db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...vals).run();
-      const updated = await db.prepare('SELECT id, name, email, role, church_role FROM users WHERE id = ?').bind(targetId).first();
+      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE id = ?').bind(targetId).first();
       return json(updated);
     }
 
@@ -212,16 +389,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (caller?.role !== 'admin') return json({ error: 'Admin only' }, 403);
       const userId = Number(routeParts[1]);
       const { role } = await request.json() as { role: string };
-      if (role !== 'admin' && role !== 'editor') return json({ error: 'Invalid role' }, 400);
+      if (!['admin', 'user'].includes(role)) return json({ error: 'Invalid role' }, 400);
+      const target = await db.prepare('SELECT role, church_role FROM users WHERE id = ?').bind(userId).first<{ role: string; church_role: string }>();
+      if (role === 'admin' && !BISHOPRIC_CALLINGS.has(target?.church_role ?? '')) {
+        return json({ error: 'Only users with a bishopric calling can be administrators.' }, 400);
+      }
       if (role !== 'admin') {
         const adminCount = await db.prepare("SELECT COUNT(*) as cnt FROM users WHERE role = 'admin'").first<{ cnt: number }>();
-        const target = await db.prepare('SELECT role FROM users WHERE id = ?').bind(userId).first<{ role: string }>();
         if (target?.role === 'admin' && adminCount && adminCount.cnt <= 1) {
           return json({ error: 'Must have at least one admin' }, 400);
         }
       }
       await db.prepare('UPDATE users SET role = ? WHERE id = ?').bind(role, userId).run();
-      const updated = await db.prepare('SELECT id, name, email, role, church_role FROM users WHERE id = ?').bind(userId).first();
+      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE id = ?').bind(userId).first();
       return json(updated);
     }
 
@@ -254,6 +434,246 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
   const session = await getSession(request, db);
   if (!session) return json({ error: 'Unauthorized' }, 401);
+
+  // Nav label customisation (admin writes, all authenticated users read)
+  if (routeParts[0] === 'nav-labels') {
+    if (method === 'GET') {
+      const rows = await db.prepare('SELECT path, label FROM nav_labels ORDER BY path ASC').all();
+      return json(rows.results);
+    }
+    if (method === 'POST') {
+      if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+      const body = await request.json() as Record<string, string>;
+      const now = new Date().toISOString();
+      const stmts: D1PreparedStatement[] = Object.entries(body).map(([path, label]) =>
+        db.prepare('INSERT INTO nav_labels (path, label, updated_at) VALUES (?, ?, ?) ON CONFLICT(path) DO UPDATE SET label = excluded.label, updated_at = excluded.updated_at')
+          .bind(path, label, now)
+      );
+      if (stmts.length > 0) await db.batch(stmts);
+      return json({ ok: true });
+    }
+    return json({ error: 'Method not allowed' }, 405);
+  }
+
+  // Shared UI settings (any authenticated user reads; any authenticated user writes)
+  if (routeParts[0] === 'ui-settings' && routeParts[1]) {
+    const key = routeParts[1];
+    if (method === 'GET') {
+      const row = await db.prepare('SELECT value FROM ui_settings WHERE key = ?').bind(key).first<{ value: string }>();
+      return json(row ? JSON.parse(row.value) : {});
+    }
+    if (method === 'PUT') {
+      const body = await request.json() as Record<string, unknown>;
+      const now = new Date().toISOString();
+      await db.prepare(
+        'INSERT INTO ui_settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at'
+      ).bind(key, JSON.stringify(body), now).run();
+      return json({ ok: true });
+    }
+    return json({ error: 'Method not allowed' }, 405);
+  }
+
+  // Speaker / prayer notes — readable + writable by all authenticated users
+  if (routeParts[0] === 'speaker-notes') {
+    if (method === 'GET') {
+      const rows = await db.prepare('SELECT person_name, category, notes FROM speaker_notes ORDER BY person_name').all<{ person_name: string; category: string; notes: string }>();
+      return json(rows.results);
+    }
+    if (method === 'POST') {
+      const body = await request.json() as { person_name: string; category: string; notes: string };
+      if (!body.person_name?.trim()) return json({ error: 'person_name required' }, 400);
+      const category = body.category === 'prayer' ? 'prayer' : 'speaker';
+      const now = new Date().toISOString();
+      await db.prepare(
+        'INSERT INTO speaker_notes (person_name, category, notes, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(person_name, category) DO UPDATE SET notes = excluded.notes, updated_at = excluded.updated_at'
+      ).bind(body.person_name.trim(), category, body.notes ?? '', now).run();
+      return json({ ok: true });
+    }
+    return json({ error: 'Method not allowed' }, 405);
+  }
+
+  // Email settings — admin only
+  if (routeParts[0] === 'email-settings') {
+    if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+    if (method === 'GET') {
+      const row = await db.prepare("SELECT value FROM ui_settings WHERE key = 'email_settings'").first<{ value: string }>();
+      return json(row ? JSON.parse(row.value) : {});
+    }
+    if (method === 'PUT') {
+      const body = await request.json() as Record<string, unknown>;
+      const now = new Date().toISOString();
+      await db.prepare(
+        "INSERT INTO ui_settings (key, value, updated_at) VALUES ('email_settings', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
+      ).bind(JSON.stringify(body), now).run();
+      return json({ ok: true });
+    }
+    return json({ error: 'Method not allowed' }, 405);
+  }
+
+  // Email preview — returns recipients + rendered data for each email type (admin only)
+  if (routeParts[0] === 'email-preview' && method === 'POST') {
+    if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+    const body = await request.json() as { type: string };
+
+    if (body.type === 'actionItems') {
+      const rows = await db.prepare(
+        "SELECT assigned_to, task FROM tasks WHERE done = 0 AND assigned_to IS NOT NULL AND assigned_to != '' ORDER BY assigned_to, id"
+      ).all<{ assigned_to: string; task: string }>();
+      const grouped = new Map<string, string[]>();
+      for (const t of rows.results) {
+        if (!grouped.has(t.assigned_to)) grouped.set(t.assigned_to, []);
+        grouped.get(t.assigned_to)!.push(t.task);
+      }
+      const recipients = await Promise.all([...grouped.entries()].map(async ([name, tasks]) => {
+        const user = await db.prepare("SELECT name, email FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))").bind(name).first<{ name: string; email: string }>();
+        return { name, email: user?.email ?? null, tasks };
+      }));
+      return json({ recipients });
+    }
+
+    if (body.type === 'spiritualThought') {
+      const wc = await db.prepare(
+        "SELECT date, spiritual_thought FROM wc_meetings WHERE date >= date('now') AND spiritual_thought IS NOT NULL AND spiritual_thought != '' ORDER BY date ASC LIMIT 1"
+      ).first<{ date: string; spiritual_thought: string }>();
+      const bh = await db.prepare(
+        "SELECT date, spiritual_thought FROM bishopric_meetings WHERE date >= date('now') AND no_meeting = 0 AND spiritual_thought IS NOT NULL AND spiritual_thought != '' ORDER BY date ASC LIMIT 1"
+      ).first<{ date: string; spiritual_thought: string }>();
+      const meetings = await Promise.all([
+        wc ? (async () => {
+          const u = await db.prepare("SELECT email FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))").bind(wc.spiritual_thought).first<{ email: string }>();
+          return { meetingType: 'Ward Council', date: wc.date, name: wc.spiritual_thought, email: u?.email ?? null };
+        })() : null,
+        bh ? (async () => {
+          const u = await db.prepare("SELECT email FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))").bind(bh.spiritual_thought).first<{ email: string }>();
+          return { meetingType: 'Bishopric', date: bh.date, name: bh.spiritual_thought, email: u?.email ?? null };
+        })() : null,
+      ]);
+      return json({ meetings: meetings.filter(Boolean) });
+    }
+
+    if (body.type === 'handbookTopic') {
+      const row = await db.prepare(
+        "SELECT date, handbook_training, handbook_section FROM bishopric_meetings WHERE date >= date('now') AND no_meeting = 0 AND handbook_training IS NOT NULL AND handbook_training != '' ORDER BY date ASC LIMIT 1"
+      ).first<{ date: string; handbook_training: string; handbook_section: string }>();
+      if (!row) return json({ assignment: null });
+      const u = await db.prepare("SELECT email FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))").bind(row.handbook_training).first<{ email: string }>();
+      return json({ assignment: { date: row.date, name: row.handbook_training, section: row.handbook_section, email: u?.email ?? null } });
+    }
+
+    return json({ error: 'Unknown type' }, 400);
+  }
+
+  // Registration requests — admin only
+  if (routeParts[0] === 'registration-requests') {
+    if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+    const reqId = routeParts[1] ? parseInt(routeParts[1]) : null;
+
+    if (!reqId) {
+      if (method === 'GET') {
+        const rows = await db.prepare('SELECT id, name, email, church_role, requested_at FROM registration_requests ORDER BY requested_at ASC').all();
+        return json(rows.results);
+      }
+      return json({ error: 'Method not allowed' }, 405);
+    }
+
+    if (routeParts[2] === 'approve' && method === 'POST') {
+      const req = await db.prepare('SELECT * FROM registration_requests WHERE id = ?').bind(reqId).first<{ name: string; email: string; church_role: string; password_hash: string }>();
+      if (!req) return json({ error: 'Not found' }, 404);
+      const conflict = await db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)').bind(req.email).first();
+      if (conflict) return json({ error: 'Email already in use by an existing account' }, 409);
+      const hub = hubForChurchRole(req.church_role);
+      await db.prepare(
+        "INSERT INTO users (name, email, password_hash, role, church_role, hub, last_login) VALUES (?, ?, ?, 'user', ?, ?, '')"
+      ).bind(req.name, req.email, req.password_hash, req.church_role, hub).run();
+      await db.prepare('DELETE FROM registration_requests WHERE id = ?').bind(reqId).run();
+      return json({ ok: true });
+    }
+
+    if (method === 'PUT') {
+      const body = await request.json() as { name?: string; email?: string; church_role?: string };
+      const fields: string[] = [];
+      const vals: unknown[] = [];
+      if (body.name !== undefined) { fields.push('name = ?'); vals.push(body.name); }
+      if (body.email !== undefined) { fields.push('email = ?'); vals.push(body.email); }
+      if (body.church_role !== undefined) { fields.push('church_role = ?'); vals.push(body.church_role); }
+      if (fields.length > 0) {
+        await db.prepare(`UPDATE registration_requests SET ${fields.join(', ')} WHERE id = ?`).bind(...vals, reqId).run();
+      }
+      const updated = await db.prepare('SELECT id, name, email, church_role, requested_at FROM registration_requests WHERE id = ?').bind(reqId).first();
+      return json(updated);
+    }
+
+    if (method === 'DELETE') {
+      await db.prepare('DELETE FROM registration_requests WHERE id = ?').bind(reqId).run();
+      return json({ ok: true });
+    }
+
+    return json({ error: 'Method not allowed' }, 405);
+  }
+
+  // WC-only users: full CRUD on WC-owned tables; read-only on shared tables
+  if (session.hub === 'wc') {
+    const tbl = routeParts[0];
+    if (tbl === 'member-needs') {
+      // WC users get full CRUD on member needs scoped to shared_with_wc=1
+      if (method === 'GET' && !routeParts[1]) {
+        const results = await db.prepare('SELECT * FROM member_needs WHERE shared_with_wc = 1 ORDER BY resolved ASC, id DESC').all();
+        return json(results.results);
+      }
+      if (method === 'POST') {
+        const body = await request.json() as Record<string, unknown>;
+        body.shared_with_wc = 1;
+        delete body.id;
+        const keys = Object.keys(body);
+        const result = await db.prepare(
+          `INSERT INTO member_needs (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
+        ).bind(...keys.map(k => body[k])).run();
+        const newRow = await db.prepare('SELECT * FROM member_needs WHERE id = ?').bind(result.meta.last_row_id).first();
+        return json(newRow, 201);
+      }
+      if (recordId && (method === 'GET' || method === 'PUT' || method === 'DELETE')) {
+        const row = await db.prepare('SELECT shared_with_wc FROM member_needs WHERE id = ?').bind(recordId).first<{ shared_with_wc: number }>();
+        if (!row || !row.shared_with_wc) return json({ error: 'Forbidden' }, 403);
+        if (method === 'PUT') {
+          const body = await request.json() as Record<string, unknown>;
+          body.shared_with_wc = 1;
+          body.updated_at = new Date().toISOString();
+          const keys = Object.keys(body);
+          await db.prepare(`UPDATE member_needs SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`)
+            .bind(...keys.map(k => body[k]), recordId).run();
+          const updated = await db.prepare('SELECT * FROM member_needs WHERE id = ?').bind(recordId).first();
+          return json(updated);
+        }
+        // GET single and DELETE fall through to generic TABLES handler (record is confirmed scoped)
+      }
+    } else if (WC_FULL_CRUD.has(tbl)) {
+      // tasks: WC users only see items shared with Ward Council
+      if (tbl === 'tasks' && method === 'GET' && !routeParts[1]) {
+        const results = await db.prepare(
+          "SELECT * FROM tasks WHERE share_with LIKE '%Ward Council%' ORDER BY done ASC, id DESC"
+        ).all();
+        return json(results.results);
+      }
+      // fall through to generic TABLES handler — full CRUD allowed
+    } else if (WC_READABLE.has(tbl)) {
+      if (method !== 'GET') return json({ error: 'Forbidden' }, 403);
+      // fall through to generic TABLES handler for read
+    } else {
+      return json({ error: 'Forbidden' }, 403);
+    }
+  }
+
+  // Youth Council hub: full CRUD on youth-activities only
+  if (session.hub === 'yc') {
+    if (routeParts[0] !== 'youth-activities') return json({ error: 'Forbidden' }, 403);
+    // fall through to generic TABLES handler
+  }
+
+  // Calendar hub: full CRUD on calendaring only
+  if (session.hub === 'cal') {
+    if (routeParts[0] !== 'calendaring') return json({ error: 'Forbidden' }, 403);
+    // fall through to generic TABLES handler
+  }
 
   // Sync conducting field on sacrament_themes for the next 12 months from rotating_assignments
   if (routeParts[0] === 'sync-conduct' && method === 'POST') {

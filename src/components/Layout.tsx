@@ -1,34 +1,66 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { api } from '../lib/api';
+import { SECURITY_QUESTIONS } from '../lib/constants';
 
-const NAV_ITEMS = [
+export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?: boolean }[] = [
   { path: '/', label: 'Dashboard', icon: '⌂' },
   { path: '/current-sacrament', label: 'Current Sacrament Meeting', icon: '♫' },
   { path: '/calendaring', label: 'Calendar Events', icon: '▣' },
   { path: '/calling-pipeline', label: 'Calling Pipeline', icon: '◉' },
+  { path: '/youth-activities', label: 'Youth Activities', icon: '⬡' },
+  { path: '/sacrament-planning', label: 'Sacrament Planning', icon: '♪' },
+  { path: '/tasks', label: 'Action Items', icon: '☑' },
   { path: '/member-needs', label: 'Member Needs', icon: '♥' },
   { path: '/missionary-pipeline', label: 'Missionary Pipeline', icon: '✈' },
-  { path: '/bishop-schedule', label: 'Bishop Schedule', icon: '🕐' },
-  { path: '/sacrament-planning', label: 'Sacrament Planning', icon: '♪' },
   { path: '/interview-pipeline', label: 'Interview Pipeline', icon: '◎' },
-  { path: '/tasks', label: 'Tasks', icon: '☑' },
-  { path: '/bishopric-meetings', label: 'Bishopric Meetings', icon: '▦' },
   { path: '/babies', label: 'Babies', icon: '★' },
   { path: '/out-of-town', label: 'Out of Town', icon: '⇢' },
+  { path: '/bishop-schedule', label: 'Bishop Schedule', icon: '🕐' },
   { path: '/assignments', label: 'Bishopric Assignments', icon: '⟳' },
+  { path: '/bishopric-meetings', label: 'Bishopric Meetings', icon: '▦' },
   { path: '/important-links', label: 'Important Links', icon: '⇗' },
+  { path: '/speakers-and-prayers', label: 'Speakers & Prayers', icon: '⊞' },
+  { path: '/ward-members', label: 'Ward Members', icon: '♟' },
   { path: '/users', label: 'Users', icon: '⊕' },
+  { path: '/email-notifications', label: 'Email Notifications', icon: '✉', adminOnly: true },
+  { path: '/help', label: 'Help', icon: '?' },
+];
+
+export const WC_NAV_ITEMS = [
+  { path: '/', label: 'Dashboard', icon: '⌂' },
+  { path: '/wc-meetings', label: 'WC Meeting Assignments', icon: '▦' },
+  { path: '/wc-discussion-topics', label: 'Discussion Topics', icon: '◈' },
+  { path: '/wc-wins', label: 'Wins for the Ward', icon: '★' },
+  { path: '/wc-family-needs', label: 'Member Needs', icon: '♥' },
+  { path: '/calendaring', label: 'Calendar of Events', icon: '▣' },
+  { path: '/tasks', label: 'Action Items', icon: '☑' },
+  { path: '/youth-activities', label: 'Youth Calendar', icon: '⬡' },
+  { path: '/current-sacrament', label: 'Current Sacrament Meeting', icon: '♫' },
+  { path: '/babies', label: 'Babies', icon: '◌' },
+  { path: '/wc-members', label: 'Ward Council Members', icon: '⊕' },
+  { path: '/help', label: 'Help', icon: '?' },
+];
+
+export const YC_NAV_ITEMS = [
+  { path: '/youth-activities', label: 'Youth Calendar', icon: '⬡' },
+  { path: '/help', label: 'Help', icon: '?' },
+];
+
+export const CAL_NAV_ITEMS = [
+  { path: '/calendaring', label: 'Calendar of Events', icon: '▣' },
+  { path: '/help', label: 'Help', icon: '?' },
 ];
 
 const NAV_ORDER_KEY = (userId: number) => `nav_order_${userId}`;
+const WC_NAV_ORDER_KEY = (userId: number) => `wc_nav_order_${userId}`;
 
 function loadOrder(userId: number): string[] {
   try {
     const stored = localStorage.getItem(NAV_ORDER_KEY(userId));
     if (stored) {
       const parsed: string[] = JSON.parse(stored);
-      // Keep only valid paths, append any new ones not yet in the stored order
       const valid = parsed.filter(p => NAV_ITEMS.some(n => n.path === p));
       const newItems = NAV_ITEMS.filter(n => !valid.includes(n.path)).map(n => n.path);
       return [...valid, ...newItems];
@@ -37,23 +69,247 @@ function loadOrder(userId: number): string[] {
   return NAV_ITEMS.map(n => n.path);
 }
 
+function loadWcOrder(userId: number): string[] {
+  try {
+    const stored = localStorage.getItem(WC_NAV_ORDER_KEY(userId));
+    if (stored) {
+      const parsed: string[] = JSON.parse(stored);
+      const valid = parsed.filter(p => WC_NAV_ITEMS.some(n => n.path === p));
+      const newItems = WC_NAV_ITEMS.filter(n => !valid.includes(n.path)).map(n => n.path);
+      return [...valid, ...newItems];
+    }
+  } catch { /* ignore */ }
+  return WC_NAV_ITEMS.map(n => n.path);
+}
+
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (next !== confirm) { setError('Passwords do not match'); return; }
+    if (next.length < 6) { setError('Password must be at least 6 characters'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      await api.auth.changePassword(current || null, next);
+      onClose();
+    } catch (err) {
+      setError((err as Error).message || 'Failed to change password');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+          <h2 className="font-semibold text-gray-900">Change Password</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <form onSubmit={submit} className="p-4 space-y-3">
+          {error && <p className="text-sm text-red-600 bg-red-50 rounded p-2">{error}</p>}
+          <label className="block">
+            <span className="text-sm font-medium text-gray-700">Current Password</span>
+            <input type="password" value={current} onChange={e => setCurrent(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-gray-700">New Password</span>
+            <input type="password" value={next} onChange={e => setNext(e.target.value)} required
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-gray-700">Confirm New Password</span>
+            <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          </label>
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
+            <button type="submit" disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function SecurityQuestionsModal({ onClose }: { onClose: () => void }) {
+  const { markSecurityQuestionsSetup } = useAuth();
+  const [q1, setQ1] = useState(SECURITY_QUESTIONS[0]);
+  const [a1, setA1] = useState('');
+  const [q2, setQ2] = useState(SECURITY_QUESTIONS[1]);
+  const [a2, setA2] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (q1 === q2) { setError('Please choose two different questions.'); return; }
+    if (a1.trim().length < 2 || a2.trim().length < 2) { setError('Each answer must be at least 2 characters.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      await api.auth.saveSecurityQuestions({ question1: q1, answer1: a1, question2: q2, answer2: a2 });
+      markSecurityQuestionsSetup();
+      onClose();
+    } catch (err) {
+      setError((err as Error).message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+          <h2 className="font-semibold text-gray-900">Security Questions</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <form onSubmit={submit} className="p-4 space-y-4">
+          {error && <p className="text-sm text-red-600 bg-red-50 rounded p-2">{error}</p>}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">Question 1</label>
+            <select value={q1} onChange={e => { setQ1(e.target.value); if (e.target.value === q2) setQ2(SECURITY_QUESTIONS.find(q => q !== e.target.value) ?? SECURITY_QUESTIONS[1]); }}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              {SECURITY_QUESTIONS.map(q => <option key={q} value={q}>{q}</option>)}
+            </select>
+            <input type="text" placeholder="Your answer" value={a1} onChange={e => setA1(e.target.value)} required
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">Question 2</label>
+            <select value={q2} onChange={e => setQ2(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              {SECURITY_QUESTIONS.filter(q => q !== q1).map(q => <option key={q} value={q}>{q}</option>)}
+            </select>
+            <input type="text" placeholder="Your answer" value={a2} onChange={e => setA2(e.target.value)} required
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <p className="text-xs text-gray-400">Answers are not case-sensitive.</p>
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
+            <button type="submit" disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function RenameLinksModal({ labels, onSave, onClose }: {
+  labels: Record<string, string>;
+  onSave: (labels: Record<string, string>) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState<Record<string, string>>({ ...labels });
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try { await onSave(draft); onClose(); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+          <h2 className="font-semibold text-gray-900">Rename Page Links</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <form onSubmit={submit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-4 space-y-2 overflow-y-auto">
+            {NAV_ITEMS.map(item => (
+              <label key={item.path} className="flex items-center gap-3">
+                <span className="w-4 text-center text-gray-400 shrink-0">{item.icon}</span>
+                <input
+                  value={draft[item.path] ?? item.label}
+                  onChange={e => setDraft(d => ({ ...d, [item.path]: e.target.value }))}
+                  className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                />
+                {draft[item.path] && draft[item.path] !== item.label && (
+                  <button type="button" title="Reset to default"
+                    onClick={() => setDraft(d => { const n = { ...d }; delete n[item.path]; return n; })}
+                    className="text-xs text-gray-400 hover:text-gray-600 shrink-0">↩</button>
+                )}
+              </label>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2 p-4 border-t border-gray-200">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
+            <button type="submit" disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save Labels'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showChangePw, setShowChangePw] = useState(false);
+  const [showSecurityQ, setShowSecurityQ] = useState(false);
+  const [showRename, setShowRename] = useState(false);
+  const [navLabels, setNavLabels] = useState<Record<string, string>>({});
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, selectedHub, chooseHub } = useAuth();
+
+  const isCal = user?.hub === 'cal';
+  const isYc = user?.hub === 'yc';
+  const isWc = selectedHub === 'wc' || user?.hub === 'wc';
+  const isAdmin = user?.role === 'admin';
+  const canSwitchHub = user?.hub === 'both';
+
+  useEffect(() => {
+    if (!isWc && !isCal) {
+      api.navLabels.get().then(rows => {
+        const map: Record<string, string> = {};
+        for (const r of rows) map[r.path] = r.label;
+        setNavLabels(map);
+      }).catch(() => {});
+    }
+  }, [isWc, isCal]);
+
+  const getLabel = (item: { path: string; label: string }) => navLabels[item.path] ?? item.label;
+
+  const saveLabels = async (labels: Record<string, string>) => {
+    await api.navLabels.set(labels);
+    setNavLabels(labels);
+  };
 
   const [navOrder, setNavOrder] = useState<string[]>(() =>
     user ? loadOrder(user.id) : NAV_ITEMS.map(n => n.path)
   );
+  const [wcNavOrder, setWcNavOrder] = useState<string[]>(() =>
+    user ? loadWcOrder(user.id) : WC_NAV_ITEMS.map(n => n.path)
+  );
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
-
-  const orderedItems = navOrder
-    .map(p => NAV_ITEMS.find(n => n.path === p))
-    .filter(Boolean) as typeof NAV_ITEMS;
 
   const saveOrder = (order: string[]) => {
     setNavOrder(order);
     if (user) localStorage.setItem(NAV_ORDER_KEY(user.id), JSON.stringify(order));
+  };
+
+  const saveWcOrder = (order: string[]) => {
+    setWcNavOrder(order);
+    if (user) localStorage.setItem(WC_NAV_ORDER_KEY(user.id), JSON.stringify(order));
   };
 
   const handleDrop = (e: React.DragEvent, targetPath: string) => {
@@ -61,60 +317,112 @@ export default function Layout() {
     setDragOverPath(null);
     const from = e.dataTransfer.getData('text/plain');
     if (!from || from === targetPath) return;
-    const next = [...navOrder];
+    const currentOrder = isWc ? wcNavOrder : navOrder;
+    const next = [...currentOrder];
     const fi = next.indexOf(from);
     const ti = next.indexOf(targetPath);
     if (fi === -1 || ti === -1) return;
     next.splice(fi, 1);
     next.splice(ti, 0, from);
-    saveOrder(next);
+    if (isWc) saveWcOrder(next);
+    else saveOrder(next);
   };
+
+  const navItems = isCal
+    ? CAL_NAV_ITEMS
+    : isYc
+      ? YC_NAV_ITEMS
+      : isWc
+        ? wcNavOrder.map(p => WC_NAV_ITEMS.find(n => n.path === p)).filter(Boolean) as typeof WC_NAV_ITEMS
+        : navOrder.map(p => NAV_ITEMS.find(n => n.path === p)).filter(Boolean).filter(n => !n!.adminOnly || isAdmin) as typeof NAV_ITEMS;
+
+  const draggable = (!isWc && !isCal && !isYc) || (isWc && isAdmin);
+
+  const activeCls = isCal
+    ? 'bg-violet-50 text-violet-700 font-medium'
+    : isYc
+      ? 'bg-amber-50 text-amber-700 font-medium'
+      : isWc
+        ? 'bg-emerald-50 text-emerald-700 font-medium'
+        : 'bg-blue-50 text-blue-700 font-medium';
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
+      {showSecurityQ && <SecurityQuestionsModal onClose={() => setShowSecurityQ(false)} />}
+      {showRename && !isWc && (
+        <RenameLinksModal labels={navLabels} onSave={saveLabels} onClose={() => setShowRename(false)} />
+      )}
+
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/30 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      <aside className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-4 border-b border-gray-200">
-          <h1 className="text-lg font-bold text-gray-900">Bishopric Hub</h1>
-          {user && <p className="text-xs text-gray-500 mt-1">{user.name}</p>}
+      <aside className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform lg:translate-x-0 flex flex-col h-screen lg:h-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className={`p-4 border-b shrink-0 ${isCal ? 'border-violet-200 bg-violet-50' : isYc ? 'border-amber-200 bg-amber-50' : isWc ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200'}`}>
+          <h1 className={`text-lg font-bold ${isCal ? 'text-violet-800' : isYc ? 'text-amber-800' : isWc ? 'text-emerald-800' : 'text-gray-900'}`}>
+            {isCal ? 'Calendar Hub' : isYc ? 'Youth Council Hub' : isWc ? 'Ward Council Hub' : 'Bishopric Hub'}
+          </h1>
+          {user && <p className={`text-xs mt-1 ${isCal ? 'text-violet-600' : isYc ? 'text-amber-600' : isWc ? 'text-emerald-600' : 'text-gray-500'}`}>{user.name}</p>}
+          {canSwitchHub && (
+            <button
+              onClick={() => chooseHub(isWc ? 'bh' : 'wc')}
+              className={`mt-2 w-full text-xs px-2 py-1 rounded border transition-colors ${
+                isWc
+                  ? 'border-emerald-300 text-emerald-700 hover:bg-emerald-100'
+                  : 'border-gray-300 text-gray-600 hover:bg-gray-100'
+              }`}>
+              Switch to {isWc ? 'Bishopric Hub' : 'Ward Council Hub'} →
+            </button>
+          )}
         </div>
-        <nav className="p-2 overflow-y-auto h-[calc(100vh-8rem)]">
-          {orderedItems.map(item => (
+        <nav className="p-2 overflow-y-auto flex-1">
+          {navItems.map(item => (
             <div
               key={item.path}
-              draggable
-              onDragStart={e => {
+              draggable={draggable}
+              onDragStart={draggable ? e => {
                 e.dataTransfer.setData('text/plain', item.path);
                 e.dataTransfer.effectAllowed = 'move';
-              }}
-              onDragOver={e => { e.preventDefault(); setDragOverPath(item.path); }}
-              onDragLeave={() => setDragOverPath(null)}
-              onDrop={e => handleDrop(e, item.path)}
-              onDragEnd={() => setDragOverPath(null)}
-              className={`rounded-md transition-colors ${dragOverPath === item.path ? 'ring-2 ring-blue-400 ring-inset' : ''}`}
+              } : undefined}
+              onDragOver={draggable ? e => { e.preventDefault(); setDragOverPath(item.path); } : undefined}
+              onDragLeave={draggable ? () => setDragOverPath(null) : undefined}
+              onDrop={draggable ? e => handleDrop(e, item.path) : undefined}
+              onDragEnd={draggable ? () => setDragOverPath(null) : undefined}
+              className={`rounded-md transition-colors ${dragOverPath === item.path ? `ring-2 ring-inset ${isYc ? 'ring-amber-400' : isWc ? 'ring-emerald-400' : 'ring-blue-400'}` : ''}`}
             >
               <Link
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                  location.pathname === item.path
-                    ? 'bg-blue-50 text-blue-700 font-medium'
-                    : 'text-gray-700 hover:bg-gray-100'
+                  location.pathname === item.path ? activeCls : 'text-gray-700 hover:bg-gray-100'
                 }`}
                 draggable={false}
               >
-                <span className="w-5 text-center text-gray-400 text-xs cursor-grab select-none" title="Drag to reorder">⠿</span>
+                {draggable && <span className="w-5 text-center text-gray-400 text-xs cursor-grab select-none" title="Drag to reorder">⠿</span>}
                 <span className="w-4 text-center">{item.icon}</span>
-                {item.label}
+                {getLabel(item)}
               </Link>
             </div>
           ))}
         </nav>
-        <div className="p-2 border-t border-gray-200">
-          <button onClick={logout} className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md">
+        <div className="p-2 border-t border-gray-200 space-y-1">
+          {isAdmin && !isWc && !isCal && (
+            <button onClick={() => setShowRename(true)}
+              className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-2">
+              <span className="text-xs">✎</span> Rename Links
+            </button>
+          )}
+          <button onClick={() => setShowChangePw(true)}
+            className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md">
+            Change Password
+          </button>
+          <button onClick={() => setShowSecurityQ(true)}
+            className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md">
+            Security Questions
+          </button>
+          <button onClick={logout}
+            className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md">
             Sign out
           </button>
         </div>

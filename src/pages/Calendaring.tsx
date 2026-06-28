@@ -4,17 +4,17 @@ import type { CalendarEvent } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Select, Textarea, Checkbox } from '../components/FormFields';
 import { SHARE_WITH_OPTIONS } from '../lib/constants';
+import { useAuth } from '../lib/auth';
 
 const TODAY_PREFIX = new Date().toISOString().slice(0, 10);
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-// Parse date parts directly from the string — avoids UTC timezone shift from new Date('YYYY-MM-DD')
+// Use local noon to avoid UTC timezone shift from new Date('YYYY-MM-DD')
 function formatDate(dates: string): string {
   if (!dates) return '';
-  const m = dates.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return dates;
-  return `${MONTHS[parseInt(m[2], 10) - 1]} ${parseInt(m[3], 10)}, ${m[1]}`;
+  const d = new Date(dates.slice(0, 10) + 'T12:00:00');
+  if (isNaN(d.getTime())) return dates;
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 // Extract YYYY-MM-DD for a date input — slicing avoids any timezone conversion
@@ -31,12 +31,13 @@ type SortKey = 'name' | 'dates' | 'notes' | 'announce_in_sacrament';
 
 const EMPTY: Partial<CalendarEvent> = { name: '', dates: '', notes: '', announce_in_sacrament: 0, share_with: '' };
 
-function EventTable({ rows, onEdit, onDelete, defaultSortKey, defaultAsc }: {
+function EventTable({ rows, onEdit, onDelete, defaultSortKey, defaultAsc, readOnly }: {
   rows: CalendarEvent[];
   onEdit: (r: CalendarEvent) => void;
   onDelete: (id: number) => void;
   defaultSortKey?: SortKey;
   defaultAsc?: boolean;
+  readOnly?: boolean;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>(defaultSortKey ?? 'dates');
   const [sortAsc, setSortAsc] = useState(defaultAsc ?? true);
@@ -86,14 +87,17 @@ function EventTable({ rows, onEdit, onDelete, defaultSortKey, defaultAsc }: {
         </thead>
         <tbody>
           {sorted.map(r => (
-            <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => onEdit(r)}>
+            <tr key={r.id} className={`border-b border-gray-50 hover:bg-gray-50 ${!readOnly ? 'cursor-pointer' : ''}`}
+              onClick={!readOnly ? () => onEdit(r) : undefined}>
               <td className="px-3 py-2 font-medium text-gray-900">{r.name}</td>
               <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{formatDate(r.dates)}</td>
               <td className="px-3 py-2 text-gray-600">{r.notes}</td>
               <td className="px-3 py-2 text-center">{r.announce_in_sacrament ? '✓' : ''}</td>
-              <td className="px-3 py-2">
-                <button onClick={e => { e.stopPropagation(); onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
-              </td>
+              {!readOnly && (
+                <td className="px-3 py-2">
+                  <button onClick={e => { e.stopPropagation(); onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -103,6 +107,7 @@ function EventTable({ rows, onEdit, onDelete, defaultSortKey, defaultAsc }: {
 }
 
 export default function Calendaring() {
+  const { isWcReadOnly } = useAuth();
   const { rows, isLoading, create, update, remove } = useTable<CalendarEvent>('calendaring');
   const [editing, setEditing] = useState<Partial<CalendarEvent> | null>(null);
 
@@ -122,7 +127,7 @@ export default function Calendaring() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Calendar Events</h1>
-        <button onClick={() => setEditing({ ...EMPTY })} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>
+        {!isWcReadOnly && <button onClick={() => setEditing({ ...EMPTY })} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>}
       </div>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
@@ -132,7 +137,7 @@ export default function Calendaring() {
               Upcoming
               <span className="text-gray-400 font-normal normal-case tracking-normal">({upcoming.length})</span>
             </h2>
-            <EventTable rows={upcoming} onEdit={setEditing} onDelete={remove} defaultSortKey="dates" defaultAsc={true} />
+            <EventTable rows={upcoming} onEdit={setEditing} onDelete={remove} defaultSortKey="dates" defaultAsc={true} readOnly={isWcReadOnly} />
           </section>
 
           <section>
@@ -140,7 +145,7 @@ export default function Calendaring() {
               Past
               <span className="text-gray-400 font-normal normal-case tracking-normal">({past.length})</span>
             </h2>
-            <EventTable rows={past} onEdit={setEditing} onDelete={remove} defaultSortKey="dates" defaultAsc={false} />
+            <EventTable rows={past} onEdit={setEditing} onDelete={remove} defaultSortKey="dates" defaultAsc={false} readOnly={isWcReadOnly} />
           </section>
         </div>
       )}

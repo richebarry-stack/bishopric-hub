@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './lib/auth';
 import Layout from './components/Layout';
@@ -18,15 +19,49 @@ import Calendaring from './pages/Calendaring';
 import BishopSchedule from './pages/BishopSchedule';
 import Assignments from './pages/Assignments';
 import Users from './pages/Users';
+import EmailNotifications from './pages/EmailNotifications';
 import ImportantLinks from './pages/ImportantLinks';
 import ForceResetPassword from './pages/ForceResetPassword';
+import SecurityQuestionsSetup from './pages/SecurityQuestionsSetup';
+import Help from './pages/Help';
+import YouthActivities from './pages/YouthActivities';
+import WardCouncilMembers from './pages/WardCouncilMembers';
+import SpeakersAndPrayers from './pages/SpeakersAndPrayers';
+import WardMembers from './pages/WardMembers';
+import WcDashboard from './pages/WcDashboard';
+import WcMeetings from './pages/WcMeetings';
+import WcWins from './pages/WcWins';
+import WcDiscussionTopics from './pages/WcDiscussionTopics';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 0, retry: 1 } },
 });
 
+function WcGuard({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const wcPaths = [
+    '/', '/wc-meetings', '/wc-wins', '/wc-family-needs', '/wc-discussion-topics',
+    '/current-sacrament', '/calendaring',
+    '/babies', '/youth-activities', '/tasks', '/wc-members', '/help',
+  ];
+  if (!wcPaths.includes(location.pathname)) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
+function CalGuard({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const calPaths = ['/calendaring', '/help'];
+  if (!calPaths.includes(location.pathname)) {
+    return <Navigate to="/calendaring" replace />;
+  }
+  return <>{children}</>;
+}
+
 function AppRoutes() {
-  const { user, loading } = useAuth();
+  const { user, loading, selectedHub } = useAuth();
+  const [securitySkipped, setSecuritySkipped] = useState(false);
 
   if (loading) {
     return (
@@ -38,7 +73,59 @@ function AppRoutes() {
 
   if (!user) return <Login />;
   if (user.must_reset_password) return <ForceResetPassword />;
+  if (!user.has_security_questions && !securitySkipped) return <SecurityQuestionsSetup onSkip={() => setSecuritySkipped(true)} />;
 
+  // Calendar hub users
+  if (user.hub === 'cal') {
+    return (
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/calendaring" element={<Calendaring />} />
+          <Route path="/help" element={<Help />} />
+          <Route path="*" element={<CalGuard><Calendaring /></CalGuard>} />
+        </Route>
+      </Routes>
+    );
+  }
+
+  // Youth Council hub users
+  if (user.hub === 'yc') {
+    return (
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/youth-activities" element={<YouthActivities />} />
+          <Route path="/help" element={<Help />} />
+          <Route path="*" element={<Navigate to="/youth-activities" replace />} />
+        </Route>
+      </Routes>
+    );
+  }
+
+  // WC-only users always go to WC hub
+  // Dual-access users in WC context also get WC routes
+  if (user.hub === 'wc' || (user.hub === 'both' && selectedHub === 'wc')) {
+    return (
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<WcDashboard />} />
+          <Route path="/wc-meetings" element={<WcMeetings />} />
+          <Route path="/wc-wins" element={<WcWins />} />
+          <Route path="/wc-family-needs" element={<MemberNeeds />} />
+          <Route path="/wc-discussion-topics" element={<WcDiscussionTopics />} />
+          <Route path="/current-sacrament" element={<CurrentSacrament />} />
+          <Route path="/calendaring" element={<Calendaring />} />
+          <Route path="/babies" element={<Babies />} />
+          <Route path="/youth-activities" element={<YouthActivities />} />
+          <Route path="/tasks" element={<Tasks />} />
+          <Route path="/wc-members" element={<WardCouncilMembers />} />
+          <Route path="/help" element={<Help />} />
+          <Route path="*" element={<WcGuard><WcDashboard /></WcGuard>} />
+        </Route>
+      </Routes>
+    );
+  }
+
+  // Bishopric hub (hub='both') — full access
   return (
     <Routes>
       <Route element={<Layout />}>
@@ -57,7 +144,12 @@ function AppRoutes() {
         <Route path="/bishop-schedule" element={<BishopSchedule />} />
         <Route path="/assignments" element={<Assignments />} />
         <Route path="/users" element={<Users />} />
+        <Route path="/email-notifications" element={<EmailNotifications />} />
         <Route path="/important-links" element={<ImportantLinks />} />
+        <Route path="/youth-activities" element={<YouthActivities />} />
+        <Route path="/speakers-and-prayers" element={<SpeakersAndPrayers />} />
+        <Route path="/ward-members" element={<WardMembers />} />
+        <Route path="/help" element={<Help />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

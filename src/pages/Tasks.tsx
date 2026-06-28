@@ -1,19 +1,61 @@
 import { useState } from 'react';
 import { useTable } from '../lib/useTable';
+import { useAuth } from '../lib/auth';
 import type { Task } from '../lib/api';
 import Modal from '../components/Modal';
-import { Input, Select, Textarea } from '../components/FormFields';
+import { Input, Textarea } from '../components/FormFields';
 import { SHARE_WITH_OPTIONS } from '../lib/constants';
 
 const EMPTY: Partial<Task> = { task: '', assigned_to: '', done: 0, share_with: '' };
 
+function parseShareWith(s: string | undefined): string[] {
+  if (!s) return [];
+  return s.split(',').map(v => v.trim()).filter(Boolean);
+}
+
+function ShareWithCheckboxes({ value, onChange, options }: {
+  value: string; onChange: (v: string) => void; options: string[];
+}) {
+  const selected = new Set(parseShareWith(value));
+  const toggle = (opt: string) => {
+    const next = new Set(selected);
+    if (next.has(opt)) next.delete(opt); else next.add(opt);
+    onChange([...next].join(','));
+  };
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Share With</label>
+      <div className="flex flex-wrap gap-2">
+        {options.map(opt => (
+          <label key={opt} className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-md border text-sm select-none ${selected.has(opt) ? 'bg-blue-50 border-blue-400 text-blue-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+            <input type="checkbox" checked={selected.has(opt)} onChange={() => toggle(opt)}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            {opt}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Tasks() {
+  const { user, selectedHub } = useAuth();
+  const isWc = user?.hub === 'wc' || (user?.hub === 'both' && selectedHub === 'wc');
+  const shareWithOptions = isWc ? ['Ward Council'] : SHARE_WITH_OPTIONS;
+
   const { rows, isLoading, create, update, remove } = useTable<Task>('tasks');
   const [editing, setEditing] = useState<Partial<Task> | null>(null);
   const [showDone, setShowDone] = useState(false);
   const [filter, setFilter] = useState('');
 
-  const filtered = rows.filter(r => {
+  const openNew = () => setEditing({ ...EMPTY, share_with: isWc ? 'Ward Council' : '' });
+
+  // hub='both' users in WC context only see WC-tagged tasks (hub='wc' is already filtered by backend)
+  const visibleRows = (isWc && user?.hub === 'both')
+    ? rows.filter(r => parseShareWith(r.share_with).includes('Ward Council'))
+    : rows;
+
+  const filtered = visibleRows.filter(r => {
     if (!showDone && r.done) return false;
     if (filter) {
       const q = filter.toLowerCase();
@@ -38,14 +80,14 @@ export default function Tasks() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
-        <button onClick={() => setEditing({ ...EMPTY })} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
-          + New Task
+        <h1 className="text-2xl font-bold text-gray-900">Action Items</h1>
+        <button onClick={openNew} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+          + New Item
         </button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2 mb-4">
-        <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Search tasks..."
+        <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Search action items..."
           className="rounded-md border border-gray-300 px-3 py-2 text-sm flex-1" />
         <label className="flex items-center gap-2 text-sm text-gray-600">
           <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)} className="rounded" />
@@ -61,25 +103,31 @@ export default function Tasks() {
                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
               <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setEditing(t)}>
                 <p className={`text-sm ${t.done ? 'line-through text-gray-400' : 'text-gray-900'}`}>{t.task}</p>
-                <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5 flex-wrap">
                   {t.assigned_to && <span>{t.assigned_to}</span>}
                   {t.created_date && <span>{t.created_date}</span>}
-                  {t.share_with && <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">{t.share_with}</span>}
+                  {parseShareWith(t.share_with).map(v => (
+                    <span key={v} className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">{v}</span>
+                  ))}
                 </div>
               </div>
               <button onClick={() => remove(t.id)} className="text-red-400 hover:text-red-600 text-xs">Del</button>
             </div>
           ))}
-          {filtered.length === 0 && <p className="text-sm text-gray-400 text-center py-8">No tasks found</p>}
+          {filtered.length === 0 && <p className="text-sm text-gray-400 text-center py-8">No action items found</p>}
         </div>
       )}
 
-      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit Task' : 'New Task'}>
+      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit Action Item' : 'New Action Item'}>
         {editing && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
             <Textarea label="Task" value={editing.task || ''} onChange={v => setEditing({ ...editing, task: v })} />
             <Input label="Assigned To" value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} />
-            <Select label="Share With" value={editing.share_with || ''} onChange={v => setEditing({ ...editing, share_with: v })} options={SHARE_WITH_OPTIONS} />
+            <ShareWithCheckboxes
+              value={editing.share_with || ''}
+              onChange={v => setEditing({ ...editing, share_with: v })}
+              options={shareWithOptions}
+            />
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
               <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">Save</button>

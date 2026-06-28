@@ -1,9 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTable } from '../lib/useTable';
-import type { SacramentSpeaker, Prayer, SacramentMusic, SacramentTheme, SacramentAnnouncement } from '../lib/api';
+import type { SacramentSpeaker, Prayer, SacramentMusic, SacramentTheme, SacramentAnnouncement, WardMember } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Select, Textarea } from '../components/FormFields';
 import { SPEAKER_TYPES } from '../lib/constants';
+import { useAuth } from '../lib/auth';
+import { resolveMemberName } from '../lib/nameUtils';
 
 const toDateKey = (d: string) => d ? d.slice(0, 10) : '';
 
@@ -17,8 +20,10 @@ function upcomingSunday(): string {
 const THIS_SUNDAY = upcomingSunday();
 
 export default function SacramentPlanning() {
+  const { isWcReadOnly } = useAuth();
   const { rows: speakers, create: createSpeaker, update: updateSpeaker, remove: removeSpeaker } = useTable<SacramentSpeaker>('sacrament-speakers');
   const { rows: prayers, create: createPrayer, update: updatePrayer, remove: removePrayer } = useTable<Prayer>('prayers');
+  const { rows: wardMembers } = useTable<WardMember>('ward-members');
   const { rows: music, create: createMusic, update: updateMusic, remove: removeMusic } = useTable<SacramentMusic>('sacrament-music');
   const { rows: themes, create: createTheme, update: updateTheme, remove: removeTheme } = useTable<SacramentTheme>('sacrament-themes');
   const { rows: announcements, create: createAnnouncement, update: updateAnnouncement, remove: removeAnnouncement } = useTable<SacramentAnnouncement>('sacrament-announcements');
@@ -36,7 +41,20 @@ export default function SacramentPlanning() {
   const [editMusic, setEditMusic] = useState<Partial<SacramentMusic> | null>(null);
   const [editTheme, setEditTheme] = useState<Partial<SacramentTheme> | null>(null);
   const [editAnnouncement, setEditAnnouncement] = useState<Partial<SacramentAnnouncement> | null>(null);
-  const [agendaDate, setAgendaDate] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [agendaDate, setAgendaDate] = useState<string | null>(() => {
+    const d = searchParams.get('date');
+    return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
+  });
+
+  // If a ?date param is present, navigate the month view to show that date
+  useEffect(() => {
+    const d = searchParams.get('date');
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      const [y, m] = d.split('-').map(Number);
+      setViewDate(new Date(y, m - 1, 1));
+    }
+  }, [searchParams]);
 
   const meetingDates = useMemo(() => {
     const dates = new Set<string>();
@@ -183,6 +201,7 @@ export default function SacramentPlanning() {
           onAdd={() => setEditSpeaker({ meeting_date: '', speaker: '', speaker_type: 'Adult Speaker', accepted: '', speaking_order: 1, topic: '', notes: '' })}
           onEdit={setEditSpeaker}
           onDelete={removeSpeaker}
+          readOnly={isWcReadOnly}
         />
       )}
 
@@ -197,6 +216,7 @@ export default function SacramentPlanning() {
           onAdd={() => setEditPrayer({ meeting_date: '', name: '', opening_closing: 'Opening', notes: '' })}
           onEdit={setEditPrayer}
           onDelete={removePrayer}
+          readOnly={isWcReadOnly}
         />
       )}
 
@@ -213,6 +233,7 @@ export default function SacramentPlanning() {
           onAdd={() => setEditMusic({ meeting_date: '', chorister: '', organist: '', opening_hymn: '', sacrament_hymn: '', rest_special: '', closing_hymn: '', notes: '' })}
           onEdit={setEditMusic}
           onDelete={removeMusic}
+          readOnly={isWcReadOnly}
         />
       )}
 
@@ -228,6 +249,7 @@ export default function SacramentPlanning() {
           onAdd={() => setEditTheme({ meeting_date: '', theme: '', references_text: '', conducting: '', meeting_link: '' })}
           onEdit={setEditTheme}
           onDelete={removeTheme}
+          readOnly={isWcReadOnly}
         />
       )}
 
@@ -242,6 +264,7 @@ export default function SacramentPlanning() {
           onAdd={() => setEditAnnouncement({ meeting_date: '', title: '', notes: '' })}
           onEdit={setEditAnnouncement}
           onDelete={removeAnnouncement}
+          readOnly={isWcReadOnly}
         />
       )}
 
@@ -251,6 +274,7 @@ export default function SacramentPlanning() {
           key={agendaDate}
           date={agendaDate}
           onClose={() => setAgendaDate(null)}
+          wardMembers={wardMembers}
           speakers={speakers} prayers={prayers} music={music} themes={themes} announcements={announcements}
           createSpeaker={createSpeaker} updateSpeaker={updateSpeaker} removeSpeaker={removeSpeaker}
           createPrayer={createPrayer} updatePrayer={updatePrayer} removePrayer={removePrayer}
@@ -281,7 +305,7 @@ export default function SacramentPlanning() {
       {/* Prayer modal */}
       <Modal open={!!editPrayer} onClose={() => setEditPrayer(null)} title={editPrayer?.id ? 'Edit Prayer' : 'New Prayer'}>
         {editPrayer && (
-          <form onSubmit={async e => { e.preventDefault(); const d = { ...editPrayer }; delete (d as Record<string, unknown>).id; editPrayer.id ? await updatePrayer(editPrayer.id, d as Record<string, unknown>) : await createPrayer(d as Record<string, unknown>); setEditPrayer(null); }} className="space-y-3">
+          <form onSubmit={async e => { e.preventDefault(); const d = { ...editPrayer, name: resolveMemberName(editPrayer.name || '', wardMembers) }; delete (d as Record<string, unknown>).id; editPrayer.id ? await updatePrayer(editPrayer.id, d as Record<string, unknown>) : await createPrayer(d as Record<string, unknown>); setEditPrayer(null); }} className="space-y-3">
             <Input label="Meeting Date" value={toDateKey(editPrayer.meeting_date || '')} onChange={v => setEditPrayer({ ...editPrayer, meeting_date: v })} type="date" required />
             <Input label="Name" value={editPrayer.name || ''} onChange={v => setEditPrayer({ ...editPrayer, name: v })} required />
             <Select label="Opening/Closing" value={editPrayer.opening_closing || ''} onChange={v => setEditPrayer({ ...editPrayer, opening_closing: v })} options={['Opening', 'Closing']} />
@@ -347,7 +371,7 @@ export default function SacramentPlanning() {
 }
 
 function TableSection<T extends { id: number }>({
-  label, rows, columns, onEdit, onDelete, accent,
+  label, rows, columns, onEdit, onDelete, accent, readOnly,
 }: {
   label: string;
   rows: T[];
@@ -355,6 +379,7 @@ function TableSection<T extends { id: number }>({
   onEdit: (row: T) => void;
   onDelete: (id: number) => void;
   accent?: string;
+  readOnly?: boolean;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -365,19 +390,22 @@ function TableSection<T extends { id: number }>({
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
               {columns.map(c => <th key={c.key} className="text-left px-3 py-2 font-medium text-gray-600">{c.label}</th>)}
-              <th className="px-3 py-2"></th>
+              {!readOnly && <th className="px-3 py-2"></th>}
             </tr>
           </thead>
           <tbody>
             {rows.map(r => (
-              <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => onEdit(r)}>
+              <tr key={r.id} className={`border-b border-gray-50 hover:bg-gray-50 ${!readOnly ? 'cursor-pointer' : ''}`}
+                onClick={!readOnly ? () => onEdit(r) : undefined}>
                 {columns.map(c => {
                   const raw = String((r as Record<string, unknown>)[c.key] || '');
                   return <td key={c.key} className="px-3 py-2 text-gray-700">{c.date ? raw.slice(0, 10) : raw}</td>;
                 })}
-                <td className="px-3 py-2">
-                  <button onClick={e => { e.stopPropagation(); onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
-                </td>
+                {!readOnly && (
+                  <td className="px-3 py-2">
+                    <button onClick={e => { e.stopPropagation(); onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -387,12 +415,13 @@ function TableSection<T extends { id: number }>({
   );
 }
 
-function CrudTable<T extends { id: number }>({ rows, columns, onAdd, onEdit, onDelete }: {
+function CrudTable<T extends { id: number }>({ rows, columns, onAdd, onEdit, onDelete, readOnly }: {
   rows: T[];
   columns: { key: string; label: string; date?: boolean }[];
   onAdd: () => void;
   onEdit: (row: T) => void;
   onDelete: (id: number) => void;
+  readOnly?: boolean;
 }) {
   const getDate = (r: T) => String((r as Record<string, unknown>)['meeting_date'] || '').slice(0, 10);
 
@@ -402,15 +431,17 @@ function CrudTable<T extends { id: number }>({ rows, columns, onAdd, onEdit, onD
 
   return (
     <>
-      <div className="flex justify-end mb-3">
-        <button onClick={onAdd} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>
-      </div>
+      {!readOnly && (
+        <div className="flex justify-end mb-3">
+          <button onClick={onAdd} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>
+        </div>
+      )}
       {current.length === 0 && future.length === 0 && past.length === 0 && (
         <p className="text-gray-400 text-sm italic text-center py-6">Nothing recorded yet.</p>
       )}
-      <TableSection label="This Sunday" rows={current} columns={columns} onEdit={onEdit} onDelete={onDelete} accent="text-blue-600" />
-      <TableSection label="Upcoming" rows={future} columns={columns} onEdit={onEdit} onDelete={onDelete} accent="text-green-600" />
-      <TableSection label="Past" rows={past} columns={columns} onEdit={onEdit} onDelete={onDelete} />
+      <TableSection label="This Sunday" rows={current} columns={columns} onEdit={onEdit} onDelete={onDelete} accent="text-blue-600" readOnly={readOnly} />
+      <TableSection label="Upcoming" rows={future} columns={columns} onEdit={onEdit} onDelete={onDelete} accent="text-green-600" readOnly={readOnly} />
+      <TableSection label="Past" rows={past} columns={columns} onEdit={onEdit} onDelete={onDelete} readOnly={readOnly} />
     </>
   );
 }
@@ -422,6 +453,7 @@ type RemoveFn = (id: number) => Promise<unknown>;
 interface AgendaModalProps {
   date: string;
   onClose: () => void;
+  wardMembers: WardMember[];
   speakers: SacramentSpeaker[];
   prayers: Prayer[];
   music: SacramentMusic[];
@@ -438,7 +470,7 @@ type SpeakerRow = { id?: number; speaker: string; speaker_type: string; topic: s
 type AnnounceRow = { id?: number; title: string; notes: string };
 
 function AgendaModal(props: AgendaModalProps) {
-  const { date, onClose } = props;
+  const { date, onClose, wardMembers } = props;
   const dk = (d: string) => (d ? d.slice(0, 10) : '');
 
   const existingTheme = props.themes.find(t => dk(t.meeting_date) === date);
@@ -499,7 +531,7 @@ function AgendaModal(props: AgendaModalProps) {
       // Prayers (opening / closing)
       const syncPrayer = async (label: string, name: string, existing?: Prayer) => {
         if (name.trim()) {
-          const data = { meeting_date: date, name, opening_closing: label };
+          const data = { meeting_date: date, name: resolveMemberName(name, wardMembers), opening_closing: label };
           if (existing) await props.updatePrayer(existing.id, data); else await props.createPrayer(data);
         } else if (existing) await props.removePrayer(existing.id);
       };

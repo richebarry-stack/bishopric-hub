@@ -83,7 +83,18 @@ export default function CallingPipeline() {
   const [editingMwc, setEditingMwc] = useState<Partial<MemberWithoutCalling> | null>(null);
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [groupBy, setGroupBy] = useState<'status' | 'org' | 'sustained'>('status');
+  const [orgStatusFilter, setOrgStatusFilter] = useState<Set<string>>(
+    () => new Set(CALLING_STATUSES.filter(s => s !== '5. Sustained'))
+  );
   const [saving, setSaving] = useState(false);
+
+  const toggleOrgStatus = (s: string) =>
+    setOrgStatusFilter(prev => {
+      const next = new Set(prev);
+      next.has(s) ? next.delete(s) : next.add(s);
+      return next;
+    });
 
   const filtered = rows.filter(r => {
     if (statusFilter && r.status !== statusFilter) return false;
@@ -141,6 +152,23 @@ export default function CallingPipeline() {
     });
   };
 
+  const groupByOrg = (items: CallingType[]) => {
+    const grouped = new Map<string, CallingType[]>();
+    for (const r of items) {
+      const org = r.organization?.trim() || 'No Organization';
+      if (!grouped.has(org)) grouped.set(org, []);
+      grouped.get(org)!.push(r);
+    }
+    return [...grouped.entries()].sort((a, b) => {
+      const ia = ORGANIZATIONS.indexOf(a[0]);
+      const ib = ORGANIZATIONS.indexOf(b[0]);
+      if (ia === -1 && ib === -1) return a[0].localeCompare(b[0]);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+  };
+
   const renderGrouped = (items: CallingType[]) =>
     groupByStatus(items).map(([status, rows]) => (
       <div key={status} className="mb-6">
@@ -152,12 +180,38 @@ export default function CallingPipeline() {
       </div>
     ));
 
+  const renderGroupedByOrg = (items: CallingType[]) =>
+    groupByOrg(items).map(([org, rows]) => {
+      const callingRows = rows.filter(r => r.type !== 'Release');
+      const releaseRows = rows.filter(r => r.type === 'Release');
+      return (
+        <div key={org} className="mb-8">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <span className="bg-gray-100 text-gray-700 rounded px-2 py-0.5">{org}</span>
+            <span className="text-gray-400">({rows.length})</span>
+          </h3>
+          {callingRows.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Callings ({callingRows.length})</p>
+              <Table rows={callingRows} onEdit={setEditing} onDelete={remove} />
+            </div>
+          )}
+          {releaseRows.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-1.5 ml-1">Releases ({releaseRows.length})</p>
+              <Table rows={releaseRows} onEdit={setEditing} onDelete={remove} />
+            </div>
+          )}
+        </div>
+      );
+    });
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
         <h1 className="text-2xl font-bold text-gray-900">Calling Pipeline</h1>
         <button onClick={() => setEditing({ ...EMPTY })} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
-          + New Calling
+          + New Calling / Release
         </button>
       </div>
 
@@ -169,9 +223,34 @@ export default function CallingPipeline() {
           <option value="">All statuses</option>
           {CALLING_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
+        <div className="flex rounded-md border border-gray-300 overflow-hidden self-start sm:self-auto">
+          {([['status', 'By Status'], ['org', 'By Org'], ['sustained', 'Needs Set Apart']] as const).map(([g, label]) => (
+            <button key={g} onClick={() => setGroupBy(g)}
+              className={`px-3 py-2 text-xs font-medium transition-colors border-r last:border-r-0 border-gray-300 ${
+                groupBy === g ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {!isLoading && actionRows.length > 0 && (
+      {groupBy === 'org' && (
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {CALLING_STATUSES.map(s => (
+            <button key={s} onClick={() => toggleOrgStatus(s)}
+              className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                orgStatusFilter.has(s)
+                  ? 'bg-blue-50 border-blue-300 text-blue-700'
+                  : 'bg-white border-gray-200 text-gray-400 line-through'
+              }`}>
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!isLoading && actionRows.length > 0 && groupBy !== 'sustained' && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
           <h2 className="text-sm font-bold uppercase tracking-widest text-amber-700 mb-3">
             Needs Action ({actionRows.length})
@@ -184,7 +263,27 @@ export default function CallingPipeline() {
         <p className="text-gray-400 text-sm">Loading...</p>
       ) : statusFilter ? (
         <Table rows={filtered} onEdit={setEditing} onDelete={remove} />
-      ) : (
+      ) : groupBy === 'sustained' ? (() => {
+          const sustainedRows = filtered.filter(r => r.status === '5. Sustained');
+          return (
+            <>
+              <h2 className="text-lg font-bold text-gray-800 mb-3 border-b border-gray-200 pb-2">Needs Set Apart ({sustainedRows.length})</h2>
+              {sustainedRows.length === 0
+                ? <p className="text-gray-400 text-sm">No sustained callings.</p>
+                : renderGroupedByOrg(sustainedRows)}
+            </>
+          );
+        })()
+      : groupBy === 'org' ? (() => {
+          const orgFiltered = filtered.filter(r => orgStatusFilter.has(r.status ?? ''));
+          return (
+            <>
+              <h2 className="text-lg font-bold text-gray-800 mb-3 border-b border-gray-200 pb-2">By Organization ({orgFiltered.length})</h2>
+              {renderGroupedByOrg(orgFiltered)}
+            </>
+          );
+        })()
+      : (
         <>
           <h2 className="text-lg font-bold text-gray-800 mb-3 border-b border-gray-200 pb-2">Callings ({callings.length})</h2>
           {renderGrouped(callings)}
@@ -194,17 +293,19 @@ export default function CallingPipeline() {
         </>
       )}
 
-      <div className="mt-10">
-        <div className="flex items-center justify-between mb-3 border-b border-gray-200 pb-2">
-          <h2 className="text-lg font-bold text-gray-800">Members Without Callings ({mwcRows.length})</h2>
-          <button onClick={() => setEditingMwc({ ...EMPTY_MWC })} className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>
+      {groupBy === 'status' && !statusFilter && (
+        <div className="mt-10">
+          <div className="flex items-center justify-between mb-3 border-b border-gray-200 pb-2">
+            <h2 className="text-lg font-bold text-gray-800">Members Without Callings ({mwcRows.length})</h2>
+            <button onClick={() => setEditingMwc({ ...EMPTY_MWC })} className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>
+          </div>
+          {mwcRows.length === 0 ? (
+            <div className="bg-white rounded-lg border border-gray-200 border-dashed p-4 text-center text-gray-400 text-sm">No members listed</div>
+          ) : (
+            <MwcTable rows={mwcRows} onEdit={setEditingMwc} onDelete={mwcRemove} />
+          )}
         </div>
-        {mwcRows.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 border-dashed p-4 text-center text-gray-400 text-sm">No members listed</div>
-        ) : (
-          <MwcTable rows={mwcRows} onEdit={setEditingMwc} onDelete={mwcRemove} />
-        )}
-      </div>
+      )}
 
       <Modal open={!!editingMwc} onClose={() => setEditingMwc(null)} title={editingMwc?.id ? 'Edit Member' : 'Add Member Without Calling'}>
         {editingMwc && (

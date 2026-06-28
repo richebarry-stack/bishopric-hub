@@ -25,6 +25,47 @@ export const api = {
     me: () => request<{ user: User | null }>('/auth/me'),
     register: (data: { name: string; email: string; password: string; role: string }) =>
       request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+    changePassword: (currentPassword: string | null, newPassword: string) =>
+      request('/auth/change-password', { method: 'POST', body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }) }),
+    getSecurityQuestions: (email: string) =>
+      request<{ question1: string; question2: string }>(`/auth/security-questions?email=${encodeURIComponent(email)}`),
+    saveSecurityQuestions: (data: { question1: string; answer1: string; question2: string; answer2: string }) =>
+      request('/auth/security-questions', { method: 'POST', body: JSON.stringify(data) }),
+    resetByQuestions: (data: { email: string; answer1: string; answer2: string; new_password: string }) =>
+      request('/auth/reset-by-questions', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  users: {
+    list: (filter?: 'wc') => request<User[]>(`/users${filter ? `?hub=${filter}` : ''}`),
+    setHub: (id: number, hub: string) =>
+      request<User>(`/users/${id}/hub`, { method: 'PUT', body: JSON.stringify({ hub }) }),
+  },
+  navLabels: {
+    get: () => request<{ path: string; label: string }[]>('/nav-labels'),
+    set: (labels: Record<string, string>) =>
+      request('/nav-labels', { method: 'POST', body: JSON.stringify(labels) }),
+  },
+  registrationRequests: {
+    list: () => request<RegistrationRequest[]>('/registration-requests'),
+    update: (id: number, data: Partial<RegistrationRequest>) =>
+      request<RegistrationRequest>(`/registration-requests/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    approve: (id: number) =>
+      request(`/registration-requests/${id}/approve`, { method: 'POST' }),
+    reject: (id: number) =>
+      request(`/registration-requests/${id}`, { method: 'DELETE' }),
+    submit: (data: { name: string; email: string; church_role: string; password: string }) =>
+      request('/auth/register-request', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  speakerNotes: {
+    getAll: () => request<{ person_name: string; category: string; notes: string }[]>('/speaker-notes'),
+    save: (person_name: string, category: string, notes: string) =>
+      request('/speaker-notes', { method: 'POST', body: JSON.stringify({ person_name, category, notes }) }),
+  },
+  emailSettings: {
+    get: () => request<Record<string, unknown>>('/email-settings'),
+    save: (settings: Record<string, unknown>) =>
+      request('/email-settings', { method: 'PUT', body: JSON.stringify(settings) }),
+    preview: (type: string) =>
+      request<Record<string, unknown>>('/email-preview', { method: 'POST', body: JSON.stringify({ type }) }),
   },
   syncConduct: () => {
     const d = new Date();
@@ -48,7 +89,10 @@ export interface User {
   email: string;
   role: string;
   church_role: string;
+  hub: string;
+  last_login?: string;
   must_reset_password?: boolean;
+  has_security_questions?: boolean;
 }
 
 export interface CallingPipeline {
@@ -135,6 +179,38 @@ export interface Prayer {
   notes: string;
 }
 
+export interface WcMeeting {
+  id: number;
+  date: string;
+  opening_prayer: string;
+  spiritual_thought: string;
+  closing_prayer: string;
+}
+
+export interface WcWin {
+  id: number;
+  date: string;
+  description: string;
+}
+
+export interface WcFamilyNeed {
+  id: number;
+  family_name: string;
+  details: string;
+  status: string;
+  assignments: string;
+}
+
+export interface WcDiscussionTopic {
+  id: number;
+  meeting_date: string;
+  organization: string;
+  topic: string;
+  status: string;
+  next_steps: string;
+  help_needed: string;
+}
+
 export interface SacramentMusic {
   id: number;
   meeting_date: string;
@@ -179,6 +255,7 @@ export interface MemberNeed {
   resolved: number;
   next_steps: string;
   pray_for: number;
+  shared_with_wc: number;
 }
 
 export interface CalendarEvent {
@@ -240,6 +317,27 @@ export interface MemberWithoutCalling {
   notes: string;
 }
 
+export interface YouthActivity {
+  id: number;
+  date: string;
+  builders_of_faith: string;
+  messengers_of_hope: string;
+  gatherers_of_light: string;
+  deacons: string;
+  teachers: string;
+  priests: string;
+  notes: string;
+  updated_at: string;
+}
+
+export interface RegistrationRequest {
+  id: number;
+  name: string;
+  email: string;
+  church_role: string;
+  requested_at: string;
+}
+
 export interface BishopScheduleEntry {
   id: number;
   date: string;
@@ -252,4 +350,14 @@ export interface BishopScheduleEntry {
 export interface PrayerOther {
   id: number;
   name: string;
+}
+
+export interface WardMember {
+  id: number;
+  name: string;
+  active: number;
+  exclude_speakers: number;
+  exclude_prayers: number;
+  birth_date: string | null;
+  updated_at: string;
 }

@@ -1,0 +1,2 @@
+ALTER TABLE ward_members ADD COLUMN exclude_speakers INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE ward_members ADD COLUMN exclude_prayers INTEGER NOT NULL DEFAULT 0;

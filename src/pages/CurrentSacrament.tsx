@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useAuth } from '../lib/auth';
 import { useTable } from '../lib/useTable';
 import type {
   SacramentSpeaker, Prayer, SacramentMusic, SacramentTheme, SacramentAnnouncement, SacramentAgendaNote,
@@ -53,7 +54,7 @@ const REST_POS = ANCHOR['rest_special']; // = 9
 const OPTIONAL_ITEMS = {
   child_blessing: { label: 'Child Blessing', pos: 5.5 },  // after opening_prayer
   confirmation:   { label: 'Confirmation',   pos: 8.3 },  // after sacrament hymn
-  ordination:     { label: 'Ordination',     pos: 8.6 },  // after confirmation
+  ordination:     { label: 'Priesthood Advancement',     pos: 8.6 },  // after confirmation
 } as const;
 type OptionalKind = keyof typeof OPTIONAL_ITEMS;
 
@@ -86,18 +87,22 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function SimpleField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function SimpleField({ label, value, onChange, readonly }: { label: string; value: string; onChange: (v: string) => void; readonly?: boolean }) {
   return (
     <Row label={label}>
-      <input className={INPUT_CLS} value={value} onChange={e => onChange(e.target.value)} />
+      {readonly
+        ? <p className="text-sm text-gray-800 py-1.5">{value || <span className="text-gray-300 italic">—</span>}</p>
+        : <input className={INPUT_CLS} value={value} onChange={e => onChange(e.target.value)} />}
     </Row>
   );
 }
 
-function TextareaField({ label, value, onChange, rows = 2 }: { label: string; value: string; onChange: (v: string) => void; rows?: number }) {
+function TextareaField({ label, value, onChange, rows = 2, readonly }: { label: string; value: string; onChange: (v: string) => void; rows?: number; readonly?: boolean }) {
   return (
     <Row label={label}>
-      <textarea className={INPUT_CLS} rows={rows} value={value} onChange={e => onChange(e.target.value)} />
+      {readonly
+        ? <p className="text-sm text-gray-800 py-1.5 whitespace-pre-wrap">{value || <span className="text-gray-300 italic">—</span>}</p>
+        : <textarea className={INPUT_CLS} rows={rows} value={value} onChange={e => onChange(e.target.value)} />}
     </Row>
   );
 }
@@ -238,6 +243,10 @@ function AnnouncementsSection({ rows, setRows }: { rows: AnnounceRow[]; setRows:
 
 // ─── AgendaEditor ─────────────────────────────────────────────────────────────
 
+type ViewerMode = 'readonly' | 'music' | undefined;
+
+const MUSIC_EDITABLE_FIELDS = new Set(['chorister', 'organist', 'opening_hymn', 'sacrament_hymn', 'rest_special', 'closing_hymn']);
+
 interface EditorProps {
   date: string;
   speakers: ReturnType<typeof useTable<SacramentSpeaker>>;
@@ -249,9 +258,11 @@ interface EditorProps {
   thanksgivings: AgendaCalling[];
   sustainings: AgendaCalling[];
   onSaveSnapshot: (sustainings: AgendaCalling[], thanksgivings: AgendaCalling[]) => Promise<void>;
+  viewerMode?: ViewerMode;
 }
 
-function AgendaEditor({ date, speakers, prayers, music, themes, announcements, notes, thanksgivings, sustainings, onSaveSnapshot }: EditorProps) {
+function AgendaEditor({ date, speakers, prayers, music, themes, announcements, notes, thanksgivings, sustainings, onSaveSnapshot, viewerMode }: EditorProps) {
+  const ro = (field: string) => viewerMode === 'readonly' || (viewerMode === 'music' && !MUSIC_EDITABLE_FIELDS.has(field));
   const existingTheme  = themes.rows.find(t => dk(t.meeting_date) === date);
   const existingMusic  = music.rows.find(m => dk(m.meeting_date) === date);
   const existingSpeakers = speakers.rows
@@ -430,6 +441,21 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
     }
   };
 
+  const handleMusicSave = async () => {
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+    setSaving(true);
+    try {
+      const musicFields = { meeting_date: date, chorister, organist, opening_hymn: openingHymn, sacrament_hymn: sacramentHymn, rest_special: restSpecial, closing_hymn: closingHymn };
+      if (existingMusic) await music.update(existingMusic.id, musicFields);
+      else await music.create(musicFields);
+      setSavedAt(new Date().toLocaleTimeString());
+    } finally {
+      isSavingRef.current = false;
+      setSaving(false);
+    }
+  };
+
   // Keep ref current so the debounced callback always calls the latest closure
   handleSaveRef.current = handleSave;
 
@@ -518,6 +544,7 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
   };
 
   const triggerAutoSave = () => {
+    if (viewerMode) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => handleSaveRef.current(), 600);
   };
@@ -534,11 +561,22 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
         {merged.map((item, mi) => {
           if (item.kind === 'speaker') {
             const si = item.speakerIndex;
+            const row = speakerRows[si];
+            if (viewerMode) {
+              return (
+                <Row key={`speaker-${si}`} label={`Speaker ${speakerDisplayIndex(si) + 1}`}>
+                  <div className="py-1">
+                    <p className="text-sm font-medium text-gray-800">{row.speaker || <span className="text-gray-300 italic">—</span>}</p>
+                    {row.topic && <p className="text-sm text-gray-600 mt-0.5">Topic: {row.topic}</p>}
+                  </div>
+                </Row>
+              );
+            }
             return (
               <SpeakerItem
                 key={`speaker-${si}`}
                 index={speakerDisplayIndex(si)}
-                row={speakerRows[si]}
+                row={row}
                 onUpdate={patch => setSpeakerRows(rs => rs.map((r, i) => i === si ? { ...r, ...patch } : r))}
                 onMoveUp={() => moveSpeaker(si, -1)}
                 onMoveDown={() => moveSpeaker(si, 1)}
@@ -552,6 +590,13 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
             const { optKind } = item;
             const val = optKind === 'child_blessing' ? childBlessing! : optKind === 'confirmation' ? confirmation! : ordination!;
             const setter = optKind === 'child_blessing' ? setChildBlessing : optKind === 'confirmation' ? setConfirmation : setOrdination;
+            if (viewerMode) {
+              return (
+                <Row key={`opt-${optKind}`} label={OPTIONAL_ITEMS[optKind].label}>
+                  <p className="text-sm text-gray-800 py-1">{val || <span className="text-gray-300 italic">—</span>}</p>
+                </Row>
+              );
+            }
             return (
               <OptionalItem key={`opt-${optKind}`}
                 label={OPTIONAL_ITEMS[optKind].label}
@@ -563,6 +608,13 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
           }
           if (item.kind === 'note') {
             const ni = item.noteIndex;
+            if (viewerMode) {
+              return (
+                <Row key={`note-${ni}`} label="Agenda Item">
+                  <p className="text-sm text-gray-800 py-1 whitespace-pre-wrap">{noteRows[ni].content || <span className="text-gray-300 italic">—</span>}</p>
+                </Row>
+              );
+            }
             return (
               <NoteItem
                 key={`note-${ni}`}
@@ -576,38 +628,39 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
           }
           const kind = item.kind as FixedKind;
           switch (kind) {
-            case 'conducting':     return <SimpleField   key={kind} label={LABEL[kind]} value={conducting}    onChange={setConducting}    />;
-            case 'chorister':      return <SimpleField   key={kind} label={LABEL[kind]} value={chorister}     onChange={setChorister}     />;
-            case 'organist':       return <SimpleField   key={kind} label={LABEL[kind]} value={organist}      onChange={setOrganist}      />;
-            case 'opening_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={openingHymn}   onChange={setOpeningHymn}   />;
-            case 'opening_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={openingPrayer} onChange={setOpeningPrayer} />;
-            case 'thanksgivings':
-              return <CallingsList key={kind} label={LABEL[kind]} callings={thanksgivings}
-                script={"[Name] has been released as [position]. Those who would like to express thanks for [his or her] service may show it by the uplifted hand."} />;
-            case 'sustainings':
-              return <CallingsList key={kind} label={LABEL[kind]} callings={sustainings}
-                script={"[Name] has been called as [position]. Those in favor of sustaining [him or her] may show it by the uplifted hand. [Pause briefly.] Those opposed, if any, may also show it. [Pause briefly.]"} />;
-            case 'stake_business': return <TextareaField key={kind} label={LABEL[kind]} value={stakeBusiness} onChange={setStakeBusiness} />;
-            case 'sacrament_hymn': return <SimpleField   key={kind} label={LABEL[kind]} value={sacramentHymn} onChange={setSacramentHymn} />;
-            case 'rest_special':   return <SimpleField   key={kind} label={LABEL[kind]} value={restSpecial}   onChange={setRestSpecial}   />;
-            case 'closing_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={closingHymn}   onChange={setClosingHymn}   />;
-            case 'closing_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={closingPrayer} onChange={setClosingPrayer} />;
-            case 'announcements':  return <AnnouncementsSection key={kind} rows={announceRows} setRows={setAnnounceRows} />;
+            case 'conducting':     return <SimpleField   key={kind} label={LABEL[kind]} value={conducting}    onChange={setConducting}    readonly={ro('conducting')} />;
+            case 'chorister':      return <SimpleField   key={kind} label={LABEL[kind]} value={chorister}     onChange={setChorister}     readonly={ro('chorister')} />;
+            case 'organist':       return <SimpleField   key={kind} label={LABEL[kind]} value={organist}      onChange={setOrganist}      readonly={ro('organist')} />;
+            case 'opening_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={openingHymn}   onChange={setOpeningHymn}   readonly={ro('opening_hymn')} />;
+            case 'opening_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={openingPrayer} onChange={setOpeningPrayer} readonly={ro('opening_prayer')} />;
+            case 'stake_business': return viewerMode ? null : <TextareaField key={kind} label={LABEL[kind]} value={stakeBusiness} onChange={setStakeBusiness} />;
+            case 'sacrament_hymn': return <SimpleField   key={kind} label={LABEL[kind]} value={sacramentHymn} onChange={setSacramentHymn} readonly={ro('sacrament_hymn')} />;
+            case 'rest_special':   return <SimpleField   key={kind} label={LABEL[kind]} value={restSpecial}   onChange={setRestSpecial}   readonly={ro('rest_special')} />;
+            case 'closing_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={closingHymn}   onChange={setClosingHymn}   readonly={ro('closing_hymn')} />;
+            case 'closing_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={closingPrayer} onChange={setClosingPrayer} readonly={ro('closing_prayer')} />;
+            case 'announcements':  return viewerMode ? null : <AnnouncementsSection key={kind} rows={announceRows} setRows={setAnnounceRows} />;
+            case 'thanksgivings':  return viewerMode ? null : <CallingsList key={kind} label={LABEL[kind]} callings={thanksgivings}
+              script={"[Name] has been released as [position]. Those who would like to express thanks for [his or her] service may show it by the uplifted hand."} />;
+            case 'sustainings':    return viewerMode ? null : <CallingsList key={kind} label={LABEL[kind]} callings={sustainings}
+              script={"[Name] has been called as [position]. Those in favor of sustaining [him or her] may show it by the uplifted hand. [Pause briefly.] Those opposed, if any, may also show it. [Pause briefly.]"} />;
+
           }
         })}
-        <div className="pt-3 flex flex-wrap gap-x-4 gap-y-2">
-          <button type="button" onClick={addSpeaker} className="text-sm text-blue-600 hover:text-blue-800">+ Add speaker</button>
-          <button type="button" onClick={addNote}    className="text-sm text-blue-600 hover:text-blue-800">+ Add agenda item</button>
-          {childBlessing === null && (
-            <button type="button" onClick={() => setChildBlessing('')} className="text-sm text-indigo-500 hover:text-indigo-700">+ Child Blessing</button>
-          )}
-          {confirmation === null && (
-            <button type="button" onClick={() => setConfirmation('')} className="text-sm text-indigo-500 hover:text-indigo-700">+ Confirmation</button>
-          )}
-          {ordination === null && (
-            <button type="button" onClick={() => setOrdination('')} className="text-sm text-indigo-500 hover:text-indigo-700">+ Ordination</button>
-          )}
-        </div>
+        {!viewerMode && (
+          <div className="pt-3 flex flex-wrap gap-x-4 gap-y-2">
+            <button type="button" onClick={addSpeaker} className="text-sm text-blue-600 hover:text-blue-800">+ Add speaker</button>
+            <button type="button" onClick={addNote}    className="text-sm text-blue-600 hover:text-blue-800">+ Add agenda item</button>
+            {childBlessing === null && (
+              <button type="button" onClick={() => setChildBlessing('')} className="text-sm text-indigo-500 hover:text-indigo-700">+ Child Blessing</button>
+            )}
+            {confirmation === null && (
+              <button type="button" onClick={() => setConfirmation('')} className="text-sm text-indigo-500 hover:text-indigo-700">+ Confirmation</button>
+            )}
+            {ordination === null && (
+              <button type="button" onClick={() => setOrdination('')} className="text-sm text-indigo-500 hover:text-indigo-700">+ Priesthood Advancement</button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="sticky bottom-0 mt-4 flex items-center justify-between gap-3 bg-gray-50/90 backdrop-blur py-3">
@@ -623,10 +676,18 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
         </div>
         <div className="flex items-center gap-3">
           {savedAt && <span className="text-xs text-green-600">Saved at {savedAt}</span>}
-          <button onClick={handleSave} disabled={saving}
-            className="px-5 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save to Sacrament Planning'}
-          </button>
+          {!viewerMode && (
+            <button onClick={handleSave} disabled={saving}
+              className="px-5 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save to Sacrament Planning'}
+            </button>
+          )}
+          {viewerMode === 'music' && (
+            <button onClick={handleMusicSave} disabled={saving}
+              className="px-5 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save Music'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -644,6 +705,13 @@ function parseSnapshot(json: string): AgendaCalling[] {
 }
 
 export default function CurrentSacrament() {
+  const { user } = useAuth();
+  const viewerMode: ViewerMode = user?.hub === 'wc'
+    ? 'readonly'
+    : user?.role === 'viewer'
+      ? (/music.?coordinator/i.test(user.church_role || '') ? 'music' : 'readonly')
+      : undefined;
+
   const [date, setDate] = useState<string>(upcomingSunday());
 
   const speakers      = useTable<SacramentSpeaker>('sacrament-speakers');
@@ -674,6 +742,7 @@ export default function CurrentSacrament() {
   // by saving empty snapshots for them, so future live data doesn't bleed through.
   const autoSavedRef = useRef(false);
   useEffect(() => {
+    if (viewerMode) return;
     if (!isCurrentDate) return;
     if (wardBusiness.isLoading || speakers.isLoading || music.isLoading || themes.isLoading) return;
     if (autoSavedRef.current) return;
@@ -742,6 +811,7 @@ export default function CurrentSacrament() {
           announcements={announcements} notes={notes}
           thanksgivings={displayThanksgivings} sustainings={displaySustainingsList}
           onSaveSnapshot={onSaveSnapshot}
+          viewerMode={viewerMode}
         />
       )}
     </div>

@@ -10,7 +10,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   '0-Not at this time': { bg: 'bg-red-100', text: 'text-red-700' },
   '1-Considering': { bg: 'bg-blue-100', text: 'text-blue-700' },
   '2-Papers Started': { bg: 'bg-green-100', text: 'text-green-700' },
-  '3-Papers Completed': { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+  '3-Papers Submitted': { bg: 'bg-yellow-100', text: 'text-yellow-700' },
   '4-Call Accepted': { bg: 'bg-pink-100', text: 'text-pink-700' },
   '5-Serving': { bg: 'bg-orange-100', text: 'text-orange-700' },
   '6-Released': { bg: 'bg-purple-100', text: 'text-purple-700' },

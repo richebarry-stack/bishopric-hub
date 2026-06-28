@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { User } from '../lib/api';
+import type { User, RegistrationRequest } from '../lib/api';
+import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import Modal from '../components/Modal';
 import { Input, Select } from '../components/FormFields';
-import { CHURCH_ROLES } from '../lib/constants';
+import { CHURCH_ROLES, BISHOPRIC_CALLINGS, WC_CALLINGS, YC_CALLINGS, CAL_CALLINGS, hubForChurchRole, HUB_LABELS } from '../lib/constants';
 
 const API = '/api/users';
 const DATALIST_ID = 'church-roles-list';
@@ -15,7 +16,6 @@ async function fetchUsers(): Promise<User[]> {
   return res.json();
 }
 
-// Module-level component to avoid remount issues
 function ChurchRoleCell({ userId, value, onSave }: { userId: number; value: string; onSave: (id: number, role: string) => void }) {
   const [local, setLocal] = useState(value);
   useEffect(() => { setLocal(value); }, [value]);
@@ -31,6 +31,20 @@ function ChurchRoleCell({ userId, value, onSave }: { userId: number; value: stri
   );
 }
 
+const GROUP_ORDER = ['both', 'wc', 'yc', 'cal'] as const;
+const GROUP_COLORS: Record<string, { header: string; stripe: string }> = {
+  both: { header: 'bg-blue-50 text-blue-800', stripe: '' },
+  wc: { header: 'bg-emerald-50 text-emerald-800', stripe: '' },
+  yc: { header: 'bg-amber-50 text-amber-800', stripe: '' },
+  cal: { header: 'bg-violet-50 text-violet-800', stripe: '' },
+};
+const GROUP_DESCRIPTIONS: Record<string, string> = {
+  both: 'Full access to Bishopric Hub and Ward Council Hub',
+  wc: '',
+  yc: 'Youth Calendar only',
+  cal: 'Calendar of Events only',
+};
+
 export default function Users() {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
@@ -38,7 +52,7 @@ export default function Users() {
   const { data: users = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: fetchUsers });
 
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'editor', church_role: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'user', church_role: '' });
   const [addError, setAddError] = useState('');
 
   const [changingPassword, setChangingPassword] = useState(false);
@@ -47,6 +61,49 @@ export default function Users() {
   const [pwSuccess, setPwSuccess] = useState('');
 
   const [tempPassword, setTempPassword] = useState<{ name: string; password: string } | null>(null);
+
+  // Registration requests (admin only)
+  const { data: regRequests = [], refetch: refetchRegs } = useQuery<RegistrationRequest[]>({
+    queryKey: ['registration-requests'],
+    queryFn: () => api.registrationRequests.list(),
+    enabled: isAdmin,
+  });
+  const [regEdits, setRegEdits] = useState<Record<number, Partial<RegistrationRequest>>>({});
+  const [regLoading, setRegLoading] = useState<Record<number, string>>({});
+
+  const getRegField = (req: RegistrationRequest, field: keyof RegistrationRequest) =>
+    (regEdits[req.id]?.[field] ?? req[field]) as string;
+
+  const handleRegChange = (id: number, field: keyof RegistrationRequest, value: string) =>
+    setRegEdits(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+
+  const handleApprove = async (req: RegistrationRequest) => {
+    setRegLoading(prev => ({ ...prev, [req.id]: 'approve' }));
+    try {
+      const edits = regEdits[req.id];
+      if (edits && Object.keys(edits).length > 0) {
+        await api.registrationRequests.update(req.id, edits);
+      }
+      await api.registrationRequests.approve(req.id);
+      await Promise.all([refetchRegs(), queryClient.invalidateQueries({ queryKey: ['users'] })]);
+      setRegEdits(prev => { const n = { ...prev }; delete n[req.id]; return n; });
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Approval failed');
+    }
+    setRegLoading(prev => { const n = { ...prev }; delete n[req.id]; return n; });
+  };
+
+  const handleReject = async (req: RegistrationRequest) => {
+    if (!confirm(`Reject request from ${req.name}?`)) return;
+    setRegLoading(prev => ({ ...prev, [req.id]: 'reject' }));
+    try {
+      await api.registrationRequests.reject(req.id);
+      refetchRegs();
+    } catch {
+      alert('Failed to reject request');
+    }
+    setRegLoading(prev => { const n = { ...prev }; delete n[req.id]; return n; });
+  };
 
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState({ name: '', email: '' });
@@ -57,13 +114,22 @@ export default function Users() {
   const [emailError, setEmailError] = useState('');
   const [emailSuccess, setEmailSuccess] = useState('');
 
+  const grouped = useMemo(() => {
+    const map: Record<string, User[]> = { both: [], wc: [], yc: [], cal: [] };
+    for (const u of users) {
+      const key = u.hub === 'both' || u.hub === 'bh' ? 'both' : u.hub === 'wc' ? 'wc' : u.hub === 'yc' ? 'yc' : u.hub === 'cal' ? 'cal' : 'both';
+      map[key].push(u);
+    }
+    return map;
+  }, [users]);
+
   const createMutation = useMutation({
     mutationFn: async (data: typeof form) => {
       const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
       return res.json();
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['users'] }); setAdding(false); setForm({ name: '', email: '', password: '', role: 'editor', church_role: '' }); setAddError(''); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['users'] }); setAdding(false); setForm({ name: '', email: '', password: '', role: 'user', church_role: '' }); setAddError(''); },
     onError: (e: Error) => setAddError(e.message),
   });
 
@@ -79,6 +145,15 @@ export default function Users() {
   const roleMutation = useMutation({
     mutationFn: async ({ id, role }: { id: number; role: string }) => {
       const res = await fetch(`${API}/${id}/role`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+    onError: (e: Error) => alert(e.message),
+  });
+
+  const hubMutation = useMutation({
+    mutationFn: async ({ id, hub }: { id: number; hub: string }) => {
+      const res = await fetch(`${API}/${id}/hub`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hub }) });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
@@ -151,9 +226,10 @@ export default function Users() {
     setPwForm({ current: '', newPw: '', confirm: '' });
   };
 
+  const derivedHub = hubForChurchRole(form.church_role);
+
   return (
     <div>
-      {/* datalist rendered once, shared by all ChurchRoleCell inputs */}
       <datalist id={DATALIST_ID}>
         {CHURCH_ROLES.map(r => <option key={r} value={r} />)}
       </datalist>
@@ -178,64 +254,202 @@ export default function Users() {
         </div>
       </div>
 
-      {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+      {isAdmin && regRequests.length > 0 && (
+        <div className="mb-6 bg-white rounded-lg border border-amber-300 overflow-x-auto">
+          <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold">{regRequests.length}</span>
+            <h2 className="font-semibold text-sm text-amber-800">Pending Access Requests</h2>
+          </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-3 py-2 font-medium text-gray-600">Name</th>
                 <th className="text-left px-3 py-2 font-medium text-gray-600">Email</th>
-                <th className="text-left px-3 py-2 font-medium text-gray-600">App Role</th>
-                <th className="text-left px-3 py-2 font-medium text-gray-600">Church Role</th>
-                {isAdmin && <th className="px-3 py-2 font-medium text-gray-600">Actions</th>}
+                <th className="text-left px-3 py-2 font-medium text-gray-600">Calling</th>
+                <th className="text-left px-3 py-2 font-medium text-gray-600">Requested</th>
+                <th className="px-3 py-2 font-medium text-gray-600">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {users.map(u => (
-                <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="px-3 py-2 font-medium text-gray-900">{u.name}</td>
-                  <td className="px-3 py-2 text-gray-700">{u.email}</td>
-                  <td className="px-3 py-2">
-                    {isAdmin ? (
-                      <select value={u.role} onChange={e => roleMutation.mutate({ id: u.id, role: e.target.value })}
-                        className="rounded border border-gray-300 px-2 py-1 text-sm">
-                        <option value="admin">admin</option>
-                        <option value="editor">editor</option>
-                      </select>
-                    ) : (
-                      <span className="text-gray-600 capitalize">{u.role}</span>
-                    )}
+              {regRequests.map(req => (
+                <tr key={req.id} className="border-b border-gray-50 hover:bg-amber-50/40">
+                  <td className="px-3 py-2 font-medium text-gray-900">
+                    <input
+                      value={getRegField(req, 'name')}
+                      onChange={e => handleRegChange(req.id, 'name', e.target.value)}
+                      className="rounded border border-transparent hover:border-gray-300 focus:border-blue-500 px-1 py-0.5 text-sm w-full min-w-[120px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-gray-600">
+                    <input
+                      type="email"
+                      value={getRegField(req, 'email')}
+                      onChange={e => handleRegChange(req.id, 'email', e.target.value)}
+                      className="rounded border border-transparent hover:border-gray-300 focus:border-blue-500 px-1 py-0.5 text-sm w-full min-w-[160px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
                   </td>
                   <td className="px-3 py-2">
-                    {isAdmin ? (
-                      <ChurchRoleCell
-                        userId={u.id}
-                        value={u.church_role || ''}
-                        onSave={(id, church_role) => churchRoleMutation.mutate({ id, church_role })}
-                      />
-                    ) : (
-                      <span className="text-gray-600">{u.church_role || '—'}</span>
-                    )}
+                    <input
+                      list={DATALIST_ID}
+                      value={getRegField(req, 'church_role')}
+                      onChange={e => handleRegChange(req.id, 'church_role', e.target.value)}
+                      className="rounded border border-gray-300 px-2 py-1 text-sm w-full min-w-[160px]"
+                    />
                   </td>
-                  {isAdmin && (
-                    <td className="px-3 py-2">
-                      <div className="flex gap-2">
-                        <button onClick={() => { setEditingUser(u); setEditForm({ name: u.name, email: u.email }); setEditError(''); }}
-                          className="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</button>
-                        <button onClick={() => resetMutation.mutate({ id: u.id, name: u.name })}
-                          className="text-yellow-600 hover:text-yellow-800 text-xs font-medium">Reset PW</button>
-                        {u.id !== currentUser?.id && (
-                          <button onClick={() => { if (confirm(`Delete ${u.name}?`)) deleteMutation.mutate(u.id); }}
-                            className="text-red-400 hover:text-red-600 text-xs">Del</button>
-                        )}
-                      </div>
-                    </td>
-                  )}
+                  <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">
+                    {new Date(req.requested_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {' '}
+                    {new Date(req.requested_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => handleApprove(req)}
+                        disabled={!!regLoading[req.id]}
+                        className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
+                        {regLoading[req.id] === 'approve' ? 'Approving…' : 'Approve'}
+                      </button>
+                      <button
+                        onClick={() => handleReject(req)}
+                        disabled={!!regLoading[req.id]}
+                        className="px-3 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50">
+                        {regLoading[req.id] === 'reject' ? 'Rejecting…' : 'Reject'}
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
+        <div className="space-y-6">
+          {GROUP_ORDER.map(hub => {
+            const group = grouped[hub];
+            if (!group || group.length === 0) return null;
+            const colors = GROUP_COLORS[hub];
+            return (
+              <div key={hub} className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+                <div className={`px-4 py-2 ${colors.header} border-b border-gray-200`}>
+                  <h2 className="font-semibold text-sm">{HUB_LABELS[hub] || hub}</h2>
+                  <p className="text-xs opacity-75">{GROUP_DESCRIPTIONS[hub]}</p>
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left px-3 py-2 font-medium text-gray-600">Name</th>
+                      <th className="text-left px-3 py-2 font-medium text-gray-600">Email</th>
+                      <th className="text-left px-3 py-2 font-medium text-gray-600">Role</th>
+                      <th className="text-left px-3 py-2 font-medium text-gray-600">Calling</th>
+                      {isAdmin && <th className="text-left px-3 py-2 font-medium text-gray-600">Hub</th>}
+                      {isAdmin && <th className="text-left px-3 py-2 font-medium text-gray-600">Last Login</th>}
+                      {isAdmin && <th className="px-3 py-2 font-medium text-gray-600">Actions</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.map(u => (
+                      <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50">
+                        <td className="px-3 py-2 font-medium text-gray-900">{u.name}</td>
+                        <td className="px-3 py-2 text-gray-700">{u.email}</td>
+                        <td className="px-3 py-2">
+                          {isAdmin ? (
+                            BISHOPRIC_CALLINGS.includes(u.church_role ?? '') ? (
+                              <select value={u.role} onChange={e => roleMutation.mutate({ id: u.id, role: e.target.value })}
+                                className="rounded border border-gray-300 px-2 py-1 text-sm">
+                                <option value="admin">admin</option>
+                                <option value="user">user</option>
+                              </select>
+                            ) : (
+                              <span className="text-gray-500 text-sm">user</span>
+                            )
+                          ) : (
+                            <span className="text-gray-600 capitalize">{u.role}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {isAdmin ? (
+                            <ChurchRoleCell
+                              userId={u.id}
+                              value={u.church_role || ''}
+                              onSave={(id, church_role) => churchRoleMutation.mutate({ id, church_role })}
+                            />
+                          ) : (
+                            <span className="text-gray-600">{u.church_role || '—'}</span>
+                          )}
+                        </td>
+                        {isAdmin && (
+                          <td className="px-3 py-2">
+                            {u.church_role ? (
+                              <span className="text-sm text-gray-500 italic">{HUB_LABELS[hubForChurchRole(u.church_role)] ?? '—'}</span>
+                            ) : (
+                              <select value={u.hub === 'bh' ? 'both' : u.hub ?? 'both'} onChange={e => hubMutation.mutate({ id: u.id, hub: e.target.value })}
+                                className="rounded border border-gray-300 px-2 py-1 text-sm">
+                                <option value="both">Bishopric and WC Hubs</option>
+                                <option value="wc">Ward Council Only</option>
+                                <option value="yc">Youth Council</option>
+                                <option value="cal">Calendar</option>
+                              </select>
+                            )}
+                          </td>
+                        )}
+                        {isAdmin && (
+                          <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">
+                            {u.last_login
+                              ? new Date(u.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                              : <span className="italic">Never</span>}
+                          </td>
+                        )}
+                        {isAdmin && (
+                          <td className="px-3 py-2">
+                            <div className="flex gap-2">
+                              <button onClick={() => { setEditingUser(u); setEditForm({ name: u.name, email: u.email }); setEditError(''); }}
+                                className="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</button>
+                              <button onClick={() => resetMutation.mutate({ id: u.id, name: u.name })}
+                                className="text-yellow-600 hover:text-yellow-800 text-xs font-medium">Reset PW</button>
+                              {u.id !== currentUser?.id && (
+                                <button onClick={() => { if (confirm(`Delete ${u.name}?`)) deleteMutation.mutate(u.id); }}
+                                  className="text-red-400 hover:text-red-600 text-xs">Del</button>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {isAdmin && (
+        <details className="mt-6 group">
+          <summary className="cursor-pointer list-none flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-700 select-none">
+            <span className="group-open:rotate-90 inline-block transition-transform">▶</span>
+            Hub Access Reference
+          </summary>
+          <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {([
+              { label: 'Bishopric Hub', desc: 'Full bishopric + ward council access', color: 'border-blue-200 bg-blue-50', header: 'text-blue-800', callings: BISHOPRIC_CALLINGS },
+              { label: 'Ward Council Hub', desc: 'Ward council access only', color: 'border-emerald-200 bg-emerald-50', header: 'text-emerald-800', callings: WC_CALLINGS },
+              { label: 'Youth Council Hub', desc: 'Youth calendar only', color: 'border-amber-200 bg-amber-50', header: 'text-amber-800', callings: YC_CALLINGS },
+              { label: 'Calendar Hub', desc: 'Calendar of events only', color: 'border-violet-200 bg-violet-50', header: 'text-violet-800', callings: CAL_CALLINGS },
+            ] as const).map(({ label, desc, color, header, callings }) => (
+              <div key={label} className={`rounded-lg border p-3 ${color}`}>
+                <p className={`text-xs font-bold uppercase tracking-wide mb-0.5 ${header}`}>{label}</p>
+                <p className="text-xs text-gray-500 mb-2">{desc}</p>
+                <ul className="space-y-0.5">
+                  {(callings as readonly string[]).map(c => (
+                    <li key={c} className="text-xs text-gray-700">{c}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
 
       {/* Admin: edit user name + email */}
@@ -272,17 +486,30 @@ export default function Users() {
           <Input label="Name" value={form.name} onChange={v => setForm({ ...form, name: v })} required />
           <Input label="Email" value={form.email} onChange={v => setForm({ ...form, email: v })} type="email" required />
           <Input label="Password" value={form.password} onChange={v => setForm({ ...form, password: v })} type="password" required />
-          <Select label="App Role" value={form.role} onChange={v => setForm({ ...form, role: v })} options={['admin', 'editor']} />
           <label className="block">
-            <span className="text-sm font-medium text-gray-700">Church Role</span>
+            <span className="text-sm font-medium text-gray-700">Calling</span>
             <input
               list={DATALIST_ID}
               value={form.church_role}
-              onChange={e => setForm({ ...form, church_role: e.target.value })}
+              onChange={e => setForm(f => ({ ...f, church_role: e.target.value }))}
               placeholder="Select or type…"
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </label>
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <Select label="Role" value={form.role} onChange={v => setForm({ ...form, role: v })} options={['user', 'admin']} />
+            </div>
+            <div className="flex-1">
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">Hub Access</span>
+                <div className="mt-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                  {HUB_LABELS[derivedHub] || derivedHub}
+                </div>
+              </label>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400">Hub access is automatically set based on calling.</p>
           {addError && <p className="text-red-600 text-sm">{addError}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => { setAdding(false); setAddError(''); }} className="px-4 py-2 text-sm text-gray-600">Cancel</button>

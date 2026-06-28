@@ -10,9 +10,21 @@ wrangler.jsonc
 # Data import/seed scripts — may contain personal ward data
 scripts/
 
-# Data import migrations — contain ward member names and event details
+# Data import/seed migrations — contain ward member names and event details
 migrations/*_import.sql
 migrations/*_seed.sql
+
+# Migrations with personal ward data (member names, interview records, birthdates, prayer history)
+migrations/0036_interview_youth_rename.sql
+migrations/0038_pipeline_rename_other.sql
+migrations/0037_recommend_dates.sql
+migrations/0039_fix_names_and_dates.sql
+migrations/0040_speakers_rename.sql
+migrations/0043_speakers_2025_2026.sql
+migrations/0044_ward_members.sql
+migrations/0045_sync_ward_members.sql
+migrations/0047_ward_member_birthdates.sql
+migrations/0048_import_prayers.sql
 
 # Environment files — never commit credentials or secrets
 .env

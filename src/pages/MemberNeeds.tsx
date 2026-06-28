@@ -4,6 +4,7 @@ import type { MemberNeed } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
 import { MEMBER_NEED_TYPES, SHARE_WITH_OPTIONS } from '../lib/constants';
+import { useAuth } from '../lib/auth';
 
 const CUSTOM_TYPES_KEY = 'bishopric_member_need_types';
 
@@ -41,9 +42,13 @@ function NeedTable({ rows, onEdit, onDelete, onTogglePray }: {
         </thead>
         <tbody>
           {rows.map(r => (
-            <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => onEdit(r)}>
-              <td className="px-3 py-2 text-center" onClick={e => { e.stopPropagation(); onTogglePray(r); }}>
-                <span className={`text-base cursor-pointer select-none ${r.pray_for ? 'opacity-100' : 'opacity-25'}`}>🙏</span>
+            <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
+              onClick={() => onEdit(r)}>
+              <td className="px-3 py-2 text-center">
+                <span
+                  className={`text-base select-none cursor-pointer ${r.pray_for ? 'opacity-100' : 'opacity-25'}`}
+                  onClick={e => { e.stopPropagation(); onTogglePray(r); }}
+                >🙏</span>
               </td>
               <td className="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">{r.who}</td>
               <td className="px-3 py-2 text-gray-700">{r.what}</td>
@@ -61,26 +66,34 @@ function NeedTable({ rows, onEdit, onDelete, onTogglePray }: {
 }
 
 export default function MemberNeeds() {
+  const { user, selectedHub } = useAuth();
+  const isWcContext = user?.hub === 'wc' || (user?.hub === 'both' && selectedHub === 'wc');
   const { rows, isLoading, create, update, remove } = useTable<MemberNeed>('member-needs');
   const [editing, setEditing] = useState<Partial<MemberNeed> | null>(null);
   const [, forceUpdate] = useState(0);
 
+  // hub='both' users in WC context see only WC-shared items (hub='wc' backend already filters)
+  const visibleRows = useMemo(
+    () => (isWcContext && user?.hub === 'both') ? rows.filter(r => r.shared_with_wc) : rows,
+    [rows, isWcContext, user]
+  );
+
   const allTypes = useMemo(() => {
     const stored = getStoredTypes();
-    const inUse = rows.map(r => r.type).filter(Boolean) as string[];
+    const inUse = visibleRows.map(r => r.type).filter(Boolean) as string[];
     return [...new Set([...MEMBER_NEED_TYPES, ...stored, ...inUse])];
-  }, [rows]);
+  }, [visibleRows]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, MemberNeed[]>();
     for (const type of allTypes) map.set(type, []);
-    for (const r of rows) {
+    for (const r of visibleRows) {
       const t = r.type || 'Other';
       if (!map.has(t)) map.set(t, []);
       map.get(t)!.push(r);
     }
     return [...map.entries()].filter(([, items]) => items.length > 0);
-  }, [rows, allTypes]);
+  }, [visibleRows, allTypes]);
 
   const handleSave = async () => {
     if (!editing) return;
@@ -100,14 +113,21 @@ export default function MemberNeeds() {
     update(r.id, { pray_for: r.pray_for ? 0 : 1 });
   };
 
+  const openNew = () => setEditing({ ...EMPTY, shared_with_wc: isWcContext ? 1 : 0 });
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Member Needs</h1>
-        <button onClick={() => setEditing({ ...EMPTY })} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+        <button onClick={openNew} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
           + Add Need
         </button>
       </div>
+      {isWcContext && (
+        <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 mb-4">
+          Showing needs shared with Ward Council.
+        </p>
+      )}
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div className="space-y-8">
@@ -144,18 +164,26 @@ export default function MemberNeeds() {
             </div>
             <Input label="Next Steps" value={editing.next_steps || ''} onChange={v => setEditing({ ...editing, next_steps: v })} />
             <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Share With</label>
-              <select value={editing.share_with || ''} onChange={e => setEditing({ ...editing, share_with: e.target.value })}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-                <option value="">— none —</option>
-                {SHARE_WITH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
+            {!isWcContext && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Share With</label>
+                <select value={editing.share_with || ''} onChange={e => setEditing({ ...editing, share_with: e.target.value })}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+                  <option value="">— none —</option>
+                  {SHARE_WITH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+            )}
             <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
               <input type="checkbox" checked={!!editing.pray_for} onChange={e => setEditing({ ...editing, pray_for: e.target.checked ? 1 : 0 })} className="rounded" />
               Include in prayer list
             </label>
+            {!isWcContext && (
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={!!editing.shared_with_wc} onChange={e => setEditing({ ...editing, shared_with_wc: e.target.checked ? 1 : 0 })} className="rounded" />
+                Share with ward council
+              </label>
+            )}
             <div className="flex justify-between pt-2">
               <div>
                 {editing.id && (

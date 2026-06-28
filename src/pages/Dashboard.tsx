@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTable } from '../lib/useTable';
 import { useAuth } from '../lib/auth';
@@ -14,14 +14,14 @@ import {
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const ACTION_STATUSES = new Set(['3. Approved and assigned', '7. Need to release']);
-const ACTIVE_MISSIONARY_STATUSES = new Set(['1-Considering', '2-Papers Started', '3-Papers Completed', '4-Call Accepted']);
+const ACTIVE_MISSIONARY_STATUSES = new Set(['1-Considering', '2-Papers Started', '3-Papers Submitted', '4-Call Accepted']);
 const FONT_SIZES: FontSize[] = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl'];
 
 function formatEventDate(iso: string): string {
   if (!iso) return '';
-  const d = new Date(iso);
+  const d = new Date(iso.slice(0, 10) + 'T12:00:00');
   if (isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function SectionTitle({ children, link }: { children: React.ReactNode; link?: string }) {
@@ -189,7 +189,7 @@ function DashboardSettingsModal({ config, onSave, onClose }: {
 
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-1">Bottom panels</p>
 
-          <SettingsSection title="Tasks"
+          <SettingsSection title="Action Items"
             visible={draft.tasks.visible} onVisibleChange={v => upd('tasks', { visible: v })}
             fontSize={draft.tasks.fontSize} onFontSizeChange={v => upd('tasks', { fontSize: v })}>
             <SubToggle label="Show assigned to" checked={draft.tasks.showAssignedTo}
@@ -242,6 +242,12 @@ export default function Dashboard() {
 
   const [newHealth, setNewHealth] = useState('');
   const [newSupport, setNewSupport] = useState('');
+  const [pendingRegCount, setPendingRegCount] = useState(0);
+
+  useEffect(() => {
+    if (user?.role !== 'admin') return;
+    fetch('/api/registration-requests').then(r => r.ok ? r.json() : []).then((rows: unknown[]) => setPendingRegCount(rows.length)).catch(() => {});
+  }, [user?.role]);
 
   const nextMeeting = useMemo(() =>
     meetings.filter(m => !m.no_meeting && m.date.slice(0, 10) >= TODAY)
@@ -294,6 +300,17 @@ export default function Dashboard() {
         )}
       </div>
 
+      {user?.role === 'admin' && pendingRegCount > 0 && (
+        <Link to="/users"
+          className="flex items-center gap-2 mb-3 px-3 py-2 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-800 hover:bg-amber-100 transition-colors">
+          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold flex-shrink-0">{pendingRegCount}</span>
+          <span>
+            {pendingRegCount === 1 ? '1 access request is' : `${pendingRegCount} access requests are`} pending approval
+          </span>
+          <span className="ml-auto text-amber-500">→</span>
+        </Link>
+      )}
+
       {/* TOP panels */}
       {topCount > 0 && (
         <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: `repeat(${topCount}, 1fr)`, height: '55%' }}>
@@ -302,11 +319,11 @@ export default function Dashboard() {
             <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col overflow-hidden">
               <SectionTitle link="/bishopric-meetings">Bishopric Meeting</SectionTitle>
               {nextMeeting ? (
-                <div className="flex-1 flex flex-col justify-center space-y-4">
+                <div className="flex-1 flex flex-col justify-start space-y-4">
                   {cfg.bishopricMeeting.showDate && (
                     <div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Date</p>
-                      <p className="text-lg font-semibold text-gray-700">
+                      <p className="text-lg font-bold text-gray-900">
                         {new Date(nextMeeting.date.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                       </p>
                     </div>
@@ -399,7 +416,7 @@ export default function Dashboard() {
           {cfg.tasks.visible && (
             <div className="bg-white rounded-xl border border-gray-200 flex flex-col overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 flex-shrink-0">
-                <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Tasks ({pendingTasks.length})</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Action Items ({pendingTasks.length})</span>
                 <Link to="/tasks" className="text-xs text-blue-400 hover:text-blue-600">↗</Link>
               </div>
               <div className="flex-1 overflow-y-auto px-4 py-2 min-h-0">
