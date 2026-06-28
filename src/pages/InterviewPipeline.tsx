@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useTable } from '../lib/useTable';
-import type { InterviewPipeline as InterviewType } from '../lib/api';
+import type { InterviewPipeline as InterviewType, WardMember } from '../lib/api';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Textarea } from '../components/FormFields'; // Select still used for Status
@@ -39,12 +39,13 @@ function formatRecommendDate(dateStr: string): string {
   return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
-type SortKey = 'member' | 'status' | 'assigned_to' | 'date_recommend_expires' | 'next_interview_date' | 'last_interview_datetime' | 'comments';
+type SortKey = 'member' | 'age' | 'status' | 'assigned_to' | 'date_recommend_expires' | 'next_interview_date' | 'last_interview_datetime' | 'comments';
 
-function InterviewTable({ rows, onEdit, onDelete }: {
+function InterviewTable({ rows, onEdit, onDelete, ageMap }: {
   rows: InterviewType[];
   onEdit: (r: InterviewType) => void;
   onDelete: (id: number) => void;
+  ageMap?: Map<string, number>;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('member');
   const [sortAsc, setSortAsc] = useState(true);
@@ -55,10 +56,16 @@ function InterviewTable({ rows, onEdit, onDelete }: {
   };
 
   const sorted = useMemo(() => [...rows].sort((a, b) => {
-    const av = ((a[sortKey] ?? '') as string).slice(0, 10);
-    const bv = ((b[sortKey] ?? '') as string).slice(0, 10);
+    if (sortKey === 'age' && ageMap) {
+      const av = ageMap.get(a.member.toLowerCase()) ?? 999;
+      const bv = ageMap.get(b.member.toLowerCase()) ?? 999;
+      return sortAsc ? av - bv : bv - av;
+    }
+    const sk = sortKey as keyof InterviewType;
+    const av = ((a[sk] ?? '') as string).slice(0, 10);
+    const bv = ((b[sk] ?? '') as string).slice(0, 10);
     return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
-  }), [rows, sortKey, sortAsc]);
+  }), [rows, sortKey, sortAsc, ageMap]);
 
   const Th = ({ col, label }: { col: SortKey; label: string }) => (
     <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap"
@@ -74,6 +81,7 @@ function InterviewTable({ rows, onEdit, onDelete }: {
         <thead>
           <tr className="border-b border-gray-100 bg-gray-50">
             <Th col="member" label="Member" />
+            {ageMap && <Th col="age" label="Age" />}
             <Th col="status" label="Status" />
             <Th col="assigned_to" label="Assigned To" />
             <Th col="date_recommend_expires" label="Rec. Expires" />
@@ -89,6 +97,7 @@ function InterviewTable({ rows, onEdit, onDelete }: {
             return (
             <tr key={r.id} className={`border-b border-gray-50 cursor-pointer hover:brightness-95 ${rowColor || 'hover:bg-gray-50'}`} onClick={() => onEdit(r)}>
               <td className="px-3 py-2 font-medium text-gray-900">{r.member}</td>
+              {ageMap && <td className="px-3 py-2 text-gray-600 text-center">{ageMap.get(r.member.toLowerCase()) ?? '—'}</td>}
               <td className="px-3 py-2"><StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} /></td>
               <td className="px-3 py-2 text-gray-600">{r.assigned_to}</td>
               <td className="px-3 py-2 text-sm font-medium text-gray-700">
@@ -110,8 +119,20 @@ function InterviewTable({ rows, onEdit, onDelete }: {
   );
 }
 
+const YOUTH_TYPES = new Set(['Annual Youth', 'Semi-Annual Youth']);
+
+function computeAge(birthDate: string): number {
+  const bd = new Date(birthDate.slice(0, 10) + 'T12:00:00');
+  const now = new Date();
+  let age = now.getFullYear() - bd.getFullYear();
+  const m = now.getMonth() - bd.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < bd.getDate())) age--;
+  return age;
+}
+
 export default function InterviewPipeline() {
   const { rows, isLoading, create, update, remove } = useTable<InterviewType>('interview-pipeline');
+  const { rows: wardMembers } = useTable<WardMember>('ward-members');
   const [editing, setEditing] = useState<Partial<InterviewType> | null>(null);
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -140,6 +161,14 @@ export default function InterviewPipeline() {
     else await create(data as Record<string, unknown>);
     setEditing(null);
   };
+
+  const ageMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const wm of wardMembers) {
+      if (wm.birth_date) m.set(wm.name.toLowerCase(), computeAge(wm.birth_date));
+    }
+    return m;
+  }, [wardMembers]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, InterviewType[]>();
@@ -191,7 +220,8 @@ export default function InterviewPipeline() {
                 {type}
                 <span className="text-gray-400 font-normal normal-case tracking-normal">({typeRows.length})</span>
               </h2>
-              <InterviewTable rows={typeRows} onEdit={setEditing} onDelete={remove} />
+              <InterviewTable rows={typeRows} onEdit={setEditing} onDelete={remove}
+                ageMap={YOUTH_TYPES.has(type) ? ageMap : undefined} />
             </div>
           ))}
           {grouped.length === 0 && <p className="text-gray-400 text-sm text-center py-8">No interviews found</p>}
