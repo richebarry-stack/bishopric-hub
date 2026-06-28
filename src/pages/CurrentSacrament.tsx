@@ -725,8 +725,9 @@ function parseSnapshot(json: string): AgendaCalling[] {
 }
 
 export default function CurrentSacrament() {
-  const { user } = useAuth();
-  const viewerMode: ViewerMode = user?.hub === 'wc'
+  const { user, selectedHub } = useAuth();
+  const isWcContext = user?.hub === 'wc' || (user?.hub === 'both' && selectedHub === 'wc');
+  const viewerMode: ViewerMode = isWcContext
     ? 'readonly'
     : user?.role === 'viewer'
       ? (/music.?coordinator/i.test(user.church_role || '') ? 'music' : 'readonly')
