@@ -236,6 +236,7 @@ export interface SacramentTheme {
   conducting: string;
   meeting_link: string;
   stake_business: string;
+  ward_business: string;
 }
 
 export interface SacramentAgendaNote {

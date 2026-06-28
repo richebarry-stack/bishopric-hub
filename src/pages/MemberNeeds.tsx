@@ -3,7 +3,7 @@ import { useTable } from '../lib/useTable';
 import type { MemberNeed } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
-import { MEMBER_NEED_TYPES, SHARE_WITH_OPTIONS } from '../lib/constants';
+import { MEMBER_NEED_TYPES } from '../lib/constants';
 import { useAuth } from '../lib/auth';
 
 const CUSTOM_TYPES_KEY = 'bishopric_member_need_types';
@@ -164,16 +164,6 @@ export default function MemberNeeds() {
             </div>
             <Input label="Next Steps" value={editing.next_steps || ''} onChange={v => setEditing({ ...editing, next_steps: v })} />
             <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} />
-            {!isWcContext && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Share With</label>
-                <select value={editing.share_with || ''} onChange={e => setEditing({ ...editing, share_with: e.target.value })}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-                  <option value="">— none —</option>
-                  {SHARE_WITH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </div>
-            )}
             <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
               <input type="checkbox" checked={!!editing.pray_for} onChange={e => setEditing({ ...editing, pray_for: e.target.checked ? 1 : 0 })} className="rounded" />
               Include in prayer list

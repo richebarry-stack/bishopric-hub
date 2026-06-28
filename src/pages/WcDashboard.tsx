@@ -206,13 +206,13 @@ export default function WcDashboard() {
       </div>
 
       {topCount > 0 && (
-        <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: `repeat(${topCount}, 1fr)`, height: '55%' }}>
+        <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: `repeat(${topCount}, 1fr)` }}>
 
           {cfg.meeting.visible && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
               <SectionTitle link="/wc-meetings">WC Meeting</SectionTitle>
               {nextMeeting ? (
-                <div className="flex-1 flex flex-col justify-start space-y-4 overflow-y-auto">
+                <div className="space-y-4">
                   {cfg.meeting.showDate && (
                     <div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Date</p>
@@ -247,7 +247,7 @@ export default function WcDashboard() {
                   )}
                 </div>
               ) : (
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex items-center justify-center py-6">
                   <p className="text-gray-300 text-lg">No upcoming meetings</p>
                 </div>
               )}
@@ -255,10 +255,10 @@ export default function WcDashboard() {
           )}
 
           {cfg.memberNeeds.visible && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
               <SectionTitle link="/wc-family-needs">Member Needs</SectionTitle>
-              <div className="flex flex-col h-full min-h-0">
-                <div className="flex-1 space-y-1.5 overflow-y-auto min-h-0">
+              <div className="flex flex-col">
+                <div className="space-y-1.5">
                   {prayerNeeds.length === 0 && <p className="text-gray-300 text-lg italic">None</p>}
                   {prayerNeeds.map(n => (
                     <div key={n.id} className="flex items-center gap-2">
@@ -280,9 +280,9 @@ export default function WcDashboard() {
           )}
 
           {cfg.missionaries.visible && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
               <SectionTitle link="/missionary-pipeline">Missionaries</SectionTitle>
-              <div className="flex-1 space-y-2 overflow-y-auto min-h-0">
+              <div className="space-y-2">
                 {activeMissionaries.length === 0 && <p className="text-gray-300 italic">None</p>}
                 {activeMissionaries.map(m => (
                   <div key={m.id}>

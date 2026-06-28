@@ -16,7 +16,7 @@ const INPUT_CLS = 'w-full rounded-md border border-gray-300 px-3 py-2 text-sm fo
 // 'speakers' removed — each speaker is now its own movable item interleaved with rest_special
 const FIXED_ORDER = [
   'conducting', 'chorister', 'organist', 'opening_hymn', 'opening_prayer',
-  'announcements', 'thanksgivings', 'sustainings', 'stake_business',
+  'announcements', 'ward_business', 'thanksgivings', 'sustainings', 'stake_business',
   'sacrament_hymn', 'rest_special', 'closing_hymn', 'closing_prayer',
 ] as const;
 type FixedKind = typeof FIXED_ORDER[number];
@@ -27,6 +27,7 @@ const ANCHOR: Record<FixedKind, number> = {
   opening_hymn:   4,
   opening_prayer: 5,
   announcements:  6,
+  ward_business:  6.2,
   thanksgivings:  6.4,
   sustainings:    6.7,
   stake_business: 7,
@@ -38,7 +39,8 @@ const ANCHOR: Record<FixedKind, number> = {
 const LABEL: Record<FixedKind, string> = {
   conducting:     'Conducting', chorister: 'Chorister', organist: 'Organist',
   opening_hymn:   'Opening Hymn', opening_prayer: 'Opening Prayer',
-  announcements:  'Announcements & Ward Business',
+  announcements:  'Announcements',
+  ward_business:  'Ward Business',
   thanksgivings:  'To Be Thanked',
   sustainings:    'To Be Sustained',
   stake_business: 'Stake Business',
@@ -274,6 +276,7 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
   const closingExisting = prayers.rows.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Closing');
 
   const [conducting,    setConducting]    = useState(existingTheme?.conducting    || '');
+  const [wardBusiness,  setWardBusiness]  = useState(existingTheme?.ward_business  || '');
   const [stakeBusiness, setStakeBusiness] = useState(existingTheme?.stake_business || '');
   const [chorister,     setChorister]     = useState(existingMusic?.chorister     || '');
   const [organist,      setOrganist]      = useState(existingMusic?.organist      || '');
@@ -386,9 +389,9 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
     isSavingRef.current = true;
     setSaving(true);
     try {
-      const themeFields = { meeting_date: date, conducting, stake_business: stakeBusiness };
+      const themeFields = { meeting_date: date, conducting, ward_business: wardBusiness, stake_business: stakeBusiness };
       if (existingTheme) await themes.update(existingTheme.id, themeFields);
-      else if (conducting || stakeBusiness) await themes.create(themeFields);
+      else if (conducting || wardBusiness || stakeBusiness) await themes.create(themeFields);
 
       const musicFields = { meeting_date: date, chorister, organist, opening_hymn: openingHymn, sacrament_hymn: sacramentHymn, rest_special: restSpecial, closing_hymn: closingHymn, child_blessing: childBlessing, confirmation, ordination };
       const hasMusic = !!(chorister || organist || openingHymn || sacramentHymn || restSpecial || closingHymn || childBlessing !== null || confirmation !== null || ordination !== null);
@@ -509,6 +512,7 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
             for (const c of sustainings) lines.push(`  • ${stripMd(c.member)}${c.calling ? ` — ${c.calling}` : ''}`);
           }
           break;
+        case 'ward_business':  if (wardBusiness)  lines.push(`Ward Business: ${wardBusiness}`);   break;
         case 'stake_business': if (stakeBusiness) lines.push(`Stake Business: ${stakeBusiness}`); break;
         case 'sacrament_hymn': if (sacramentHymn) lines.push(`Sacrament Hymn: ${sacramentHymn}`); break;
         case 'rest_special':   if (restSpecial)   lines.push(`Rest / Special Music: ${restSpecial}`); break;
@@ -634,11 +638,27 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
             case 'opening_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={openingHymn}   onChange={setOpeningHymn}   readonly={ro('opening_hymn')} />;
             case 'opening_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={openingPrayer} onChange={setOpeningPrayer} readonly={ro('opening_prayer')} />;
             case 'stake_business': return viewerMode ? null : <TextareaField key={kind} label={LABEL[kind]} value={stakeBusiness} onChange={setStakeBusiness} />;
+            case 'ward_business':  return viewerMode ? null : <TextareaField key={kind} label={LABEL[kind]} value={wardBusiness} onChange={setWardBusiness} />;
             case 'sacrament_hymn': return <SimpleField   key={kind} label={LABEL[kind]} value={sacramentHymn} onChange={setSacramentHymn} readonly={ro('sacrament_hymn')} />;
             case 'rest_special':   return <SimpleField   key={kind} label={LABEL[kind]} value={restSpecial}   onChange={setRestSpecial}   readonly={ro('rest_special')} />;
             case 'closing_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={closingHymn}   onChange={setClosingHymn}   readonly={ro('closing_hymn')} />;
             case 'closing_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={closingPrayer} onChange={setClosingPrayer} readonly={ro('closing_prayer')} />;
-            case 'announcements':  return viewerMode ? null : <AnnouncementsSection key={kind} rows={announceRows} setRows={setAnnounceRows} />;
+            case 'announcements':
+              if (viewerMode === 'music') return null;
+              if (viewerMode === 'readonly') {
+                const visibleAnn = announceRows.filter(r => r.title.trim());
+                if (visibleAnn.length === 0) return null;
+                return (
+                  <Row key={kind} label={LABEL[kind]}>
+                    <ul className="space-y-0.5 py-1">
+                      {visibleAnn.map((r, i) => (
+                        <li key={i} className="text-sm text-gray-800">• {r.title}{r.notes ? ` — ${r.notes}` : ''}</li>
+                      ))}
+                    </ul>
+                  </Row>
+                );
+              }
+              return <AnnouncementsSection key={kind} rows={announceRows} setRows={setAnnounceRows} />;
             case 'thanksgivings':  return viewerMode ? null : <CallingsList key={kind} label={LABEL[kind]} callings={thanksgivings}
               script={"[Name] has been released as [position]. Those who would like to express thanks for [his or her] service may show it by the uplifted hand."} />;
             case 'sustainings':    return viewerMode ? null : <CallingsList key={kind} label={LABEL[kind]} callings={sustainings}

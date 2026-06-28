@@ -231,7 +231,7 @@ export default function WcDiscussionTopics() {
   const nextMeeting = upcomingMeetings[0] ?? null;
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const activeMeetingDate = selectedDate ?? nextMeeting?.date?.slice(0, 10) ?? null;
-  const isCurrentMeeting = activeMeetingDate === nextMeeting?.date?.slice(0, 10);
+  const isPastMeeting = activeMeetingDate !== null && activeMeetingDate < TODAY;
 
   const activeTopics = useMemo(() =>
     topics.filter(t => t.meeting_date?.slice(0, 10) === activeMeetingDate),
@@ -247,12 +247,32 @@ export default function WcDiscussionTopics() {
     if (found) {
       return { existingId: found.id, status: found.status ?? '', next_steps: found.next_steps ?? '', help_needed: found.help_needed ?? '' };
     }
-    if (isCurrentMeeting && prevTopics.length > 0) {
-      const prev = prevTopics.find(t => t.organization === org);
-      if (prev) return { existingId: null, status: prev.status ?? '', next_steps: prev.next_steps ?? '', help_needed: prev.help_needed ?? '' };
-    }
     return { existingId: null, status: '', next_steps: '', help_needed: '' };
-  }, [activeTopics, prevTopics, isCurrentMeeting]);
+  }, [activeTopics]);
+
+  const [copyingPrior, setCopyingPrior] = useState(false);
+
+  const handleCopyFromPrior = useCallback(async () => {
+    if (!activeMeetingDate || prevTopics.length === 0) return;
+    const hasContent = activeTopics.some(t => t.status || t.next_steps || t.help_needed);
+    if (hasContent && !window.confirm('This will replace existing content for this meeting. Continue?')) return;
+    setCopyingPrior(true);
+    try {
+      for (const org of orgOrder) {
+        const prev = prevTopics.find(t => t.organization === org);
+        if (!prev) continue;
+        const current = activeTopics.find(t => t.organization === org);
+        const payload = { status: prev.status ?? '', next_steps: prev.next_steps ?? '', help_needed: prev.help_needed ?? '' };
+        if (current) {
+          await update(current.id, payload);
+        } else {
+          await create({ meeting_date: activeMeetingDate, organization: org, topic: '', ...payload });
+        }
+      }
+    } finally {
+      setCopyingPrior(false);
+    }
+  }, [activeMeetingDate, prevTopics, activeTopics, orgOrder, create, update]);
 
   const handleSave = useCallback(async (org: string, field: 'status' | 'next_steps' | 'help_needed', value: string) => {
     if (!activeMeetingDate) return;
@@ -294,11 +314,17 @@ export default function WcDiscussionTopics() {
                 <option key={m.id} value={m.date.slice(0, 10)}>{formatDate(m.date)}</option>
               ))}
             </select>
-            {!isCurrentMeeting && (
+            {isPastMeeting && (
               <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Read-only — past meeting</span>
             )}
-            {isCurrentMeeting && prevMeetingDate && activeTopics.length < ORGS.length && (
-              <span className="text-xs text-gray-400 italic">Pre-filled from previous meeting</span>
+            {!isPastMeeting && prevTopics.length > 0 && (
+              <button
+                type="button"
+                onClick={handleCopyFromPrior}
+                disabled={copyingPrior}
+                className="text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded hover:bg-emerald-100 disabled:opacity-50">
+                {copyingPrior ? 'Copying…' : 'Copy from prior meeting'}
+              </button>
             )}
           </div>
 
@@ -347,15 +373,15 @@ export default function WcDiscussionTopics() {
                       <td className="px-4 py-2 font-medium text-gray-800 align-top whitespace-nowrap">{org}</td>
                       <td className="px-2 py-1 align-top">
                         <AutoTextarea value={row.status} onSave={v => handleSave(org, 'status', v)}
-                          readOnly={!isCurrentMeeting} placeholder="Status…" />
+                          readOnly={isPastMeeting} placeholder="Status…" />
                       </td>
                       <td className="px-2 py-1 align-top">
                         <AutoTextarea value={row.next_steps} onSave={v => handleSave(org, 'next_steps', v)}
-                          readOnly={!isCurrentMeeting} placeholder="Next steps…" />
+                          readOnly={isPastMeeting} placeholder="Next steps…" />
                       </td>
                       <td className="px-2 py-1 align-top">
                         <AutoTextarea value={row.help_needed} onSave={v => handleSave(org, 'help_needed', v)}
-                          readOnly={!isCurrentMeeting} placeholder="Help needed…" />
+                          readOnly={isPastMeeting} placeholder="Help needed…" />
                       </td>
                     </tr>
                   );

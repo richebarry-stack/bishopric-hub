@@ -44,8 +44,8 @@ function NeedList({ items, onToggle, newValue, onChangeNew, onAdd, placeholder, 
   fontSize: FontSize;
 }) {
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 space-y-1.5 overflow-y-auto min-h-0">
+    <div className="flex flex-col">
+      <div className="space-y-1.5">
         {items.length === 0 && <p className="text-gray-300 text-lg italic">None</p>}
         {items.map(n => (
           <div key={n.id} className="flex items-center gap-2">
@@ -313,13 +313,13 @@ export default function Dashboard() {
 
       {/* TOP panels */}
       {topCount > 0 && (
-        <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: `repeat(${topCount}, 1fr)`, height: '55%' }}>
+        <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: `repeat(${topCount}, 1fr)` }}>
 
           {cfg.bishopricMeeting.visible && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
               <SectionTitle link="/bishopric-meetings">Bishopric Meeting</SectionTitle>
               {nextMeeting ? (
-                <div className="flex-1 flex flex-col justify-start space-y-4">
+                <div className="space-y-4">
                   {cfg.bishopricMeeting.showDate && (
                     <div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Date</p>
@@ -364,7 +364,7 @@ export default function Dashboard() {
                   )}
                 </div>
               ) : (
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex items-center justify-center py-6">
                   <p className="text-gray-300 text-lg">No upcoming meetings</p>
                 </div>
               )}
@@ -372,7 +372,7 @@ export default function Dashboard() {
           )}
 
           {cfg.healthNeeds.visible && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
               <SectionTitle link="/member-needs">Health Needs</SectionTitle>
               <NeedList items={healthNeeds} onToggle={removePrayer}
                 newValue={newHealth} onChangeNew={setNewHealth} onAdd={handleAddHealth}
@@ -381,7 +381,7 @@ export default function Dashboard() {
           )}
 
           {cfg.supportNeeds.visible && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
               <SectionTitle link="/member-needs">Needs Support</SectionTitle>
               <NeedList items={supportNeeds} onToggle={removePrayer}
                 newValue={newSupport} onChangeNew={setNewSupport} onAdd={handleAddSupport}
@@ -390,9 +390,9 @@ export default function Dashboard() {
           )}
 
           {cfg.missionaries.visible && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
               <SectionTitle link="/missionary-pipeline">Missionaries</SectionTitle>
-              <div className="flex-1 space-y-2 overflow-y-auto min-h-0">
+              <div className="space-y-2">
                 {activeMissionaries.length === 0 && <p className="text-gray-300 text-lg italic">None</p>}
                 {activeMissionaries.map(m => (
                   <div key={m.id}>
