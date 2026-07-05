@@ -376,6 +376,7 @@ export default function Help() {
                 'Sacrament export: removed the "Note:" prefix on custom agenda items',
                 'Sacrament agenda: added an editable "Preparing for the Sacrament" line just before the Sacrament Hymn',
                 'Guests and Ward Council now see only the core meeting structure (Presiding, Conducting, Chorister, Organist, Opening Hymn, Sacrament Hymn, Speakers/Testimonies, Closing Hymn)',
+                'Sacrament export: "To Be Sustained" section now includes standard sustaining vote wording after the names',
               ],
             },
             {

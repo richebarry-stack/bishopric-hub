@@ -654,6 +654,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
               const name = stripMd(c.member);
               lines.push(c.calling ? `  • ${name} has been called as ${stripMd(c.calling)}.` : `  • ${name}`);
             }
+            lines.push('We propose that they be sustained in these callings. Those in favor may manifest it by the uplifted hand. (pause) Those opposed, if any, may manifest it (pause)');
           }
           break;
         case 'ward_business':  if (wardBusiness)  lines.push(`Ward Business: ${wardBusiness}`);   break;
