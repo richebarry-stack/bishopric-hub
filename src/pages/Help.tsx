@@ -388,6 +388,7 @@ export default function Help() {
                 'Sacrament export: "To Be Sustained" now introduces the names with "The following have been called to positions in the ward. We ask that if they are present that they please stand and remain standing until the sustaining vote is complete." before listing name — calling',
                 'Sacrament export: "Closing Remarks" now always appears in the export, even when the field is left blank',
                 'Sacrament export: High Councilor recognition now reads "Brother [Last Name]" instead of the full name',
+                'Auto-filled Conducting for future sacrament meetings now shows "Bishop [Last Name]" or "Brother [Last Name]" instead of the full name, including retroactively fixing already-scheduled future weeks',
               ],
             },
             {

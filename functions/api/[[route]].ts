@@ -763,12 +763,24 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const body = await request.json() as { today?: string };
     const todayStr = body.today || new Date().toISOString().slice(0, 10);
 
+    const usersResult = await db.prepare('SELECT name, church_role FROM users').all();
+    const roleByName = new Map<string, string>();
+    for (const u of usersResult.results as { name: string; church_role: string }[]) {
+      if (u.name) roleByName.set(u.name.trim(), u.church_role || '');
+    }
+    const formatConductor = (rawName: string): string => {
+      const title = roleByName.get(rawName) === 'Bishop' ? 'Bishop' : 'Brother';
+      const lastName = rawName.trim().split(/\s+/).pop() || rawName;
+      return `${title} ${lastName}`;
+    };
+
     const assignmentsResult = await db.prepare('SELECT month, plan_conduct FROM rotating_assignments').all();
-    const assignmentMap = new Map<string, string>();
+    const assignmentMap = new Map<string, { raw: string; formatted: string }>();
     for (const a of assignmentsResult.results as { month: string; plan_conduct: string }[]) {
       if (a.month && a.plan_conduct) {
         const key = a.month.trim().slice(0, 3);
-        assignmentMap.set(key.charAt(0).toUpperCase() + key.slice(1).toLowerCase(), a.plan_conduct.trim());
+        const raw = a.plan_conduct.trim();
+        assignmentMap.set(key.charAt(0).toUpperCase() + key.slice(1).toLowerCase(), { raw, formatted: formatConductor(raw) });
       }
     }
     if (assignmentMap.size === 0) return json({ ok: true, created: 0, updated: 0 });
@@ -790,8 +802,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     for (let i = 0; i < 12; i++) {
       const monthIdx = (startMonthNum - 1 + i) % 12; // 0-based
       const year = startYear + Math.floor((startMonthNum - 1 + i) / 12);
-      const conductor = assignmentMap.get(MONTH_ABBR[monthIdx]);
-      if (!conductor) continue;
+      const assignment = assignmentMap.get(MONTH_ABBR[monthIdx]);
+      if (!assignment) continue;
 
       // Find first Sunday of month then step by 7
       const firstDay = new Date(year, monthIdx, 1);
@@ -805,14 +817,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
         const existing = themeMap.get(dateStr);
         if (existing) {
-          if (!existing.conducting || !existing.conducting.trim()) {
-            stmts.push(db.prepare('UPDATE sacrament_themes SET conducting = ?, updated_at = ? WHERE id = ?').bind(conductor, now, existing.id));
+          const cur = (existing.conducting || '').trim();
+          // Fill blanks, and retroactively re-title anything still holding the old raw assignment name
+          if (!cur || cur === assignment.raw) {
+            stmts.push(db.prepare('UPDATE sacrament_themes SET conducting = ?, updated_at = ? WHERE id = ?').bind(assignment.formatted, now, existing.id));
             updated++;
           }
         } else {
-          stmts.push(db.prepare('INSERT INTO sacrament_themes (meeting_date, conducting, theme, references_text, meeting_link, stake_business, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(dateStr, conductor, '', '', '', '', now));
+          stmts.push(db.prepare('INSERT INTO sacrament_themes (meeting_date, conducting, theme, references_text, meeting_link, stake_business, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(dateStr, assignment.formatted, '', '', '', '', now));
           created++;
-          themeMap.set(dateStr, { id: -1, conducting: conductor });
+          themeMap.set(dateStr, { id: -1, conducting: assignment.formatted });
         }
       }
     }
