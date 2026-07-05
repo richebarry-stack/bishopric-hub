@@ -248,6 +248,7 @@ export interface SacramentTheme {
   is_fast_sunday: number;
   sacrament_intro: string;
   high_councilor: string;
+  stake_reps: string;
 }
 
 export interface SacramentAgendaNote {

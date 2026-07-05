@@ -382,6 +382,8 @@ export default function Help() {
                 'Fixed: High Councilor recognition sometimes missing from Recognize defaults due to a data-loading race condition',
                 'Sacrament agenda: music thanks in Recognize now automatically follows that week\'s current Organist/Chorister fields instead of being frozen in at save time',
                 'Sacrament agenda: added a dedicated High Councilor field, pre-filled from the current High Councilor user and editable per week; feeds the Recognize section in the export automatically',
+                'Sacrament agenda: added an "Other Stake Representatives" field for recognizing additional stake guests when present; left blank by default and omitted from the export when empty',
+                'Export PDF no longer auto-opens the print dialog — print manually from the opened tab when ready',
               ],
             },
             {
