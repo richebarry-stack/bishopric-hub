@@ -14,13 +14,19 @@ import { renderRichText } from '../lib/richText';
 const INPUT_CLS = 'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500';
 
 const DEFAULT_INTRO_REMARKS = 'Welcome those with us today to our church services, as we are here to remember and worship our Savior Jesus Christ. We offer a special welcome to any that are visiting or that may be here for the first time.';
+const DEFAULT_SACRAMENT_INTRO = 'Now we will prepare for the sacrament which is the central focus of our meeting by singing…';
+
+// Guests and Ward Council read-only viewers only see the bare structure of the meeting
+const READONLY_VISIBLE_KINDS = new Set([
+  'presiding', 'conducting', 'chorister', 'organist', 'opening_hymn', 'sacrament_hymn', 'testimonies', 'closing_hymn',
+]);
 
 // 'speakers' removed — each speaker is now its own movable item interleaved with rest_special
 const FIXED_ORDER = [
   'intro_remarks',
   'presiding', 'conducting', 'chorister', 'organist', 'recognize', 'opening_hymn', 'opening_prayer',
   'announcements', 'ward_business', 'thanksgivings', 'sustainings', 'stake_business',
-  'sacrament_hymn', 'testimonies', 'rest_special', 'closing_remarks', 'closing_hymn', 'closing_prayer',
+  'sacrament_intro', 'sacrament_hymn', 'testimonies', 'rest_special', 'closing_remarks', 'closing_hymn', 'closing_prayer',
 ] as const;
 type FixedKind = typeof FIXED_ORDER[number];
 const ANCHOR: Record<FixedKind, number> = {
@@ -37,6 +43,7 @@ const ANCHOR: Record<FixedKind, number> = {
   thanksgivings:  6.4,
   sustainings:    6.7,
   stake_business: 7,
+  sacrament_intro: 7.9,
   sacrament_hymn: 8,
   testimonies:    8.5,
   rest_special:   9,
@@ -56,6 +63,7 @@ const LABEL: Record<FixedKind, string> = {
   sustainings:    'To Be Sustained',
   testimonies:    'Bearing of Testimonies',
   stake_business: 'Stake Business',
+  sacrament_intro: 'Preparing for the Sacrament',
   sacrament_hymn: 'Sacrament Hymn',
   rest_special:   'Rest / Special Music',
   closing_remarks: 'Closing Remarks',
@@ -358,6 +366,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   const [stakeBusiness,  setStakeBusiness]  = useState(existingTheme?.stake_business  || '');
   const [closingRemarks, setClosingRemarks] = useState(existingTheme?.closing_remarks || '');
   const [isFastSunday,   setIsFastSunday]   = useState(!!existingTheme?.is_fast_sunday);
+  const [sacramentIntro, setSacramentIntro] = useState(existingTheme?.sacrament_intro || DEFAULT_SACRAMENT_INTRO);
   const [chorister,     setChorister]     = useState(existingMusic?.chorister     || '');
   const [organist,      setOrganist]      = useState(existingMusic?.organist      || '');
   const [openingHymn,   setOpeningHymn]   = useState(existingMusic?.opening_hymn  || '');
@@ -495,10 +504,10 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       const themeFields = {
         meeting_date: date, presiding, conducting, ward_business: wardBusiness, stake_business: stakeBusiness,
         intro_remarks: introRemarks, recognize: recognizeValue, closing_remarks: closingRemarks,
-        is_fast_sunday: isFastSunday ? 1 : 0,
+        is_fast_sunday: isFastSunday ? 1 : 0, sacrament_intro: sacramentIntro,
       };
       if (existingTheme) await themes.update(existingTheme.id, themeFields);
-      else if (presiding || conducting || wardBusiness || stakeBusiness || introRemarks || recognizeValue || closingRemarks || isFastSunday) await themes.create(themeFields);
+      else if (presiding || conducting || wardBusiness || stakeBusiness || introRemarks || recognizeValue || closingRemarks || isFastSunday || sacramentIntro) await themes.create(themeFields);
 
       const musicFields = { meeting_date: date, chorister, organist, opening_hymn: openingHymn, sacrament_hymn: sacramentHymn, rest_special: restSpecial, closing_hymn: closingHymn, child_blessing: childBlessing, confirmation, ordination };
       const hasMusic = !!(chorister || organist || openingHymn || sacramentHymn || restSpecial || closingHymn || childBlessing !== null || confirmation !== null || ordination !== null);
@@ -596,7 +605,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       }
       if (item.kind === 'note') {
         const c = noteRows[item.noteIndex].content.trim();
-        if (c) lines.push(`Note: ${c}`);
+        if (c) lines.push(c);
         continue;
       }
       if (item.kind === 'optional') {
@@ -649,6 +658,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
           break;
         case 'ward_business':  if (wardBusiness)  lines.push(`Ward Business: ${wardBusiness}`);   break;
         case 'stake_business': if (stakeBusiness) lines.push(`Stake Business: ${stakeBusiness}`); break;
+        case 'sacrament_intro': if (sacramentIntro) lines.push(sacramentIntro); break;
         case 'sacrament_hymn': if (sacramentHymn) lines.push(`Sacrament Hymn: ${sacramentHymn}`); break;
         case 'testimonies':    if (isFastSunday)  lines.push('Bearing of Testimonies'); break;
         case 'rest_special':   if (restSpecial)   lines.push(`Rest / Special Music: ${restSpecial}`); break;
@@ -698,6 +708,11 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
     return speakerRows.filter(s => s.position < myPos).length;
   };
 
+  // Read-only viewers (guests, Ward Council) only see the bare structure of the meeting
+  const visibleMerged = viewerMode === 'readonly'
+    ? merged.filter(item => item.kind === 'speaker' || READONLY_VISIBLE_KINDS.has(item.kind as string))
+    : merged;
+
   return (
     <div className="max-w-3xl">
       <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6" onBlur={triggerAutoSave}>
@@ -709,7 +724,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
             Fast &amp; Testimony Meeting (no assigned speakers)
           </label>
         )}
-        {merged.map((item, mi) => {
+        {visibleMerged.map((item, mi) => {
           if (item.kind === 'speaker') {
             const si = item.speakerIndex;
             const row = speakerRows[si];
@@ -802,6 +817,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
             case 'opening_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={openingPrayer} onChange={setOpeningPrayer} readonly={ro('opening_prayer')} />;
             case 'stake_business': return viewerMode ? null : <TextareaField key={kind} label={LABEL[kind]} value={stakeBusiness} onChange={setStakeBusiness} />;
             case 'ward_business':  return viewerMode ? null : <TextareaField key={kind} label={LABEL[kind]} value={wardBusiness} onChange={setWardBusiness} />;
+            case 'sacrament_intro': return <TextareaField key={kind} label={LABEL[kind]} value={sacramentIntro} onChange={setSacramentIntro} readonly={ro('sacrament_intro')} />;
             case 'sacrament_hymn': return <SimpleField   key={kind} label={LABEL[kind]} value={sacramentHymn} onChange={setSacramentHymn} readonly={ro('sacrament_hymn')} />;
             case 'testimonies':
               return (

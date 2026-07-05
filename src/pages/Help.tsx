@@ -373,6 +373,9 @@ export default function Help() {
                 'Sacrament agenda: Introductory Remarks and Recognize now pre-fill with a welcome message and the stake High Councilor/music/door-greeter thanks; Recognize items can be added or removed individually',
                 'Sacrament agenda: added a Fast & Testimony Meeting toggle that replaces assigned speakers with a Bearing of Testimonies item, in both Current Sacrament and Sacrament Planning',
                 'Sacrament export: "To Be Thanked" section now includes standard release wording before the names',
+                'Sacrament export: removed the "Note:" prefix on custom agenda items',
+                'Sacrament agenda: added an editable "Preparing for the Sacrament" line just before the Sacrament Hymn',
+                'Guests and Ward Council now see only the core meeting structure (Presiding, Conducting, Chorister, Organist, Opening Hymn, Sacrament Hymn, Speakers/Testimonies, Closing Hymn)',
               ],
             },
             {

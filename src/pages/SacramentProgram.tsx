@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useTable } from '../lib/useTable';
-import type { SacramentSpeaker, Prayer, SacramentMusic, SacramentTheme, SacramentAnnouncement } from '../lib/api';
+import type { SacramentSpeaker, SacramentMusic, SacramentTheme } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
 const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -40,12 +40,10 @@ export default function SacramentProgram() {
   const [date, setDate] = useState(currentSunday);
 
   const { rows: speakers, isLoading: spLoad } = useTable<SacramentSpeaker>('sacrament-speakers');
-  const { rows: prayers,  isLoading: prLoad } = useTable<Prayer>('prayers');
   const { rows: music,    isLoading: muLoad } = useTable<SacramentMusic>('sacrament-music');
   const { rows: themes,   isLoading: thLoad } = useTable<SacramentTheme>('sacrament-themes');
-  const { rows: announcements, isLoading: anLoad } = useTable<SacramentAnnouncement>('sacrament-announcements');
 
-  const isLoading = spLoad || prLoad || muLoad || thLoad || anLoad;
+  const isLoading = spLoad || muLoad || thLoad;
 
   const theme   = useMemo(() => themes.find(t => toKey(t.meeting_date) === date), [themes, date]);
   const mus     = useMemo(() => music.find(m => toKey(m.meeting_date) === date), [music, date]);
@@ -53,11 +51,9 @@ export default function SacramentProgram() {
     () => speakers.filter(s => toKey(s.meeting_date) === date).sort((a, b) => (a.speaking_order ?? 0) - (b.speaking_order ?? 0)),
     [speakers, date]
   );
-  const opening = useMemo(() => prayers.find(p => toKey(p.meeting_date) === date && p.opening_closing === 'Opening'), [prayers, date]);
-  const closing = useMemo(() => prayers.find(p => toKey(p.meeting_date) === date && p.opening_closing === 'Closing'), [prayers, date]);
-  const dateAnnouncements = useMemo(() => announcements.filter(a => toKey(a.meeting_date) === date), [announcements, date]);
+  const isFastSunday = !!theme?.is_fast_sunday;
 
-  const hasContent = !!(theme || mus || dateSpeakers.length || opening || closing || (!isSacGuest && dateAnnouncements.length));
+  const hasContent = !!(theme?.presiding || theme?.conducting || mus || dateSpeakers.length || isFastSunday);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -91,33 +87,12 @@ export default function SacramentProgram() {
       ) : (
         <div className="space-y-5">
 
-          {/* Theme + Conducting */}
-          {theme && (
+          {/* Presiding / Conducting */}
+          {(theme?.presiding || theme?.conducting) && (
             <section className="bg-white rounded-lg border border-gray-200 p-4">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Theme</h2>
-              {theme.theme && <p className="text-gray-800 font-medium">{theme.theme}</p>}
-              {theme.conducting && (
-                <p className="text-sm text-gray-600 mt-1">Conducting: {theme.conducting}</p>
-              )}
-              {theme.references_text && (
-                <p className="text-sm text-gray-500 mt-2 whitespace-pre-line">{theme.references_text}</p>
-              )}
-            </section>
-          )}
-
-          {/* Prayers */}
-          {(opening || closing) && (
-            <section className="bg-white rounded-lg border border-gray-200 p-4">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Prayers</h2>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="font-medium text-gray-600">Opening</p>
-                  <p className="text-gray-800 mt-0.5">{opening?.name || <span className="text-gray-400">TBD</span>}</p>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-600">Closing</p>
-                  <p className="text-gray-800 mt-0.5">{closing?.name || <span className="text-gray-400">TBD</span>}</p>
-                </div>
+              <div className="space-y-1.5 text-sm">
+                {theme?.presiding  && <Row label="Presiding"  value={theme.presiding} />}
+                {theme?.conducting && <Row label="Conducting" value={theme.conducting} />}
               </div>
             </section>
           )}
@@ -129,7 +104,6 @@ export default function SacramentProgram() {
               <div className="space-y-1.5 text-sm">
                 {mus.opening_hymn  && <Row label="Opening Hymn"   value={mus.opening_hymn} />}
                 {mus.sacrament_hymn && <Row label="Sacrament Hymn" value={mus.sacrament_hymn} />}
-                {mus.rest_special   && <Row label="Special Music"  value={mus.rest_special} />}
                 {mus.closing_hymn  && <Row label="Closing Hymn"   value={mus.closing_hymn} />}
                 {(mus.chorister || mus.organist) && (
                   <div className="pt-2 mt-2 border-t border-gray-100 grid grid-cols-2 gap-2 text-gray-500">
@@ -141,8 +115,13 @@ export default function SacramentProgram() {
             </section>
           )}
 
-          {/* Speakers */}
-          {dateSpeakers.length > 0 && (
+          {/* Speakers / Bearing of Testimonies */}
+          {isFastSunday ? (
+            <section className="bg-white rounded-lg border border-gray-200 p-4">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Bearing of Testimonies</h2>
+              <p className="text-sm text-gray-500 italic">Members of the ward bear their testimonies.</p>
+            </section>
+          ) : dateSpeakers.length > 0 && (
             <section className="bg-white rounded-lg border border-gray-200 p-4">
               <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Speakers</h2>
               <div className="space-y-3">
@@ -156,21 +135,6 @@ export default function SacramentProgram() {
                   </div>
                 ))}
               </div>
-            </section>
-          )}
-
-          {/* Announcements (no ward/stake business) */}
-          {!isSacGuest && dateAnnouncements.length > 0 && (
-            <section className="bg-white rounded-lg border border-gray-200 p-4">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Announcements</h2>
-              <ul className="space-y-2">
-                {dateAnnouncements.map(a => (
-                  <li key={a.id} className="text-sm">
-                    <span className="font-medium text-gray-800">{a.title}</span>
-                    {a.notes && <p className="text-gray-600 mt-0.5">{a.notes}</p>}
-                  </li>
-                ))}
-              </ul>
             </section>
           )}
 
