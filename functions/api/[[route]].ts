@@ -763,14 +763,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const body = await request.json() as { today?: string };
     const todayStr = body.today || new Date().toISOString().slice(0, 10);
 
+    // rotating_assignments.plan_conduct may hold just a last name (e.g. "Jones") or a full name —
+    // match by last name so lookups work either way.
     const usersResult = await db.prepare('SELECT name, church_role FROM users').all();
-    const roleByName = new Map<string, string>();
+    const roleByLastName = new Map<string, string>();
     for (const u of usersResult.results as { name: string; church_role: string }[]) {
-      if (u.name) roleByName.set(u.name.trim(), u.church_role || '');
+      if (!u.name) continue;
+      const lastName = u.name.trim().split(/\s+/).pop();
+      if (lastName) roleByLastName.set(lastName, u.church_role || '');
     }
     const formatConductor = (rawName: string): string => {
-      const title = roleByName.get(rawName) === 'Bishop' ? 'Bishop' : 'Brother';
       const lastName = rawName.trim().split(/\s+/).pop() || rawName;
+      const title = roleByLastName.get(lastName) === 'Bishop' ? 'Bishop' : 'Brother';
       return `${title} ${lastName}`;
     };
 
