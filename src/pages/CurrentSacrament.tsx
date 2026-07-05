@@ -24,7 +24,7 @@ const READONLY_VISIBLE_KINDS = new Set([
 // 'speakers' removed — each speaker is now its own movable item interleaved with rest_special
 const FIXED_ORDER = [
   'intro_remarks',
-  'presiding', 'conducting', 'chorister', 'organist', 'recognize', 'opening_hymn', 'opening_prayer',
+  'presiding', 'conducting', 'chorister', 'organist', 'high_councilor', 'recognize', 'opening_hymn', 'opening_prayer',
   'announcements', 'ward_business', 'thanksgivings', 'sustainings', 'stake_business',
   'sacrament_intro', 'sacrament_hymn', 'testimonies', 'rest_special', 'closing_remarks', 'closing_hymn', 'closing_prayer',
 ] as const;
@@ -35,6 +35,7 @@ const ANCHOR: Record<FixedKind, number> = {
   conducting:     1,
   chorister:      2,
   organist:       3,
+  high_councilor: 3.3,
   recognize:      3.5,
   opening_hymn:   4,
   opening_prayer: 5,
@@ -55,6 +56,7 @@ const LABEL: Record<FixedKind, string> = {
   intro_remarks:  'Introductory Remarks',
   presiding:      'Presiding',
   conducting:     'Conducting', chorister: 'Chorister', organist: 'Organist',
+  high_councilor: 'High Councilor',
   recognize:      'Recognize',
   opening_hymn:   'Opening Hymn', opening_prayer: 'Opening Prayer',
   announcements:  'Announcements',
@@ -292,21 +294,21 @@ function AnnouncementsSection({ rows, setRows, onCopyPrior, priorCount }: {
   );
 }
 
-function RecognizeSection({ rows, setRows, musicThanksLine }: {
+function RecognizeSection({ rows, setRows, autoLines }: {
   rows: string[];
   setRows: React.Dispatch<React.SetStateAction<string[]>>;
-  musicThanksLine?: string;
+  autoLines?: string[];
 }) {
   return (
     <Row label={LABEL.recognize}>
       <div className="space-y-2">
-        {musicThanksLine && (
-          <div className="flex items-start gap-2">
-            <p className="flex-1 text-sm text-gray-600 italic py-1.5">{musicThanksLine}</p>
-            <span className="text-[10px] text-gray-300 shrink-0 mt-2" title="Automatically follows this week's Organist/Chorister fields">auto</span>
+        {autoLines?.map((line, i) => (
+          <div key={`auto-${i}`} className="flex items-start gap-2">
+            <p className="flex-1 text-sm text-gray-600 italic py-1.5">{line}</p>
+            <span className="text-[10px] text-gray-300 shrink-0 mt-2" title="Automatically follows the High Councilor / Organist / Chorister fields above">auto</span>
           </div>
-        )}
-        {rows.length === 0 && !musicThanksLine && <p className="text-xs text-gray-300 italic">None</p>}
+        ))}
+        {rows.length === 0 && !autoLines?.length && <p className="text-xs text-gray-300 italic">None</p>}
         {rows.map((r, i) => (
           <div key={i} className="flex items-start gap-2">
             <AutoTextarea className={INPUT_CLS} value={r}
@@ -355,26 +357,29 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   const closingExisting = prayers.rows.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Closing');
 
   const { rows: allUsers, isLoading: usersLoading } = useTable<User>('users');
-  const highCouncilor = allUsers.find(u => u.church_role === 'High Councilor');
+  const currentHighCouncilor = allUsers.find(u => u.church_role === 'High Councilor');
   const defaultRecognizeRows = [
-    highCouncilor ? `${highCouncilor.name} from the stake high council` : '',
     "The youth door greeters, for creating a reverent and welcoming environment",
-  ].filter(Boolean);
+  ];
 
   const [introRemarks,   setIntroRemarks]   = useState(existingTheme?.intro_remarks   || DEFAULT_INTRO_REMARKS);
   const [presiding,      setPresiding]      = useState(existingTheme?.presiding       || '');
   const [conducting,     setConducting]     = useState(existingTheme?.conducting      || '');
+  const [highCouncilorName, setHighCouncilorName] = useState(existingTheme?.high_councilor || '');
   const [recognizeRows,  setRecognizeRows]  = useState<string[]>(() =>
     existingTheme?.recognize ? existingTheme.recognize.split('\n').filter(Boolean) : defaultRecognizeRows);
 
-  // The user list loads asynchronously — backfill the High Councilor line once it's ready,
-  // if this date still has no saved Recognize value.
+  // The user list loads asynchronously — backfill the current High Councilor's name once it's
+  // ready, if this date has no saved value yet (a genuinely new/unedited future agenda).
   useEffect(() => {
-    if (usersLoading || existingTheme?.recognize || !highCouncilor) return;
-    const line = `${highCouncilor.name} from the stake high council`;
-    setRecognizeRows(rows => rows.includes(line) ? rows : [line, ...rows]);
+    if (usersLoading || existingTheme?.high_councilor || !currentHighCouncilor) return;
+    setHighCouncilorName(name => name || currentHighCouncilor.name);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usersLoading, highCouncilor?.name]);
+  }, [usersLoading, currentHighCouncilor?.name]);
+
+  // Always reflects the High Councilor field above, rather than being frozen into the saved Recognize text
+  const highCouncilorThanksLine = highCouncilorName ? `${highCouncilorName} from the stake high council` : '';
+
   const [wardBusiness,   setWardBusiness]   = useState(existingTheme?.ward_business   || '');
   const [stakeBusiness,  setStakeBusiness]  = useState(existingTheme?.stake_business  || '');
   const [closingRemarks, setClosingRemarks] = useState(existingTheme?.closing_remarks || '');
@@ -523,10 +528,10 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       const themeFields = {
         meeting_date: date, presiding, conducting, ward_business: wardBusiness, stake_business: stakeBusiness,
         intro_remarks: introRemarks, recognize: recognizeValue, closing_remarks: closingRemarks,
-        is_fast_sunday: isFastSunday ? 1 : 0, sacrament_intro: sacramentIntro,
+        is_fast_sunday: isFastSunday ? 1 : 0, sacrament_intro: sacramentIntro, high_councilor: highCouncilorName,
       };
       if (existingTheme) await themes.update(existingTheme.id, themeFields);
-      else if (presiding || conducting || wardBusiness || stakeBusiness || introRemarks || recognizeValue || closingRemarks || isFastSunday || sacramentIntro) await themes.create(themeFields);
+      else if (presiding || conducting || wardBusiness || stakeBusiness || introRemarks || recognizeValue || closingRemarks || isFastSunday || sacramentIntro || highCouncilorName) await themes.create(themeFields);
 
       const musicFields = { meeting_date: date, chorister, organist, opening_hymn: openingHymn, sacrament_hymn: sacramentHymn, rest_special: restSpecial, closing_hymn: closingHymn, child_blessing: childBlessing, confirmation, ordination };
       const hasMusic = !!(chorister || organist || openingHymn || sacramentHymn || restSpecial || closingHymn || childBlessing !== null || confirmation !== null || ordination !== null);
@@ -639,7 +644,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         case 'chorister':      if (chorister)     lines.push(`Chorister: ${chorister}`); break;
         case 'organist':       if (organist)      lines.push(`Organist: ${organist}`); break;
         case 'recognize': {
-          const recognizeItems = [...recognizeRows.map(r => r.trim()).filter(Boolean), musicThanksLine].filter(Boolean);
+          const recognizeItems = [highCouncilorThanksLine, musicThanksLine, ...recognizeRows.map(r => r.trim()).filter(Boolean)].filter(Boolean);
           if (recognizeItems.length) {
             lines.push('Recognize:');
             for (const r of recognizeItems) lines.push(`  • ${r}`);
@@ -821,8 +826,9 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
             case 'conducting':     return <SimpleField   key={kind} label={LABEL[kind]} value={conducting}    onChange={setConducting}    readonly={ro('conducting')} />;
             case 'chorister':      return <SimpleField   key={kind} label={LABEL[kind]} value={chorister}     onChange={setChorister}     readonly={ro('chorister')} />;
             case 'organist':       return <SimpleField   key={kind} label={LABEL[kind]} value={organist}      onChange={setOrganist}      readonly={ro('organist')} />;
+            case 'high_councilor': return <SimpleField   key={kind} label={LABEL[kind]} value={highCouncilorName} onChange={setHighCouncilorName} readonly={ro('high_councilor')} />;
             case 'recognize': {
-              const visibleRecognize = [...recognizeRows.filter(r => r.trim()), musicThanksLine].filter(Boolean);
+              const visibleRecognize = [highCouncilorThanksLine, musicThanksLine, ...recognizeRows.filter(r => r.trim())].filter(Boolean);
               if (ro('recognize')) {
                 if (visibleRecognize.length === 0) return null;
                 return (
@@ -833,7 +839,8 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
                   </Row>
                 );
               }
-              return <RecognizeSection key={kind} rows={recognizeRows} setRows={setRecognizeRows} musicThanksLine={musicThanksLine} />;
+              return <RecognizeSection key={kind} rows={recognizeRows} setRows={setRecognizeRows}
+                autoLines={[highCouncilorThanksLine, musicThanksLine].filter(Boolean)} />;
             }
             case 'opening_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={openingHymn}   onChange={setOpeningHymn}   readonly={ro('opening_hymn')} />;
             case 'opening_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={openingPrayer} onChange={setOpeningPrayer} readonly={ro('opening_prayer')} />;

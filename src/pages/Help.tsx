@@ -381,6 +381,7 @@ export default function Help() {
                 'Sacrament agenda: Recognize items are now multi-line text fields so longer entries are fully visible',
                 'Fixed: High Councilor recognition sometimes missing from Recognize defaults due to a data-loading race condition',
                 'Sacrament agenda: music thanks in Recognize now automatically follows that week\'s current Organist/Chorister fields instead of being frozen in at save time',
+                'Sacrament agenda: added a dedicated High Councilor field, pre-filled from the current High Councilor user and editable per week; feeds the Recognize section in the export automatically',
               ],
             },
             {
