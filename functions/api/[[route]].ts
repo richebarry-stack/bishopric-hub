@@ -778,16 +778,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return `${title} ${lastName}`;
     };
 
+    const assignmentMap = new Map<string, string>(); // month abbr -> formatted name
     const assignmentsResult = await db.prepare('SELECT month, plan_conduct FROM rotating_assignments').all();
-    const assignmentMap = new Map<string, { raw: string; formatted: string }>();
     for (const a of assignmentsResult.results as { month: string; plan_conduct: string }[]) {
       if (a.month && a.plan_conduct) {
         const key = a.month.trim().slice(0, 3);
-        const raw = a.plan_conduct.trim();
-        assignmentMap.set(key.charAt(0).toUpperCase() + key.slice(1).toLowerCase(), { raw, formatted: formatConductor(raw) });
+        assignmentMap.set(key.charAt(0).toUpperCase() + key.slice(1).toLowerCase(), formatConductor(a.plan_conduct.trim()));
       }
     }
     if (assignmentMap.size === 0) return json({ ok: true, created: 0, updated: 0 });
+    const TITLED_RE = /^(Bishop|Brother|Sister)\s/i;
 
     const themesResult = await db.prepare('SELECT id, meeting_date, conducting FROM sacrament_themes').all();
     const themeMap = new Map<string, { id: number; conducting: string | null }>();
@@ -822,15 +822,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const existing = themeMap.get(dateStr);
         if (existing) {
           const cur = (existing.conducting || '').trim();
-          // Fill blanks, and retroactively re-title anything still holding the old raw assignment name
-          if (!cur || cur === assignment.raw) {
-            stmts.push(db.prepare('UPDATE sacrament_themes SET conducting = ?, updated_at = ? WHERE id = ?').bind(assignment.formatted, now, existing.id));
+          if (!cur) {
+            // Blank — fill from this month's current assignment
+            stmts.push(db.prepare('UPDATE sacrament_themes SET conducting = ?, updated_at = ? WHERE id = ?').bind(assignment, now, existing.id));
+            updated++;
+          } else if (!TITLED_RE.test(cur)) {
+            // Retroactively title whoever is already listed, without changing who it is
+            stmts.push(db.prepare('UPDATE sacrament_themes SET conducting = ?, updated_at = ? WHERE id = ?').bind(formatConductor(cur), now, existing.id));
             updated++;
           }
         } else {
-          stmts.push(db.prepare('INSERT INTO sacrament_themes (meeting_date, conducting, theme, references_text, meeting_link, stake_business, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(dateStr, assignment.formatted, '', '', '', '', now));
+          stmts.push(db.prepare('INSERT INTO sacrament_themes (meeting_date, conducting, theme, references_text, meeting_link, stake_business, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(dateStr, assignment, '', '', '', '', now));
           created++;
-          themeMap.set(dateStr, { id: -1, conducting: assignment.formatted });
+          themeMap.set(dateStr, { id: -1, conducting: assignment });
         }
       }
     }
