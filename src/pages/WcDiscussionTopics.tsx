@@ -346,15 +346,13 @@ export default function WcDiscussionTopics() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Discussion Topics</h1>
-        {isAdmin && (
-          <button type="button" onClick={() => setManageOpen(o => !o)}
-            className="text-xs text-gray-400 hover:text-gray-700 flex items-center gap-1 px-2 py-1 rounded border border-gray-200 hover:bg-gray-50">
-            ⚙ Manage Categories
-          </button>
-        )}
+        <button type="button" onClick={() => setManageOpen(o => !o)}
+          className="text-xs text-gray-400 hover:text-gray-700 flex items-center gap-1 px-2 py-1 rounded border border-gray-200 hover:bg-gray-50">
+          ⚙ Manage Categories
+        </button>
       </div>
 
-      {isAdmin && manageOpen && (
+      {manageOpen && (
         <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
           {orgs.map(org => (
             <div key={org} className="flex items-center gap-2">

@@ -245,6 +245,7 @@ export interface SacramentTheme {
   intro_remarks: string;
   recognize: string;
   closing_remarks: string;
+  is_fast_sunday: number;
 }
 
 export interface SacramentAgendaNote {

@@ -45,7 +45,7 @@ function WcGuard({ children }: { children: React.ReactNode }) {
   const wcPaths = [
     '/', '/wc-meetings', '/wc-wins', '/wc-family-needs', '/wc-discussion-topics',
     '/current-sacrament', '/calendaring',
-    '/babies', '/youth-activities', '/tasks', '/wc-members', '/help',
+    '/babies', '/youth-activities', '/tasks', '/wc-members', '/hub-suggestions', '/help',
   ];
   if (!wcPaths.includes(location.pathname)) {
     return <Navigate to="/" replace />;
@@ -134,6 +134,7 @@ function AppRoutes() {
           <Route path="/youth-activities" element={<YouthActivities />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/wc-members" element={<WardCouncilMembers />} />
+          <Route path="/hub-suggestions" element={<HubSuggestions />} />
           <Route path="/help" element={<Help />} />
           <Route path="*" element={<WcGuard><WcDashboard /></WcGuard>} />
         </Route>

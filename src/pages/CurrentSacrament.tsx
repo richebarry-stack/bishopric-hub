@@ -3,7 +3,7 @@ import { useAuth } from '../lib/auth';
 import { useTable } from '../lib/useTable';
 import type {
   SacramentSpeaker, Prayer, SacramentMusic, SacramentTheme, SacramentAnnouncement, SacramentAgendaNote,
-  CallingPipeline, SacramentWardBusiness,
+  CallingPipeline, SacramentWardBusiness, User,
 } from '../lib/api';
 // CallingPipeline is used only in the page shell (toAgendaCalling); SacramentWardBusiness for snapshot table
 import { SPEAKER_TYPES } from '../lib/constants';
@@ -13,12 +13,14 @@ import { renderRichText } from '../lib/richText';
 
 const INPUT_CLS = 'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500';
 
+const DEFAULT_INTRO_REMARKS = 'Welcome those with us today to our church services, as we are here to remember and worship our Savior Jesus Christ. We offer a special welcome to any that are visiting or that may be here for the first time.';
+
 // 'speakers' removed — each speaker is now its own movable item interleaved with rest_special
 const FIXED_ORDER = [
   'intro_remarks',
   'presiding', 'conducting', 'chorister', 'organist', 'recognize', 'opening_hymn', 'opening_prayer',
   'announcements', 'ward_business', 'thanksgivings', 'sustainings', 'stake_business',
-  'sacrament_hymn', 'rest_special', 'closing_remarks', 'closing_hymn', 'closing_prayer',
+  'sacrament_hymn', 'testimonies', 'rest_special', 'closing_remarks', 'closing_hymn', 'closing_prayer',
 ] as const;
 type FixedKind = typeof FIXED_ORDER[number];
 const ANCHOR: Record<FixedKind, number> = {
@@ -36,6 +38,7 @@ const ANCHOR: Record<FixedKind, number> = {
   sustainings:    6.7,
   stake_business: 7,
   sacrament_hymn: 8,
+  testimonies:    8.5,
   rest_special:   9,
   closing_remarks: 9.5,
   closing_hymn:   10,
@@ -51,6 +54,7 @@ const LABEL: Record<FixedKind, string> = {
   ward_business:  'Ward Business',
   thanksgivings:  'To Be Thanked',
   sustainings:    'To Be Sustained',
+  testimonies:    'Bearing of Testimonies',
   stake_business: 'Stake Business',
   sacrament_hymn: 'Sacrament Hymn',
   rest_special:   'Rest / Special Music',
@@ -280,6 +284,29 @@ function AnnouncementsSection({ rows, setRows, onCopyPrior, priorCount }: {
   );
 }
 
+function RecognizeSection({ rows, setRows }: {
+  rows: string[];
+  setRows: React.Dispatch<React.SetStateAction<string[]>>;
+}) {
+  return (
+    <Row label={LABEL.recognize}>
+      <div className="space-y-2">
+        {rows.length === 0 && <p className="text-xs text-gray-300 italic">None</p>}
+        {rows.map((r, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input className={INPUT_CLS} value={r}
+              onChange={e => setRows(rs => rs.map((x, idx) => idx === i ? e.target.value : x))} />
+            <button type="button" onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))}
+              className="text-gray-300 hover:text-red-500 text-sm leading-none shrink-0">×</button>
+          </div>
+        ))}
+        <button type="button" onClick={() => setRows(rs => [...rs, ''])}
+          className="text-xs text-blue-600 hover:text-blue-800">+ Add recognition</button>
+      </div>
+    </Row>
+  );
+}
+
 // ─── AgendaEditor ─────────────────────────────────────────────────────────────
 
 type ViewerMode = 'readonly' | 'music' | undefined;
@@ -312,13 +339,25 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   const openingExisting = prayers.rows.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Opening');
   const closingExisting = prayers.rows.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Closing');
 
-  const [introRemarks,   setIntroRemarks]   = useState(existingTheme?.intro_remarks   || '');
+  const { rows: allUsers } = useTable<User>('users');
+  const highCouncilor = allUsers.find(u => u.church_role === 'High Councilor');
+  const defaultRecognizeRows = [
+    highCouncilor ? `${highCouncilor.name} from the stake high council` : '',
+    (existingMusic?.organist || existingMusic?.chorister)
+      ? `Those providing the music — ${[existingMusic?.organist && `Organist: ${existingMusic.organist}`, existingMusic?.chorister && `Chorister: ${existingMusic.chorister}`].filter(Boolean).join(', ')}`
+      : '',
+    "The youth door greeters, for creating a reverent and welcoming environment",
+  ].filter(Boolean);
+
+  const [introRemarks,   setIntroRemarks]   = useState(existingTheme?.intro_remarks   || DEFAULT_INTRO_REMARKS);
   const [presiding,      setPresiding]      = useState(existingTheme?.presiding       || '');
   const [conducting,     setConducting]     = useState(existingTheme?.conducting      || '');
-  const [recognize,      setRecognize]      = useState(existingTheme?.recognize       || '');
+  const [recognizeRows,  setRecognizeRows]  = useState<string[]>(() =>
+    existingTheme?.recognize ? existingTheme.recognize.split('\n').filter(Boolean) : defaultRecognizeRows);
   const [wardBusiness,   setWardBusiness]   = useState(existingTheme?.ward_business   || '');
   const [stakeBusiness,  setStakeBusiness]  = useState(existingTheme?.stake_business  || '');
   const [closingRemarks, setClosingRemarks] = useState(existingTheme?.closing_remarks || '');
+  const [isFastSunday,   setIsFastSunday]   = useState(!!existingTheme?.is_fast_sunday);
   const [chorister,     setChorister]     = useState(existingMusic?.chorister     || '');
   const [organist,      setOrganist]      = useState(existingMusic?.organist      || '');
   const [openingHymn,   setOpeningHymn]   = useState(existingMusic?.opening_hymn  || '');
@@ -390,8 +429,8 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
     | { kind: 'optional';   pos: number; optKind: OptionalKind };
 
   const merged: MergedItem[] = [
-    ...FIXED_ORDER.map(k => ({ kind: k, pos: ANCHOR[k] } as MergedItem)),
-    ...speakerRows.map((s, i) => ({ kind: 'speaker' as const, pos: s.position, speakerIndex: i })),
+    ...FIXED_ORDER.filter(k => k !== 'testimonies' || isFastSunday).map(k => ({ kind: k, pos: ANCHOR[k] } as MergedItem)),
+    ...(isFastSunday ? [] : speakerRows.map((s, i) => ({ kind: 'speaker' as const, pos: s.position, speakerIndex: i }))),
     ...noteRows.map((n, i)    => ({ kind: 'note'    as const, pos: n.position, noteIndex:   i })),
     ...(childBlessing !== null ? [{ kind: 'optional' as const, pos: OPTIONAL_ITEMS.child_blessing.pos, optKind: 'child_blessing' as OptionalKind }] : []),
     ...(confirmation  !== null ? [{ kind: 'optional' as const, pos: OPTIONAL_ITEMS.confirmation.pos,   optKind: 'confirmation'   as OptionalKind }] : []),
@@ -452,12 +491,14 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
     isSavingRef.current = true;
     setSaving(true);
     try {
+      const recognizeValue = recognizeRows.filter(r => r.trim()).join('\n');
       const themeFields = {
         meeting_date: date, presiding, conducting, ward_business: wardBusiness, stake_business: stakeBusiness,
-        intro_remarks: introRemarks, recognize, closing_remarks: closingRemarks,
+        intro_remarks: introRemarks, recognize: recognizeValue, closing_remarks: closingRemarks,
+        is_fast_sunday: isFastSunday ? 1 : 0,
       };
       if (existingTheme) await themes.update(existingTheme.id, themeFields);
-      else if (presiding || conducting || wardBusiness || stakeBusiness || introRemarks || recognize || closingRemarks) await themes.create(themeFields);
+      else if (presiding || conducting || wardBusiness || stakeBusiness || introRemarks || recognizeValue || closingRemarks || isFastSunday) await themes.create(themeFields);
 
       const musicFields = { meeting_date: date, chorister, organist, opening_hymn: openingHymn, sacrament_hymn: sacramentHymn, rest_special: restSpecial, closing_hymn: closingHymn, child_blessing: childBlessing, confirmation, ordination };
       const hasMusic = !!(chorister || organist || openingHymn || sacramentHymn || restSpecial || closingHymn || childBlessing !== null || confirmation !== null || ordination !== null);
@@ -473,9 +514,8 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       await syncPrayer('Opening', openingPrayer, openingExisting);
       await syncPrayer('Closing', closingPrayer, closingExisting);
 
-      // Sort speakers by position to assign speaking_order and persist position
-      const keepSpk = speakerRows
-        .filter(r => r.speaker.trim())
+      // Sort speakers by position to assign speaking_order and persist position — none for a fast/testimony meeting
+      const keepSpk = (isFastSunday ? [] : speakerRows.filter(r => r.speaker.trim()))
         .sort((a, b) => a.position - b.position);
       const keepSpkIds = new Set(keepSpk.filter(r => r.id).map(r => r.id));
       for (const s of existingSpeakers) if (!keepSpkIds.has(s.id)) await speakers.remove(s.id);
@@ -570,7 +610,12 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         case 'conducting':     if (conducting)    lines.push(`Conducting: ${conducting}`); break;
         case 'chorister':      if (chorister)     lines.push(`Chorister: ${chorister}`); break;
         case 'organist':       if (organist)      lines.push(`Organist: ${organist}`); break;
-        case 'recognize':      if (recognize)     lines.push(`Recognize: ${recognize}`); break;
+        case 'recognize':
+          if (recognizeRows.some(r => r.trim())) {
+            lines.push('Recognize:');
+            for (const r of recognizeRows) if (r.trim()) lines.push(`  • ${r.trim()}`);
+          }
+          break;
         case 'opening_hymn':   if (openingHymn)   lines.push(`Opening Hymn: ${openingHymn}`); break;
         case 'opening_prayer': if (openingPrayer) lines.push(`Opening Prayer: ${openingPrayer}`); break;
         case 'announcements':
@@ -604,6 +649,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         case 'ward_business':  if (wardBusiness)  lines.push(`Ward Business: ${wardBusiness}`);   break;
         case 'stake_business': if (stakeBusiness) lines.push(`Stake Business: ${stakeBusiness}`); break;
         case 'sacrament_hymn': if (sacramentHymn) lines.push(`Sacrament Hymn: ${sacramentHymn}`); break;
+        case 'testimonies':    if (isFastSunday)  lines.push('Bearing of Testimonies'); break;
         case 'rest_special':   if (restSpecial)   lines.push(`Rest / Special Music: ${restSpecial}`); break;
         case 'closing_remarks': if (closingRemarks) lines.push(`Closing Remarks: ${closingRemarks}`); break;
         case 'closing_hymn':   if (closingHymn)   lines.push(`Closing Hymn: ${closingHymn}`); break;
@@ -654,6 +700,14 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   return (
     <div className="max-w-3xl">
       <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6" onBlur={triggerAutoSave}>
+        {!viewerMode && (
+          <label className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100 text-sm text-gray-700 cursor-pointer select-none">
+            <input type="checkbox" checked={isFastSunday}
+              onChange={e => { setIsFastSunday(e.target.checked); triggerAutoSave(); }}
+              className="rounded border-gray-300" />
+            Fast &amp; Testimony Meeting (no assigned speakers)
+          </label>
+        )}
         {merged.map((item, mi) => {
           if (item.kind === 'speaker') {
             const si = item.speakerIndex;
@@ -729,12 +783,31 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
             case 'conducting':     return <SimpleField   key={kind} label={LABEL[kind]} value={conducting}    onChange={setConducting}    readonly={ro('conducting')} />;
             case 'chorister':      return <SimpleField   key={kind} label={LABEL[kind]} value={chorister}     onChange={setChorister}     readonly={ro('chorister')} />;
             case 'organist':       return <SimpleField   key={kind} label={LABEL[kind]} value={organist}      onChange={setOrganist}      readonly={ro('organist')} />;
-            case 'recognize':      return <TextareaField key={kind} label={LABEL[kind]} value={recognize}      onChange={setRecognize}     readonly={ro('recognize')} />;
+            case 'recognize': {
+              const visibleRecognize = recognizeRows.filter(r => r.trim());
+              if (ro('recognize')) {
+                if (visibleRecognize.length === 0) return null;
+                return (
+                  <Row key={kind} label={LABEL[kind]}>
+                    <ul className="space-y-0.5 py-1">
+                      {visibleRecognize.map((r, i) => <li key={i} className="text-sm text-gray-800">• {r}</li>)}
+                    </ul>
+                  </Row>
+                );
+              }
+              return <RecognizeSection key={kind} rows={recognizeRows} setRows={setRecognizeRows} />;
+            }
             case 'opening_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={openingHymn}   onChange={setOpeningHymn}   readonly={ro('opening_hymn')} />;
             case 'opening_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={openingPrayer} onChange={setOpeningPrayer} readonly={ro('opening_prayer')} />;
             case 'stake_business': return viewerMode ? null : <TextareaField key={kind} label={LABEL[kind]} value={stakeBusiness} onChange={setStakeBusiness} />;
             case 'ward_business':  return viewerMode ? null : <TextareaField key={kind} label={LABEL[kind]} value={wardBusiness} onChange={setWardBusiness} />;
             case 'sacrament_hymn': return <SimpleField   key={kind} label={LABEL[kind]} value={sacramentHymn} onChange={setSacramentHymn} readonly={ro('sacrament_hymn')} />;
+            case 'testimonies':
+              return (
+                <Row key={kind} label={LABEL[kind]}>
+                  <p className="text-sm text-gray-500 italic py-1.5">Members of the ward bear their testimonies.</p>
+                </Row>
+              );
             case 'rest_special':   return <SimpleField   key={kind} label={LABEL[kind]} value={restSpecial}   onChange={setRestSpecial}   readonly={ro('rest_special')} />;
             case 'closing_remarks': return <TextareaField key={kind} label={LABEL[kind]} value={closingRemarks} onChange={setClosingRemarks} readonly={ro('closing_remarks')} />;
             case 'closing_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={closingHymn}   onChange={setClosingHymn}   readonly={ro('closing_hymn')} />;
@@ -765,7 +838,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         })}
         {!viewerMode && (
           <div className="pt-3 flex flex-wrap gap-x-4 gap-y-2">
-            <button type="button" onClick={addSpeaker} className="text-sm text-blue-600 hover:text-blue-800">+ Add speaker</button>
+            {!isFastSunday && <button type="button" onClick={addSpeaker} className="text-sm text-blue-600 hover:text-blue-800">+ Add speaker</button>}
             <button type="button" onClick={addNote}    className="text-sm text-blue-600 hover:text-blue-800">+ Add agenda item</button>
             {childBlessing === null && (
               <button type="button" onClick={() => setChildBlessing('')} className="text-sm text-indigo-500 hover:text-indigo-700">+ Child Blessing</button>

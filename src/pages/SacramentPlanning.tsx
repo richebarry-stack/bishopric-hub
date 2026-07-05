@@ -482,6 +482,7 @@ function AgendaModal(props: AgendaModalProps) {
   const closingExisting = props.prayers.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Closing');
 
   const [theme, setTheme] = useState({ theme: existingTheme?.theme || '', presiding: existingTheme?.presiding || '', conducting: existingTheme?.conducting || '', references_text: existingTheme?.references_text || '' });
+  const [isFastSunday, setIsFastSunday] = useState(!!existingTheme?.is_fast_sunday);
   const [mus, setMus] = useState({
     opening_hymn: existingMusic?.opening_hymn || '', sacrament_hymn: existingMusic?.sacrament_hymn || '',
     rest_special: existingMusic?.rest_special || '', closing_hymn: existingMusic?.closing_hymn || '',
@@ -518,8 +519,8 @@ function AgendaModal(props: AgendaModalProps) {
     setSaving(true);
     try {
       // Theme
-      const themeHas = !!(theme.theme || theme.presiding || theme.conducting || theme.references_text);
-      const themeData = { meeting_date: date, theme: theme.theme, presiding: theme.presiding, conducting: theme.conducting, references_text: theme.references_text };
+      const themeHas = !!(theme.theme || theme.presiding || theme.conducting || theme.references_text || isFastSunday);
+      const themeData = { meeting_date: date, theme: theme.theme, presiding: theme.presiding, conducting: theme.conducting, references_text: theme.references_text, is_fast_sunday: isFastSunday ? 1 : 0 };
       if (existingTheme && themeHas) await props.updateTheme(existingTheme.id, themeData);
       else if (existingTheme && !themeHas) await props.removeTheme(existingTheme.id);
       else if (!existingTheme && themeHas) await props.createTheme(themeData);
@@ -531,8 +532,8 @@ function AgendaModal(props: AgendaModalProps) {
       else if (existingMusic && !musHas) await props.removeMusic(existingMusic.id);
       else if (!existingMusic && musHas) await props.createMusic(musData);
 
-      // Speakers (delete removed, upsert the rest, renumber by order)
-      const keepSpeakers = speakerRows.filter(r => r.speaker.trim());
+      // Speakers (delete removed, upsert the rest, renumber by order) — none for a fast/testimony meeting
+      const keepSpeakers = isFastSunday ? [] : speakerRows.filter(r => r.speaker.trim());
       const keepSpeakerIds = new Set(keepSpeakers.filter(r => r.id).map(r => r.id));
       for (const s of existingSpeakers) if (!keepSpeakerIds.has(s.id)) await props.removeSpeaker(s.id);
       for (let i = 0; i < keepSpeakers.length; i++) {
@@ -579,6 +580,12 @@ function AgendaModal(props: AgendaModalProps) {
           <Input label="Presiding" value={theme.presiding} onChange={v => { setTheme({ ...theme, presiding: v }); mark(); }} />
           <Input label="Conducting" value={theme.conducting} onChange={v => { setTheme({ ...theme, conducting: v }); mark(); }} />
           <Textarea label="References" value={theme.references_text} onChange={v => { setTheme({ ...theme, references_text: v }); mark(); }} rows={2} />
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+            <input type="checkbox" checked={isFastSunday}
+              onChange={e => { setIsFastSunday(e.target.checked); mark(); }}
+              className="rounded border-gray-300" />
+            Fast &amp; Testimony Meeting (no assigned speakers)
+          </label>
         </section>
 
         {/* Music */}
@@ -596,24 +603,30 @@ function AgendaModal(props: AgendaModalProps) {
 
         {/* Speakers */}
         <section className="space-y-3 border-t border-gray-100 pt-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Speakers</h3>
-            <button type="button" onClick={() => { setSpeakerRows(r => [...r, { speaker: '', speaker_type: 'Adult Speaker', topic: '', accepted: '' }]); mark(); }}
-              className="text-xs text-blue-600 hover:text-blue-800">+ Add speaker</button>
-          </div>
-          {speakerRows.length === 0 && <p className="text-xs text-gray-400">No speakers yet.</p>}
-          {speakerRows.map((r, i) => (
-            <div key={i} className="rounded-md border border-gray-200 p-3 space-y-2 relative">
-              <button type="button" onClick={() => { setSpeakerRows(rows => rows.filter((_, idx) => idx !== i)); mark(); }}
-                className="absolute top-2 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
-              <Input label={`Speaker ${i + 1}`} value={r.speaker} onChange={v => updateSpeakerRow(i, { speaker: v })} />
-              <div className="grid grid-cols-2 gap-3">
-                <Select label="Type" value={r.speaker_type} onChange={v => updateSpeakerRow(i, { speaker_type: v })} options={SPEAKER_TYPES} />
-                <Select label="Accepted" value={r.accepted} onChange={v => updateSpeakerRow(i, { accepted: v })} options={['Considering', 'Called and Accepted']} />
+          {isFastSunday ? (
+            <p className="text-sm text-gray-500 italic">Fast &amp; Testimony Meeting — no assigned speakers.</p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Speakers</h3>
+                <button type="button" onClick={() => { setSpeakerRows(r => [...r, { speaker: '', speaker_type: 'Adult Speaker', topic: '', accepted: '' }]); mark(); }}
+                  className="text-xs text-blue-600 hover:text-blue-800">+ Add speaker</button>
               </div>
-              <Input label="Topic" value={r.topic} onChange={v => updateSpeakerRow(i, { topic: v })} />
-            </div>
-          ))}
+              {speakerRows.length === 0 && <p className="text-xs text-gray-400">No speakers yet.</p>}
+              {speakerRows.map((r, i) => (
+                <div key={i} className="rounded-md border border-gray-200 p-3 space-y-2 relative">
+                  <button type="button" onClick={() => { setSpeakerRows(rows => rows.filter((_, idx) => idx !== i)); mark(); }}
+                    className="absolute top-2 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
+                  <Input label={`Speaker ${i + 1}`} value={r.speaker} onChange={v => updateSpeakerRow(i, { speaker: v })} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <Select label="Type" value={r.speaker_type} onChange={v => updateSpeakerRow(i, { speaker_type: v })} options={SPEAKER_TYPES} />
+                    <Select label="Accepted" value={r.accepted} onChange={v => updateSpeakerRow(i, { accepted: v })} options={['Considering', 'Called and Accepted']} />
+                  </div>
+                  <Input label="Topic" value={r.topic} onChange={v => updateSpeakerRow(i, { topic: v })} />
+                </div>
+              ))}
+            </>
+          )}
         </section>
 
         {/* Prayers */}

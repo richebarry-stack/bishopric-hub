@@ -367,6 +367,11 @@ export default function Help() {
                 'Calling Pipeline: new "Pray About" section',
                 'Missionary Pipeline: sortable columns',
                 'Sacrament Planning: warns before discarding unsaved agenda changes',
+                'Fixed: Hub Suggestions link in Ward Council nav no longer redirects to the dashboard',
+                'Ward Council sidebar now grouped into categories (Ward Council, Ward Care, Sacrament Meeting, Calendar, Administration), matching the Bishopric Hub layout',
+                'Discussion Topics: "Manage Categories" is now available to all users, not just admins',
+                'Sacrament agenda: Introductory Remarks and Recognize now pre-fill with a welcome message and the stake High Councilor/music/door-greeter thanks; Recognize items can be added or removed individually',
+                'Sacrament agenda: added a Fast & Testimony Meeting toggle that replaces assigned speakers with a Bearing of Testimonies item, in both Current Sacrament and Sacrament Planning',
               ],
             },
             {

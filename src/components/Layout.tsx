@@ -29,20 +29,45 @@ export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?:
   { path: '/help', label: 'Help', icon: '?' },
 ];
 
-export const WC_NAV_ITEMS = [
-  { path: '/', label: 'Dashboard', icon: '⌂' },
-  { path: '/wc-meetings', label: 'WC Meeting Assignments', icon: '▦' },
-  { path: '/wc-discussion-topics', label: 'Discussion Topics', icon: '◈' },
-  { path: '/wc-wins', label: 'Wins for the Ward', icon: '★' },
-  { path: '/wc-family-needs', label: 'Member Needs', icon: '♥' },
-  { path: '/calendaring', label: 'Calendar of Events', icon: '▣' },
-  { path: '/tasks', label: 'Action Items', icon: '☑' },
-  { path: '/youth-activities', label: 'Youth Calendar', icon: '⬡' },
-  { path: '/current-sacrament', label: 'Current Sacrament Meeting', icon: '♫' },
-  { path: '/babies', label: 'Babies', icon: '◌' },
-  { path: '/wc-members', label: 'Ward Council Members', icon: '⊕' },
-  { path: '/hub-suggestions', label: 'Hub Suggestions', icon: '✎' },
-  { path: '/help', label: 'Help', icon: '?' },
+const WC_DASHBOARD_ITEM = { path: '/', label: 'Dashboard', icon: '⌂' };
+export const WC_NAV_CATEGORIES: { label: string; items: { path: string; label: string; icon: string }[] }[] = [
+  {
+    label: 'Ward Council',
+    items: [
+      { path: '/wc-meetings',           label: 'WC Meeting Assignments', icon: '▦' },
+      { path: '/wc-discussion-topics',  label: 'Discussion Topics',      icon: '◈' },
+      { path: '/wc-wins',               label: 'Wins for the Ward',      icon: '★' },
+      { path: '/wc-members',            label: 'Ward Council Members',   icon: '⊕' },
+    ],
+  },
+  {
+    label: 'Ward Care',
+    items: [
+      { path: '/wc-family-needs', label: 'Member Needs', icon: '♥' },
+      { path: '/babies',          label: 'Babies',        icon: '◌' },
+    ],
+  },
+  {
+    label: 'Sacrament Meeting',
+    items: [
+      { path: '/current-sacrament', label: 'Current Sacrament Meeting', icon: '♫' },
+    ],
+  },
+  {
+    label: 'Calendar',
+    items: [
+      { path: '/calendaring',      label: 'Calendar of Events', icon: '▣' },
+      { path: '/youth-activities', label: 'Youth Calendar',     icon: '⬡' },
+      { path: '/tasks',            label: 'Action Items',       icon: '☑' },
+    ],
+  },
+  {
+    label: 'Administration',
+    items: [
+      { path: '/hub-suggestions', label: 'Hub Suggestions', icon: '✎' },
+      { path: '/help',            label: 'Help',            icon: '?' },
+    ],
+  },
 ];
 
 export const YC_NAV_ITEMS = [
@@ -107,7 +132,6 @@ export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: s
 const BH_ALL_ITEMS = [BH_DASHBOARD_ITEM, ...BH_NAV_CATEGORIES.flatMap(cat => cat.items)];
 
 const NAV_ORDER_KEY = (userId: number) => `nav_order_${userId}`;
-const WC_NAV_ORDER_KEY = (userId: number) => `wc_nav_order_${userId}`;
 export const LAST_VISITED_KEY = 'last_visited_page';
 
 function loadOrder(userId: number): string[] {
@@ -121,19 +145,6 @@ function loadOrder(userId: number): string[] {
     }
   } catch { /* ignore */ }
   return NAV_ITEMS.map(n => n.path);
-}
-
-function loadWcOrder(userId: number): string[] {
-  try {
-    const stored = localStorage.getItem(WC_NAV_ORDER_KEY(userId));
-    if (stored) {
-      const parsed: string[] = JSON.parse(stored);
-      const valid = parsed.filter(p => WC_NAV_ITEMS.some(n => n.path === p));
-      const newItems = WC_NAV_ITEMS.filter(n => !valid.includes(n.path)).map(n => n.path);
-      return [...valid, ...newItems];
-    }
-  } catch { /* ignore */ }
-  return WC_NAV_ITEMS.map(n => n.path);
 }
 
 function ChangePasswordModal({ onClose }: { onClose: () => void }) {
@@ -374,9 +385,6 @@ export default function Layout() {
   const [navOrder, setNavOrder] = useState<string[]>(() =>
     user ? loadOrder(user.id) : NAV_ITEMS.map(n => n.path)
   );
-  const [wcNavOrder, setWcNavOrder] = useState<string[]>(() =>
-    user ? loadWcOrder(user.id) : WC_NAV_ITEMS.map(n => n.path)
-  );
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
 
   const saveOrder = (order: string[]) => {
@@ -384,25 +392,18 @@ export default function Layout() {
     if (user) localStorage.setItem(NAV_ORDER_KEY(user.id), JSON.stringify(order));
   };
 
-  const saveWcOrder = (order: string[]) => {
-    setWcNavOrder(order);
-    if (user) localStorage.setItem(WC_NAV_ORDER_KEY(user.id), JSON.stringify(order));
-  };
-
   const handleDrop = (e: React.DragEvent, targetPath: string) => {
     e.preventDefault();
     setDragOverPath(null);
     const from = e.dataTransfer.getData('text/plain');
     if (!from || from === targetPath) return;
-    const currentOrder = isWc ? wcNavOrder : navOrder;
-    const next = [...currentOrder];
+    const next = [...navOrder];
     const fi = next.indexOf(from);
     const ti = next.indexOf(targetPath);
     if (fi === -1 || ti === -1) return;
     next.splice(fi, 1);
     next.splice(ti, 0, from);
-    if (isWc) saveWcOrder(next);
-    else saveOrder(next);
+    saveOrder(next);
   };
 
   const ycNavItems = isGuest
@@ -415,11 +416,9 @@ export default function Layout() {
     ? CAL_NAV_ITEMS
     : isYc
       ? ycNavItems
-      : isWc
-        ? wcNavOrder.map(p => WC_NAV_ITEMS.find(n => n.path === p)).filter(Boolean) as typeof WC_NAV_ITEMS
-        : navOrder.map(p => NAV_ITEMS.find(n => n.path === p)).filter(Boolean).filter(n => !n!.adminOnly || isAdmin) as typeof NAV_ITEMS;
+      : navOrder.map(p => NAV_ITEMS.find(n => n.path === p)).filter(Boolean).filter(n => !n!.adminOnly || isAdmin) as typeof NAV_ITEMS;
 
-  const draggable = isWc && isAdmin;
+  const draggable = false;
 
   const activeCls = isCal
     ? 'bg-violet-50 text-violet-700 font-medium'
@@ -509,6 +508,39 @@ export default function Layout() {
                         {getLabel(item)}
                       </Link>
                     ))}
+                </div>
+              ))}
+            </>
+          ) : isWc ? (
+            <>
+              <Link
+                to="/"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors mb-1 ${
+                  location.pathname === '/' ? activeCls : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <span className="w-4 text-center">{WC_DASHBOARD_ITEM.icon}</span>
+                {getLabel(WC_DASHBOARD_ITEM)}
+              </Link>
+              {WC_NAV_CATEGORIES.map(cat => (
+                <div key={cat.label} className="mt-3">
+                  <p className="px-3 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 select-none">
+                    {cat.label}
+                  </p>
+                  {cat.items.map(item => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setSidebarOpen(false)}
+                      className={`flex items-center gap-2 pl-4 pr-3 py-1.5 rounded-md text-sm transition-colors ${
+                        location.pathname === item.path ? activeCls : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <span className="w-4 text-center shrink-0">{item.icon}</span>
+                      {getLabel(item)}
+                    </Link>
+                  ))}
                 </div>
               ))}
             </>
