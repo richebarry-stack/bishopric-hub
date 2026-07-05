@@ -681,7 +681,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         case 'sustainings':
           if (sustainings.length) {
             lines.push('To Be Sustained (Callings):');
-            lines.push('The following have been called to positions in the ward. If they are present then please stand.');
+            lines.push('The following have been called to positions in the ward. We ask that if they are present that they please stand and remain standing until the sustaining vote is complete.');
             for (const c of sustainings) {
               const name = stripMd(c.member);
               lines.push(c.calling ? `  • ${name} — ${stripMd(c.calling)}` : `  • ${name}`);

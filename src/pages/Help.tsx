@@ -385,7 +385,7 @@ export default function Help() {
                 'Sacrament agenda: added an "Other Stake Representatives" field for recognizing additional stake guests when present; left blank by default and omitted from the export when empty',
                 'Export PDF no longer auto-opens the print dialog — print manually from the opened tab when ready',
                 'Sacrament export: "Bearing of Testimonies" no longer shows a trailing colon, but still bolds correctly',
-                'Sacrament export: "To Be Sustained" now introduces the names with "The following have been called to positions in the ward. If they are present then please stand." before listing name — calling',
+                'Sacrament export: "To Be Sustained" now introduces the names with "The following have been called to positions in the ward. We ask that if they are present that they please stand and remain standing until the sustaining vote is complete." before listing name — calling',
               ],
             },
             {
