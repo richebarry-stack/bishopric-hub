@@ -301,11 +301,11 @@ function RecognizeSection({ rows, setRows }: {
       <div className="space-y-2">
         {rows.length === 0 && <p className="text-xs text-gray-300 italic">None</p>}
         {rows.map((r, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <input className={INPUT_CLS} value={r}
+          <div key={i} className="flex items-start gap-2">
+            <AutoTextarea className={INPUT_CLS} value={r}
               onChange={e => setRows(rs => rs.map((x, idx) => idx === i ? e.target.value : x))} />
             <button type="button" onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))}
-              className="text-gray-300 hover:text-red-500 text-sm leading-none shrink-0">×</button>
+              className="text-gray-300 hover:text-red-500 text-sm leading-none shrink-0 mt-2">×</button>
           </div>
         ))}
         <button type="button" onClick={() => setRows(rs => [...rs, ''])}
@@ -347,7 +347,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   const openingExisting = prayers.rows.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Opening');
   const closingExisting = prayers.rows.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Closing');
 
-  const { rows: allUsers } = useTable<User>('users');
+  const { rows: allUsers, isLoading: usersLoading } = useTable<User>('users');
   const highCouncilor = allUsers.find(u => u.church_role === 'High Councilor');
   const defaultRecognizeRows = [
     highCouncilor ? `${highCouncilor.name} from the stake high council` : '',
@@ -362,6 +362,15 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   const [conducting,     setConducting]     = useState(existingTheme?.conducting      || '');
   const [recognizeRows,  setRecognizeRows]  = useState<string[]>(() =>
     existingTheme?.recognize ? existingTheme.recognize.split('\n').filter(Boolean) : defaultRecognizeRows);
+
+  // The user list loads asynchronously — backfill the High Councilor line once it's ready,
+  // if this date still has no saved Recognize value.
+  useEffect(() => {
+    if (usersLoading || existingTheme?.recognize || !highCouncilor) return;
+    const line = `${highCouncilor.name} from the stake high council`;
+    setRecognizeRows(rows => rows.includes(line) ? rows : [line, ...rows]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usersLoading, highCouncilor?.name]);
   const [wardBusiness,   setWardBusiness]   = useState(existingTheme?.ward_business   || '');
   const [stakeBusiness,  setStakeBusiness]  = useState(existingTheme?.stake_business  || '');
   const [closingRemarks, setClosingRemarks] = useState(existingTheme?.closing_remarks || '');
@@ -661,7 +670,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         case 'stake_business': if (stakeBusiness) lines.push(`Stake Business: ${stakeBusiness}`); break;
         case 'sacrament_intro': if (sacramentIntro) lines.push(sacramentIntro); break;
         case 'sacrament_hymn': if (sacramentHymn) lines.push(`Sacrament Hymn: ${sacramentHymn}`); break;
-        case 'testimonies':    if (isFastSunday)  lines.push('Bearing of Testimonies'); break;
+        case 'testimonies':    if (isFastSunday)  lines.push('Bearing of Testimonies:'); break;
         case 'rest_special':   if (restSpecial)   lines.push(`Rest / Special Music: ${restSpecial}`); break;
         case 'closing_remarks': if (closingRemarks) lines.push(`Closing Remarks: ${closingRemarks}`); break;
         case 'closing_hymn':   if (closingHymn)   lines.push(`Closing Hymn: ${closingHymn}`); break;

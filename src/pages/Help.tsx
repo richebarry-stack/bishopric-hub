@@ -377,6 +377,9 @@ export default function Help() {
                 'Sacrament agenda: added an editable "Preparing for the Sacrament" line just before the Sacrament Hymn',
                 'Guests and Ward Council now see only the core meeting structure (Presiding, Conducting, Chorister, Organist, Opening Hymn, Sacrament Hymn, Speakers/Testimonies, Closing Hymn)',
                 'Sacrament export: "To Be Sustained" section now includes standard sustaining vote wording after the names',
+                'Sacrament export: "Bearing of Testimonies" now bolded like other section headers',
+                'Sacrament agenda: Recognize items are now multi-line text fields so longer entries are fully visible',
+                'Fixed: High Councilor recognition sometimes missing from Recognize defaults due to a data-loading race condition',
               ],
             },
             {
