@@ -353,6 +353,23 @@ export default function Help() {
         <div className="space-y-4">
           {([
             {
+              date: 'Jul 5, 2026',
+              items: [
+                'Guest login flows added for viewing the youth schedule and sacrament program without an account',
+                'Hub Suggestions page added for submitting feature/bug ideas, with an Implemented status; added to Ward Council nav',
+                'Ward Council can now edit Youth Activities and Babies directly',
+                'Ward Council dashboard: Member Needs split into separate Health Needs and Other Needs panels',
+                'Wins for the Ward reworked to a weekly table view',
+                'Discussion Topics: organization categories are now admin-editable instead of fixed',
+                'Sacrament agenda: added Introductory Remarks, Recognize, and Closing Remarks fields, included in Copy Text and Export PDF',
+                'Escape key now closes all popup dialogs',
+                'Sacrament guest view no longer shows announcements',
+                'Calling Pipeline: new "Pray About" section',
+                'Missionary Pipeline: sortable columns',
+                'Sacrament Planning: warns before discarding unsaved agenda changes',
+              ],
+            },
+            {
               date: 'Jun 28, 2026',
               items: [
                 'Toast notifications replace browser alerts for save errors',
