@@ -386,6 +386,7 @@ export default function Help() {
                 'Export PDF no longer auto-opens the print dialog — print manually from the opened tab when ready',
                 'Sacrament export: "Bearing of Testimonies" no longer shows a trailing colon, but still bolds correctly',
                 'Sacrament export: "To Be Sustained" now introduces the names with "The following have been called to positions in the ward. We ask that if they are present that they please stand and remain standing until the sustaining vote is complete." before listing name — calling',
+                'Sacrament export: "Closing Remarks" now always appears in the export, even when the field is left blank',
               ],
             },
             {

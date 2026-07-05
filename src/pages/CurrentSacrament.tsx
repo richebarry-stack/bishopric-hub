@@ -695,7 +695,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         case 'sacrament_hymn': if (sacramentHymn) lines.push(`Sacrament Hymn: ${sacramentHymn}`); break;
         case 'testimonies':    if (isFastSunday)  lines.push('Bearing of Testimonies'); break;
         case 'rest_special':   if (restSpecial)   lines.push(`Rest / Special Music: ${restSpecial}`); break;
-        case 'closing_remarks': if (closingRemarks) lines.push(`Closing Remarks: ${closingRemarks}`); break;
+        case 'closing_remarks': lines.push(`Closing Remarks: ${closingRemarks}`); break;
         case 'closing_hymn':   if (closingHymn)   lines.push(`Closing Hymn: ${closingHymn}`); break;
         case 'closing_prayer': if (closingPrayer) lines.push(`Closing Prayer: ${closingPrayer}`); break;
       }
