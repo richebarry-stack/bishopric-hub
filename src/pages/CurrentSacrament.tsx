@@ -292,14 +292,21 @@ function AnnouncementsSection({ rows, setRows, onCopyPrior, priorCount }: {
   );
 }
 
-function RecognizeSection({ rows, setRows }: {
+function RecognizeSection({ rows, setRows, musicThanksLine }: {
   rows: string[];
   setRows: React.Dispatch<React.SetStateAction<string[]>>;
+  musicThanksLine?: string;
 }) {
   return (
     <Row label={LABEL.recognize}>
       <div className="space-y-2">
-        {rows.length === 0 && <p className="text-xs text-gray-300 italic">None</p>}
+        {musicThanksLine && (
+          <div className="flex items-start gap-2">
+            <p className="flex-1 text-sm text-gray-600 italic py-1.5">{musicThanksLine}</p>
+            <span className="text-[10px] text-gray-300 shrink-0 mt-2" title="Automatically follows this week's Organist/Chorister fields">auto</span>
+          </div>
+        )}
+        {rows.length === 0 && !musicThanksLine && <p className="text-xs text-gray-300 italic">None</p>}
         {rows.map((r, i) => (
           <div key={i} className="flex items-start gap-2">
             <AutoTextarea className={INPUT_CLS} value={r}
@@ -351,9 +358,6 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   const highCouncilor = allUsers.find(u => u.church_role === 'High Councilor');
   const defaultRecognizeRows = [
     highCouncilor ? `${highCouncilor.name} from the stake high council` : '',
-    (existingMusic?.organist || existingMusic?.chorister)
-      ? `Those providing the music — ${[existingMusic?.organist && `Organist: ${existingMusic.organist}`, existingMusic?.chorister && `Chorister: ${existingMusic.chorister}`].filter(Boolean).join(', ')}`
-      : '',
     "The youth door greeters, for creating a reverent and welcoming environment",
   ].filter(Boolean);
 
@@ -378,6 +382,12 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   const [sacramentIntro, setSacramentIntro] = useState(existingTheme?.sacrament_intro || DEFAULT_SACRAMENT_INTRO);
   const [chorister,     setChorister]     = useState(existingMusic?.chorister     || '');
   const [organist,      setOrganist]      = useState(existingMusic?.organist      || '');
+
+  // Always reflects this week's current Organist/Chorister fields, rather than being frozen into the saved Recognize text
+  const musicThanksLine = (organist || chorister)
+    ? `Those providing the music — ${[organist && `Organist: ${organist}`, chorister && `Chorister: ${chorister}`].filter(Boolean).join(', ')}`
+    : '';
+
   const [openingHymn,   setOpeningHymn]   = useState(existingMusic?.opening_hymn  || '');
   const [sacramentHymn, setSacramentHymn] = useState(existingMusic?.sacrament_hymn || '');
   const [restSpecial,   setRestSpecial]   = useState(existingMusic?.rest_special   || '');
@@ -628,12 +638,14 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         case 'conducting':     if (conducting)    lines.push(`Conducting: ${conducting}`); break;
         case 'chorister':      if (chorister)     lines.push(`Chorister: ${chorister}`); break;
         case 'organist':       if (organist)      lines.push(`Organist: ${organist}`); break;
-        case 'recognize':
-          if (recognizeRows.some(r => r.trim())) {
+        case 'recognize': {
+          const recognizeItems = [...recognizeRows.map(r => r.trim()).filter(Boolean), musicThanksLine].filter(Boolean);
+          if (recognizeItems.length) {
             lines.push('Recognize:');
-            for (const r of recognizeRows) if (r.trim()) lines.push(`  • ${r.trim()}`);
+            for (const r of recognizeItems) lines.push(`  • ${r}`);
           }
           break;
+        }
         case 'opening_hymn':   if (openingHymn)   lines.push(`Opening Hymn: ${openingHymn}`); break;
         case 'opening_prayer': if (openingPrayer) lines.push(`Opening Prayer: ${openingPrayer}`); break;
         case 'announcements':
@@ -810,7 +822,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
             case 'chorister':      return <SimpleField   key={kind} label={LABEL[kind]} value={chorister}     onChange={setChorister}     readonly={ro('chorister')} />;
             case 'organist':       return <SimpleField   key={kind} label={LABEL[kind]} value={organist}      onChange={setOrganist}      readonly={ro('organist')} />;
             case 'recognize': {
-              const visibleRecognize = recognizeRows.filter(r => r.trim());
+              const visibleRecognize = [...recognizeRows.filter(r => r.trim()), musicThanksLine].filter(Boolean);
               if (ro('recognize')) {
                 if (visibleRecognize.length === 0) return null;
                 return (
@@ -821,7 +833,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
                   </Row>
                 );
               }
-              return <RecognizeSection key={kind} rows={recognizeRows} setRows={setRecognizeRows} />;
+              return <RecognizeSection key={kind} rows={recognizeRows} setRows={setRecognizeRows} musicThanksLine={musicThanksLine} />;
             }
             case 'opening_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={openingHymn}   onChange={setOpeningHymn}   readonly={ro('opening_hymn')} />;
             case 'opening_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={openingPrayer} onChange={setOpeningPrayer} readonly={ro('opening_prayer')} />;

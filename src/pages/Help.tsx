@@ -380,6 +380,7 @@ export default function Help() {
                 'Sacrament export: "Bearing of Testimonies" now bolded like other section headers',
                 'Sacrament agenda: Recognize items are now multi-line text fields so longer entries are fully visible',
                 'Fixed: High Councilor recognition sometimes missing from Recognize defaults due to a data-loading race condition',
+                'Sacrament agenda: music thanks in Recognize now automatically follows that week\'s current Organist/Chorister fields instead of being frozen in at save time',
               ],
             },
             {
