@@ -372,6 +372,7 @@ export default function Help() {
                 'Discussion Topics: "Manage Categories" is now available to all users, not just admins',
                 'Sacrament agenda: Introductory Remarks and Recognize now pre-fill with a welcome message and the stake High Councilor/music/door-greeter thanks; Recognize items can be added or removed individually',
                 'Sacrament agenda: added a Fast & Testimony Meeting toggle that replaces assigned speakers with a Bearing of Testimonies item, in both Current Sacrament and Sacrament Planning',
+                'Sacrament export: "To Be Thanked" section now includes standard release wording before the names',
               ],
             },
             {

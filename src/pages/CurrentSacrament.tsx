@@ -631,6 +631,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         case 'thanksgivings':
           if (thanksgivings.length) {
             lines.push('To Be Thanked (Releases):');
+            lines.push('The following have been released from positions in the ward. We propose that they be given a vote of thanks for their service.');
             for (const c of thanksgivings) {
               const name = stripMd(c.member);
               lines.push(c.calling ? `  • ${name} has been released as ${stripMd(c.calling)}.` : `  • ${name}`);
