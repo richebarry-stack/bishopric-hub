@@ -390,6 +390,7 @@ export default function Help() {
                 'Sacrament export: High Councilor recognition now reads "Brother [Last Name]" instead of the full name',
                 'Auto-filled Conducting for future sacrament meetings now shows "Bishop [Last Name]" or "Brother [Last Name]" instead of the full name, including retroactively fixing already-scheduled future weeks',
                 'Fixed: prayers and speakers entered in Current Sacrament now match ward member records the same way Sacrament Planning already did, so they correctly show up in the Speakers & Prayers count history',
+                'Bishopric Meetings: added recurring meetings (weekly, every 2/3/4 weeks) with a set number of occurrences; edit one occurrence independently, or "Save + apply to future meetings" to update the rest of the series at once',
               ],
             },
             {

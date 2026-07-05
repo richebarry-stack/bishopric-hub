@@ -151,6 +151,8 @@ export interface BishopricMeeting {
   minutes: string;
   no_meeting: number;
   reason_not_meeting: string;
+  recurrence_id: string | null;
+  recurrence_interval_weeks: number | null;
 }
 
 export interface OutOfTown {

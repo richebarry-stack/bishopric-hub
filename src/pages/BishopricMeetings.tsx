@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTable } from '../lib/useTable';
 import type { BishopricMeeting } from '../lib/api';
 import Modal from '../components/Modal';
-import { Input, Textarea, Checkbox } from '../components/FormFields';
+import { Input, Textarea, Checkbox, Select } from '../components/FormFields';
 
 const EMPTY: Partial<BishopricMeeting> = {
   date: '', spiritual_thought: '', opening_prayer: '', closing_prayer: '',
@@ -18,9 +18,26 @@ function formatDate(d: string): string {
   });
 }
 
+const REPEAT_OPTIONS = [
+  { label: 'Weekly', weeks: 1 },
+  { label: 'Every 2 weeks', weeks: 2 },
+  { label: 'Every 3 weeks', weeks: 3 },
+  { label: 'Every 4 weeks', weeks: 4 },
+];
+
+function addWeeks(dateStr: string, weeks: number): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + weeks * 7);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function BishopricMeetings() {
   const { rows, isLoading, create, update, remove } = useTable<BishopricMeeting>('bishopric-meetings');
   const [editing, setEditing] = useState<Partial<BishopricMeeting> | null>(null);
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
+  const [repeatWeeks, setRepeatWeeks] = useState(1);
+  const [repeatCount, setRepeatCount] = useState(12);
+  const [saving, setSaving] = useState(false);
   const [viewDate, setViewDate] = useState(() => new Date());
 
   const viewYear = viewDate.getFullYear();
@@ -37,15 +54,67 @@ export default function BishopricMeetings() {
 
   const handleSave = async () => {
     if (!editing) return;
-    const data = { ...editing };
-    delete (data as Record<string, unknown>).id;
-    if (editing.id) await update(editing.id, data as Record<string, unknown>);
-    else await create(data as Record<string, unknown>);
-    setEditing(null);
+    setSaving(true);
+    try {
+      const data = { ...editing };
+      delete (data as Record<string, unknown>).id;
+
+      if (editing.id) {
+        await update(editing.id, data as Record<string, unknown>);
+      } else if (repeatEnabled && editing.date) {
+        const recurrenceId = crypto.randomUUID();
+        await create({ ...data, recurrence_id: recurrenceId, recurrence_interval_weeks: repeatWeeks });
+        let date = editing.date;
+        for (let i = 1; i < repeatCount; i++) {
+          date = addWeeks(date, repeatWeeks);
+          await create({
+            ...EMPTY, date, recurrence_id: recurrenceId, recurrence_interval_weeks: repeatWeeks,
+          });
+        }
+      } else {
+        await create(data as Record<string, unknown>);
+      }
+      setEditing(null);
+      setRepeatEnabled(false);
+      setRepeatWeeks(1);
+      setRepeatCount(12);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Apply this meeting's content to every other meeting in its recurring series dated on or after it,
+  // leaving each sibling's own date and recurrence settings untouched.
+  const handleSaveToFutureSeries = async () => {
+    if (!editing?.id || !editing.recurrence_id) return;
+    setSaving(true);
+    try {
+      const ownData = { ...editing };
+      delete (ownData as Record<string, unknown>).id;
+      await update(editing.id, ownData as Record<string, unknown>);
+
+      const contentData = { ...ownData };
+      delete (contentData as Record<string, unknown>).date;
+      delete (contentData as Record<string, unknown>).recurrence_id;
+      delete (contentData as Record<string, unknown>).recurrence_interval_weeks;
+
+      const futureSiblings = rows.filter(m =>
+        m.recurrence_id === editing.recurrence_id && m.id !== editing.id && m.date.slice(0, 10) >= (editing.date || '').slice(0, 10)
+      );
+      for (const sibling of futureSiblings) {
+        await update(sibling.id, contentData as Record<string, unknown>);
+      }
+      setEditing(null);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openNew = () => {
     const today = new Date().toISOString().slice(0, 10);
+    setRepeatEnabled(false);
+    setRepeatWeeks(1);
+    setRepeatCount(12);
     setEditing({ ...EMPTY, date: today });
   };
 
@@ -109,6 +178,28 @@ export default function BishopricMeetings() {
         {editing && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
             <Input label="Date" value={(editing.date || '').slice(0, 10)} onChange={v => setEditing({ ...editing, date: v })} type="date" required />
+
+            {!editing.id && (
+              <div className="border border-gray-200 rounded-md p-3 space-y-2">
+                <Checkbox label="Repeat this meeting" checked={repeatEnabled} onChange={setRepeatEnabled} />
+                {repeatEnabled && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <Select label="Frequency" value={REPEAT_OPTIONS.find(o => o.weeks === repeatWeeks)?.label || ''}
+                      onChange={v => setRepeatWeeks(REPEAT_OPTIONS.find(o => o.label === v)?.weeks || 1)}
+                      options={REPEAT_OPTIONS.map(o => o.label)} />
+                    <Input label="Number of occurrences" type="number" value={String(repeatCount)}
+                      onChange={v => setRepeatCount(Math.max(1, parseInt(v, 10) || 1))} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {editing.id && editing.recurrence_id && (
+              <p className="text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+                Part of a recurring series (every {editing.recurrence_interval_weeks ?? 1} week{editing.recurrence_interval_weeks === 1 ? '' : 's'}). Saving below only changes this meeting.
+              </p>
+            )}
+
             <Checkbox label="No bishopric meeting" checked={!!editing.no_meeting} onChange={v => setEditing({ ...editing, no_meeting: v ? 1 : 0 })} />
             {editing.no_meeting ? (
               <Input label="Reason" value={editing.reason_not_meeting || ''} onChange={v => setEditing({ ...editing, reason_not_meeting: v })} />
@@ -124,7 +215,15 @@ export default function BishopricMeetings() {
             )}
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
-              <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">Save</button>
+              {editing.id && editing.recurrence_id && (
+                <button type="button" disabled={saving} onClick={handleSaveToFutureSeries}
+                  className="px-4 py-2 border border-blue-600 text-blue-600 rounded-md text-sm hover:bg-blue-50 disabled:opacity-50">
+                  Save + apply to future meetings
+                </button>
+              )}
+              <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">
+                {saving ? 'Saving…' : 'Save'}
+              </button>
             </div>
           </form>
         )}
