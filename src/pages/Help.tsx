@@ -389,6 +389,7 @@ export default function Help() {
                 'Sacrament export: "Closing Remarks" now always appears in the export, even when the field is left blank',
                 'Sacrament export: High Councilor recognition now reads "Brother [Last Name]" instead of the full name',
                 'Auto-filled Conducting for future sacrament meetings now shows "Bishop [Last Name]" or "Brother [Last Name]" instead of the full name, including retroactively fixing already-scheduled future weeks',
+                'Fixed: prayers and speakers entered in Current Sacrament now match ward member records the same way Sacrament Planning already did, so they correctly show up in the Speakers & Prayers count history',
               ],
             },
             {

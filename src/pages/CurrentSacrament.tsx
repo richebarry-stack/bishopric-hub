@@ -3,11 +3,12 @@ import { useAuth } from '../lib/auth';
 import { useTable } from '../lib/useTable';
 import type {
   SacramentSpeaker, Prayer, SacramentMusic, SacramentTheme, SacramentAnnouncement, SacramentAgendaNote,
-  CallingPipeline, SacramentWardBusiness, User,
+  CallingPipeline, SacramentWardBusiness, User, WardMember,
 } from '../lib/api';
 // CallingPipeline is used only in the page shell (toAgendaCalling); SacramentWardBusiness for snapshot table
 import { SPEAKER_TYPES } from '../lib/constants';
 import { renderRichText } from '../lib/richText';
+import { resolveMemberName } from '../lib/nameUtils';
 
 // ─── module-level constants ───────────────────────────────────────────────────
 
@@ -359,6 +360,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   const closingExisting = prayers.rows.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Closing');
 
   const { rows: allUsers, isLoading: usersLoading } = useTable<User>('users');
+  const { rows: wardMembers } = useTable<WardMember>('ward-members');
   const currentHighCouncilor = allUsers.find(u => u.church_role === 'High Councilor');
   const defaultRecognizeRows = [
     "The youth door greeters, for creating a reverent and welcoming environment",
@@ -546,7 +548,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
 
       const syncPrayer = async (lbl: string, name: string, existing?: Prayer) => {
         if (name.trim()) {
-          const d = { meeting_date: date, name, opening_closing: lbl };
+          const d = { meeting_date: date, name: resolveMemberName(name, wardMembers), opening_closing: lbl };
           if (existing) await prayers.update(existing.id, d); else await prayers.create(d);
         } else if (existing) await prayers.remove(existing.id);
       };
@@ -560,7 +562,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       for (const s of existingSpeakers) if (!keepSpkIds.has(s.id)) await speakers.remove(s.id);
       for (let i = 0; i < keepSpk.length; i++) {
         const r = keepSpk[i];
-        const d = { meeting_date: date, speaker: r.speaker, speaker_type: r.speaker_type || 'Adult Speaker', topic: r.topic, accepted: r.accepted, speaking_order: i + 1, position: r.position };
+        const d = { meeting_date: date, speaker: resolveMemberName(r.speaker, wardMembers), speaker_type: r.speaker_type || 'Adult Speaker', topic: r.topic, accepted: r.accepted, speaking_order: i + 1, position: r.position };
         if (r.id) await speakers.update(r.id, d); else await speakers.create(d);
       }
 
