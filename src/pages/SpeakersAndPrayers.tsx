@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import { useTable } from '../lib/useTable';
 import { api } from '../lib/api';
-import type { SacramentSpeaker, Prayer, WardMember } from '../lib/api';
+import type { SacramentSpeaker, Prayer, WardMember, SacramentMusic, SacramentTheme, SacramentAnnouncement, SacramentAgendaNote, SacramentWardBusiness } from '../lib/api';
+import { AgendaEditor, type AgendaCalling } from './CurrentSacrament';
 
 function currentAge(birthDate: string | null | undefined): number | null {
   if (!birthDate) return null;
@@ -30,11 +30,73 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function AgendaLink({ date, children, className }: { date: string; children: React.ReactNode; className?: string }) {
+function AgendaLink({ date, children, className, onOpen }: { date: string; children: React.ReactNode; className?: string; onOpen: (date: string) => void }) {
   return (
-    <Link to={`/sacrament-planning?date=${date}`} className={className} onClick={e => e.stopPropagation()}>
+    <button type="button" className={className} onClick={e => { e.stopPropagation(); onOpen(date); }}>
       {children}
-    </Link>
+    </button>
+  );
+}
+
+function AgendaOverlayModal({ date, onClose }: { date: string; onClose: () => void }) {
+  const speakers      = useTable<SacramentSpeaker>('sacrament-speakers');
+  const prayers       = useTable<Prayer>('prayers');
+  const music         = useTable<SacramentMusic>('sacrament-music');
+  const themes        = useTable<SacramentTheme>('sacrament-themes');
+  const announcements = useTable<SacramentAnnouncement>('sacrament-announcements');
+  const notes         = useTable<SacramentAgendaNote>('sacrament-agenda-notes');
+  const wardBusiness  = useTable<SacramentWardBusiness>('sacrament-ward-business');
+
+  const wbRow = wardBusiness.rows.find(r => r.meeting_date?.slice(0, 10) === date);
+
+  const parseSnapshot = (json: string): AgendaCalling[] => {
+    try { return JSON.parse(json); } catch { return []; }
+  };
+  const sustainings:   AgendaCalling[] = parseSnapshot(wbRow?.sustainings_snapshot  ?? '[]');
+  const thanksgivings: AgendaCalling[] = parseSnapshot(wbRow?.thanksgivings_snapshot ?? '[]');
+
+  const onSaveSnapshot = async (s: AgendaCalling[], t: AgendaCalling[]) => {
+    const data = { meeting_date: date, sustainings_snapshot: JSON.stringify(s), thanksgivings_snapshot: JSON.stringify(t) };
+    if (wbRow) await wardBusiness.update(wbRow.id, data);
+    else await wardBusiness.create(data);
+  };
+
+  const isLoading = speakers.isLoading || prayers.isLoading || music.isLoading || themes.isLoading || announcements.isLoading || notes.isLoading;
+  const dateLabel = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-4 px-4 pb-4" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[94vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 shrink-0">
+          <h2 className="font-semibold text-gray-900">Sacrament Meeting — {dateLabel}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-4">
+          {isLoading ? (
+            <p className="text-gray-400 text-sm">Loading…</p>
+          ) : (
+            <AgendaEditor
+              date={date}
+              speakers={speakers}
+              prayers={prayers}
+              music={music}
+              themes={themes}
+              announcements={announcements}
+              notes={notes}
+              sustainings={sustainings}
+              thanksgivings={thanksgivings}
+              onSaveSnapshot={onSaveSnapshot}
+            />
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -92,7 +154,7 @@ interface SpeakerRow {
 
 interface SpeakerRowEx extends SpeakerRow { age: number | null; }
 
-function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember }: {
+function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember, onDateClick }: {
   rows: SpeakerRowEx[];
   notes: Map<string, string>;
   onSaveNote: (name: string, category: string, text: string) => void;
@@ -103,6 +165,7 @@ function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey,
   toggle: (k: 'name' | 'count' | 'lastDate') => void;
   memberMap: Map<string, WardMember>;
   onUpdateMember: (id: number, data: Record<string, unknown>) => void;
+  onDateClick: (date: string) => void;
 }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
@@ -150,7 +213,7 @@ function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey,
                     <td colSpan={6} className="px-6 py-2">
                       <div className="flex flex-wrap gap-2">
                         {r.dates.map(d => (
-                          <AgendaLink key={d} date={d} className="text-xs bg-blue-50 text-blue-700 rounded px-2 py-0.5 hover:bg-blue-100 transition-colors">{formatDate(d)}</AgendaLink>
+                          <AgendaLink key={d} date={d} onOpen={onDateClick} className="text-xs bg-blue-50 text-blue-700 rounded px-2 py-0.5 hover:bg-blue-100 transition-colors">{formatDate(d)}</AgendaLink>
                         ))}
                       </div>
                     </td>
@@ -165,13 +228,14 @@ function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey,
   );
 }
 
-function SpeakersTab({ speakers, notes, onSaveNote, activeMembers, wardMembers, onUpdateMember }: {
+function SpeakersTab({ speakers, notes, onSaveNote, activeMembers, wardMembers, onUpdateMember, onDateClick }: {
   speakers: SacramentSpeaker[];
   notes: Map<string, string>;
   onSaveNote: (name: string, category: string, text: string) => void;
   activeMembers: Set<string>;
   wardMembers: WardMember[];
   onUpdateMember: (id: number, data: Record<string, unknown>) => void;
+  onDateClick: (date: string) => void;
 }) {
   const [filter, setFilter] = useState('');
   const [sortKey, setSortKey] = useState<'name' | 'count' | 'lastDate'>('name');
@@ -237,7 +301,7 @@ function SpeakersTab({ speakers, notes, onSaveNote, activeMembers, wardMembers, 
   const youth    = sorted.filter(r => ageGroup(birthDateMap.get(r.name)) === 'youth');
   const children = sorted.filter(r => ageGroup(birthDateMap.get(r.name)) === 'child');
 
-  const tableProps = { notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember };
+  const tableProps = { notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember, onDateClick };
 
   return (
     <div className="space-y-3">
@@ -287,7 +351,7 @@ interface PrayerRow {
 
 interface PrayerRowEx extends PrayerRow { age: number | null; }
 
-function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember }: {
+function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember, onDateClick }: {
   rows: PrayerRowEx[];
   notes: Map<string, string>;
   onSaveNote: (name: string, category: string, text: string) => void;
@@ -298,6 +362,7 @@ function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, 
   toggle: (k: 'name' | 'count' | 'lastDate') => void;
   memberMap: Map<string, WardMember>;
   onUpdateMember: (id: number, data: Record<string, unknown>) => void;
+  onDateClick: (date: string) => void;
 }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
@@ -348,7 +413,7 @@ function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, 
                           <span className="text-xs font-semibold text-gray-500 mr-2">Opening:</span>
                           <span className="flex flex-wrap gap-1.5 mt-1">
                             {r.openingDates.map(d => (
-                              <AgendaLink key={d} date={d} className="text-xs bg-green-50 text-green-700 rounded px-2 py-0.5 hover:bg-green-100 transition-colors">{formatDate(d)}</AgendaLink>
+                              <AgendaLink key={d} date={d} onOpen={onDateClick} className="text-xs bg-green-50 text-green-700 rounded px-2 py-0.5 hover:bg-green-100 transition-colors">{formatDate(d)}</AgendaLink>
                             ))}
                           </span>
                         </div>
@@ -358,7 +423,7 @@ function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, 
                           <span className="text-xs font-semibold text-gray-500 mr-2">Closing:</span>
                           <span className="flex flex-wrap gap-1.5 mt-1">
                             {r.closingDates.map(d => (
-                              <AgendaLink key={d} date={d} className="text-xs bg-purple-50 text-purple-700 rounded px-2 py-0.5 hover:bg-purple-100 transition-colors">{formatDate(d)}</AgendaLink>
+                              <AgendaLink key={d} date={d} onOpen={onDateClick} className="text-xs bg-purple-50 text-purple-700 rounded px-2 py-0.5 hover:bg-purple-100 transition-colors">{formatDate(d)}</AgendaLink>
                             ))}
                           </span>
                         </div>
@@ -375,13 +440,14 @@ function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, 
   );
 }
 
-function PrayersTab({ prayers, notes, onSaveNote, activeMembers, wardMembers, onUpdateMember }: {
+function PrayersTab({ prayers, notes, onSaveNote, activeMembers, wardMembers, onUpdateMember, onDateClick }: {
   prayers: Prayer[];
   notes: Map<string, string>;
   onSaveNote: (name: string, category: string, text: string) => void;
   activeMembers: Set<string>;
   wardMembers: WardMember[];
   onUpdateMember: (id: number, data: Record<string, unknown>) => void;
+  onDateClick: (date: string) => void;
 }) {
   const [filter, setFilter] = useState('');
   const [sortKey, setSortKey] = useState<'name' | 'count' | 'lastDate'>('name');
@@ -458,7 +524,7 @@ function PrayersTab({ prayers, notes, onSaveNote, activeMembers, wardMembers, on
   const youth    = sorted.filter(r => ageGroup(birthDateMap.get(r.name)) === 'youth');
   const children = sorted.filter(r => ageGroup(birthDateMap.get(r.name)) === 'child');
 
-  const tableProps = { notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember };
+  const tableProps = { notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember, onDateClick };
 
   return (
     <div className="space-y-3">
@@ -516,6 +582,7 @@ function cutoffDate(months: number | null): string {
 export default function SpeakersAndPrayers() {
   const [tab, setTab] = useState<'speakers' | 'prayers'>('speakers');
   const [horizonMonths, setHorizonMonths] = useState<number | null>(24);
+  const [previewDate, setPreviewDate] = useState<string | null>(null);
   const { rows: speakers, isLoading: loadingSpeakers } = useTable<SacramentSpeaker>('sacrament-speakers');
   const { rows: prayers, isLoading: loadingPrayers } = useTable<Prayer>('prayers');
   const { rows: wardMembers, isLoading: loadingMembers, update: updateMember } = useTable<WardMember>('ward-members');
@@ -561,6 +628,7 @@ export default function SpeakersAndPrayers() {
 
   return (
     <div>
+      {previewDate && <AgendaOverlayModal date={previewDate} onClose={() => setPreviewDate(null)} />}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900">Speakers &amp; Prayers</h1>
         <div className="flex items-center gap-2 text-sm">
@@ -598,9 +666,9 @@ export default function SpeakersAndPrayers() {
       {isLoading ? (
         <p className="text-gray-400 text-sm">Loading…</p>
       ) : tab === 'speakers' ? (
-        <SpeakersTab speakers={filteredSpeakers} notes={notes} onSaveNote={handleSaveNote} activeMembers={speakerMembers} wardMembers={wardMembers} onUpdateMember={handleUpdateMember} />
+        <SpeakersTab speakers={filteredSpeakers} notes={notes} onSaveNote={handleSaveNote} activeMembers={speakerMembers} wardMembers={wardMembers} onUpdateMember={handleUpdateMember} onDateClick={setPreviewDate} />
       ) : (
-        <PrayersTab prayers={filteredPrayers} notes={notes} onSaveNote={handleSaveNote} activeMembers={prayerMembers} wardMembers={wardMembers} onUpdateMember={handleUpdateMember} />
+        <PrayersTab prayers={filteredPrayers} notes={notes} onSaveNote={handleSaveNote} activeMembers={prayerMembers} wardMembers={wardMembers} onUpdateMember={handleUpdateMember} onDateClick={setPreviewDate} />
       )}
     </div>
   );

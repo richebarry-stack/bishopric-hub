@@ -246,7 +246,7 @@ export default function SacramentPlanning() {
             { key: 'conducting', label: 'Conducting' },
             { key: 'references_text', label: 'References' },
           ]}
-          onAdd={() => setEditTheme({ meeting_date: '', theme: '', references_text: '', conducting: '', meeting_link: '' })}
+          onAdd={() => setEditTheme({ meeting_date: '', theme: '', references_text: '', presiding: '', conducting: '', meeting_link: '' })}
           onEdit={setEditTheme}
           onDelete={removeTheme}
           readOnly={isWcReadOnly}
@@ -343,6 +343,7 @@ export default function SacramentPlanning() {
             <Input label="Meeting Date" value={toDateKey(editTheme.meeting_date || '')} onChange={v => setEditTheme({ ...editTheme, meeting_date: v })} type="date" required />
             <Input label="Theme" value={editTheme.theme || ''} onChange={v => setEditTheme({ ...editTheme, theme: v })} />
             <Textarea label="References" value={editTheme.references_text || ''} onChange={v => setEditTheme({ ...editTheme, references_text: v })} />
+            <Input label="Presiding" value={editTheme.presiding || ''} onChange={v => setEditTheme({ ...editTheme, presiding: v })} />
             <Input label="Conducting" value={editTheme.conducting || ''} onChange={v => setEditTheme({ ...editTheme, conducting: v })} />
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setEditTheme(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
@@ -480,7 +481,7 @@ function AgendaModal(props: AgendaModalProps) {
   const openingExisting = props.prayers.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Opening');
   const closingExisting = props.prayers.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Closing');
 
-  const [theme, setTheme] = useState({ theme: existingTheme?.theme || '', conducting: existingTheme?.conducting || '', references_text: existingTheme?.references_text || '' });
+  const [theme, setTheme] = useState({ theme: existingTheme?.theme || '', presiding: existingTheme?.presiding || '', conducting: existingTheme?.conducting || '', references_text: existingTheme?.references_text || '' });
   const [mus, setMus] = useState({
     opening_hymn: existingMusic?.opening_hymn || '', sacrament_hymn: existingMusic?.sacrament_hymn || '',
     rest_special: existingMusic?.rest_special || '', closing_hymn: existingMusic?.closing_hymn || '',
@@ -495,18 +496,30 @@ function AgendaModal(props: AgendaModalProps) {
     existingAnnouncements.map(a => ({ id: a.id, title: a.title || '', notes: a.notes || '' }))
   );
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
-  const updateSpeakerRow = (i: number, patch: Partial<SpeakerRow>) =>
+  const mark = () => setDirty(true);
+
+  const handleClose = () => {
+    if (dirty) { setConfirmDiscard(true); } else { onClose(); }
+  };
+
+  const updateSpeakerRow = (i: number, patch: Partial<SpeakerRow>) => {
     setSpeakerRows(rows => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  const updateAnnounceRow = (i: number, patch: Partial<AnnounceRow>) =>
+    mark();
+  };
+  const updateAnnounceRow = (i: number, patch: Partial<AnnounceRow>) => {
     setAnnounceRows(rows => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+    mark();
+  };
 
   const handleSave = async () => {
     setSaving(true);
     try {
       // Theme
-      const themeHas = !!(theme.theme || theme.conducting || theme.references_text);
-      const themeData = { meeting_date: date, theme: theme.theme, conducting: theme.conducting, references_text: theme.references_text };
+      const themeHas = !!(theme.theme || theme.presiding || theme.conducting || theme.references_text);
+      const themeData = { meeting_date: date, theme: theme.theme, presiding: theme.presiding, conducting: theme.conducting, references_text: theme.references_text };
       if (existingTheme && themeHas) await props.updateTheme(existingTheme.id, themeData);
       else if (existingTheme && !themeHas) await props.removeTheme(existingTheme.id);
       else if (!existingTheme && themeHas) await props.createTheme(themeData);
@@ -556,27 +569,28 @@ function AgendaModal(props: AgendaModalProps) {
   const title = `Agenda — ${new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`;
 
   return (
-    <Modal open onClose={onClose} title={title}>
+    <Modal open onClose={handleClose} title={title}>
       <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-5">
 
         {/* Theme */}
         <section className="space-y-3">
           <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Theme</h3>
-          <Input label="Theme" value={theme.theme} onChange={v => setTheme({ ...theme, theme: v })} />
-          <Input label="Conducting" value={theme.conducting} onChange={v => setTheme({ ...theme, conducting: v })} />
-          <Textarea label="References" value={theme.references_text} onChange={v => setTheme({ ...theme, references_text: v })} rows={2} />
+          <Input label="Theme" value={theme.theme} onChange={v => { setTheme({ ...theme, theme: v }); mark(); }} />
+          <Input label="Presiding" value={theme.presiding} onChange={v => { setTheme({ ...theme, presiding: v }); mark(); }} />
+          <Input label="Conducting" value={theme.conducting} onChange={v => { setTheme({ ...theme, conducting: v }); mark(); }} />
+          <Textarea label="References" value={theme.references_text} onChange={v => { setTheme({ ...theme, references_text: v }); mark(); }} rows={2} />
         </section>
 
         {/* Music */}
         <section className="space-y-3 border-t border-gray-100 pt-4">
           <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Music</h3>
-          <Input label="Opening Hymn" value={mus.opening_hymn} onChange={v => setMus({ ...mus, opening_hymn: v })} />
-          <Input label="Sacrament Hymn" value={mus.sacrament_hymn} onChange={v => setMus({ ...mus, sacrament_hymn: v })} />
-          <Input label="Rest/Special" value={mus.rest_special} onChange={v => setMus({ ...mus, rest_special: v })} />
-          <Input label="Closing Hymn" value={mus.closing_hymn} onChange={v => setMus({ ...mus, closing_hymn: v })} />
+          <Input label="Opening Hymn" value={mus.opening_hymn} onChange={v => { setMus({ ...mus, opening_hymn: v }); mark(); }} />
+          <Input label="Sacrament Hymn" value={mus.sacrament_hymn} onChange={v => { setMus({ ...mus, sacrament_hymn: v }); mark(); }} />
+          <Input label="Rest/Special" value={mus.rest_special} onChange={v => { setMus({ ...mus, rest_special: v }); mark(); }} />
+          <Input label="Closing Hymn" value={mus.closing_hymn} onChange={v => { setMus({ ...mus, closing_hymn: v }); mark(); }} />
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Chorister" value={mus.chorister} onChange={v => setMus({ ...mus, chorister: v })} />
-            <Input label="Organist" value={mus.organist} onChange={v => setMus({ ...mus, organist: v })} />
+            <Input label="Chorister" value={mus.chorister} onChange={v => { setMus({ ...mus, chorister: v }); mark(); }} />
+            <Input label="Organist" value={mus.organist} onChange={v => { setMus({ ...mus, organist: v }); mark(); }} />
           </div>
         </section>
 
@@ -584,13 +598,13 @@ function AgendaModal(props: AgendaModalProps) {
         <section className="space-y-3 border-t border-gray-100 pt-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Speakers</h3>
-            <button type="button" onClick={() => setSpeakerRows(r => [...r, { speaker: '', speaker_type: 'Adult Speaker', topic: '', accepted: '' }])}
+            <button type="button" onClick={() => { setSpeakerRows(r => [...r, { speaker: '', speaker_type: 'Adult Speaker', topic: '', accepted: '' }]); mark(); }}
               className="text-xs text-blue-600 hover:text-blue-800">+ Add speaker</button>
           </div>
           {speakerRows.length === 0 && <p className="text-xs text-gray-400">No speakers yet.</p>}
           {speakerRows.map((r, i) => (
             <div key={i} className="rounded-md border border-gray-200 p-3 space-y-2 relative">
-              <button type="button" onClick={() => setSpeakerRows(rows => rows.filter((_, idx) => idx !== i))}
+              <button type="button" onClick={() => { setSpeakerRows(rows => rows.filter((_, idx) => idx !== i)); mark(); }}
                 className="absolute top-2 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
               <Input label={`Speaker ${i + 1}`} value={r.speaker} onChange={v => updateSpeakerRow(i, { speaker: v })} />
               <div className="grid grid-cols-2 gap-3">
@@ -606,8 +620,8 @@ function AgendaModal(props: AgendaModalProps) {
         <section className="space-y-3 border-t border-gray-100 pt-4">
           <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Prayers</h3>
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Opening" value={openingName} onChange={setOpeningName} />
-            <Input label="Closing" value={closingName} onChange={setClosingName} />
+            <Input label="Opening" value={openingName} onChange={v => { setOpeningName(v); mark(); }} />
+            <Input label="Closing" value={closingName} onChange={v => { setClosingName(v); mark(); }} />
           </div>
         </section>
 
@@ -615,13 +629,13 @@ function AgendaModal(props: AgendaModalProps) {
         <section className="space-y-3 border-t border-gray-100 pt-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Announcements & Ward Business</h3>
-            <button type="button" onClick={() => setAnnounceRows(r => [...r, { title: '', notes: '' }])}
+            <button type="button" onClick={() => { setAnnounceRows(r => [...r, { title: '', notes: '' }]); mark(); }}
               className="text-xs text-blue-600 hover:text-blue-800">+ Add</button>
           </div>
           {announceRows.length === 0 && <p className="text-xs text-gray-400">None.</p>}
           {announceRows.map((r, i) => (
             <div key={i} className="rounded-md border border-gray-200 p-3 space-y-2 relative">
-              <button type="button" onClick={() => setAnnounceRows(rows => rows.filter((_, idx) => idx !== i))}
+              <button type="button" onClick={() => { setAnnounceRows(rows => rows.filter((_, idx) => idx !== i)); mark(); }}
                 className="absolute top-2 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
               <Input label="Title" value={r.title} onChange={v => updateAnnounceRow(i, { title: v })} />
               <Textarea label="Details" value={r.notes} onChange={v => updateAnnounceRow(i, { notes: v })} rows={2} />
@@ -629,12 +643,32 @@ function AgendaModal(props: AgendaModalProps) {
           ))}
         </section>
 
-        <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
-          <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save Agenda'}
-          </button>
-        </div>
+        {confirmDiscard ? (
+          <div className="border-t border-amber-200 bg-amber-50 rounded-lg p-4 flex flex-col gap-3">
+            <p className="text-sm text-amber-800 font-medium">You have unsaved changes. What would you like to do?</p>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setConfirmDiscard(false)}
+                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md">
+                Keep editing
+              </button>
+              <button type="button" onClick={onClose}
+                className="px-3 py-1.5 text-sm text-red-600 hover:text-red-800 border border-red-200 rounded-md">
+                Discard
+              </button>
+              <button type="button" onClick={() => { setConfirmDiscard(false); handleSave(); }} disabled={saving}
+                className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50">
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+            <button type="button" onClick={handleClose} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
+            <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save Agenda'}
+            </button>
+          </div>
+        )}
       </form>
     </Modal>
   );

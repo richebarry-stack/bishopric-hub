@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTable } from '../lib/useTable';
 import { useAuth } from '../lib/auth';
@@ -93,6 +93,12 @@ function SettingsModal({ config, onSave, onClose }: {
     setDraft(d => ({ ...d, [key]: { ...d[key], ...patch } }));
   const handleSave = () => { saveWcDashboardConfig(draft); onSave(draft); onClose(); };
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-8">
@@ -109,8 +115,10 @@ function SettingsModal({ config, onSave, onClose }: {
             <SubToggle label="Opening Prayer" checked={draft.meeting.showOpeningPrayer} onChange={v => upd('meeting', { showOpeningPrayer: v })} />
             <SubToggle label="Closing Prayer" checked={draft.meeting.showClosingPrayer} onChange={v => upd('meeting', { showClosingPrayer: v })} />
           </SettingsSection>
-          <SettingsSection title="Member Needs" visible={draft.memberNeeds.visible} onVisibleChange={v => upd('memberNeeds', { visible: v })}
-            fontSize={draft.memberNeeds.fontSize} onFontSizeChange={v => upd('memberNeeds', { fontSize: v })} />
+          <SettingsSection title="Health Needs" visible={draft.healthNeeds.visible} onVisibleChange={v => upd('healthNeeds', { visible: v })}
+            fontSize={draft.healthNeeds.fontSize} onFontSizeChange={v => upd('healthNeeds', { fontSize: v })} />
+          <SettingsSection title="Other Needs" visible={draft.otherNeeds.visible} onVisibleChange={v => upd('otherNeeds', { visible: v })}
+            fontSize={draft.otherNeeds.fontSize} onFontSizeChange={v => upd('otherNeeds', { fontSize: v })} />
           <SettingsSection title="Missionaries" visible={draft.missionaries.visible} onVisibleChange={v => upd('missionaries', { visible: v })}
             fontSize={draft.missionaries.fontSize} onFontSizeChange={v => upd('missionaries', { fontSize: v })}>
             <SubToggle label="Show status / mission" checked={draft.missionaries.showStatus} onChange={v => upd('missionaries', { showStatus: v })} />
@@ -171,15 +179,18 @@ export default function WcDashboard() {
     [allNeeds, isWcContext, user]);
 
   const prayerNeeds = useMemo(() => memberNeeds.filter(n => n.pray_for), [memberNeeds]);
+  const healthPrayerNeeds = useMemo(() => prayerNeeds.filter(n => n.type === 'Health'), [prayerNeeds]);
+  const otherPrayerNeeds  = useMemo(() => prayerNeeds.filter(n => n.type !== 'Health'), [prayerNeeds]);
 
-  const [newNeed, setNewNeed] = useState('');
+  const [newHealthNeed, setNewHealthNeed] = useState('');
+  const [newOtherNeed, setNewOtherNeed] = useState('');
 
-  const handleAddNeed = async (e: React.FormEvent) => {
+  const handleAddNeed = (type: string) => async (e: React.FormEvent) => {
     e.preventDefault();
-    const name = newNeed.trim();
+    const name = (type === 'Health' ? newHealthNeed : newOtherNeed).trim();
     if (!name) return;
-    await createNeed({ who: name, what: '', type: 'Support', notes: '', share_with: '', next_steps: '', pray_for: 1, shared_with_wc: 1 });
-    setNewNeed('');
+    await createNeed({ who: name, what: '', type, notes: '', share_with: '', next_steps: '', pray_for: 1, shared_with_wc: 1 });
+    if (type === 'Health') setNewHealthNeed(''); else setNewOtherNeed('');
   };
 
   const removePrayer = (id: number) => updateNeed(id, { pray_for: 0 });
@@ -190,7 +201,7 @@ export default function WcDashboard() {
     [events]);
 
   const cfg = config;
-  const topCount = [cfg.meeting.visible, cfg.memberNeeds.visible, cfg.missionaries.visible].filter(Boolean).length;
+  const topCount = [cfg.meeting.visible, cfg.healthNeeds.visible, cfg.otherNeeds.visible, cfg.missionaries.visible].filter(Boolean).length;
   const bottomCount = [cfg.actionItems.visible, cfg.events.visible].filter(Boolean).length;
 
   return (
@@ -254,24 +265,49 @@ export default function WcDashboard() {
             </div>
           )}
 
-          {cfg.memberNeeds.visible && (
+          {cfg.healthNeeds.visible && (
             <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
-              <SectionTitle link="/wc-family-needs">Member Needs</SectionTitle>
+              <SectionTitle link="/wc-family-needs">Health Needs</SectionTitle>
               <div className="flex flex-col">
                 <div className="space-y-1.5">
-                  {prayerNeeds.length === 0 && <p className="text-gray-300 text-lg italic">None</p>}
-                  {prayerNeeds.map(n => (
+                  {healthPrayerNeeds.length === 0 && <p className="text-gray-300 text-lg italic">None</p>}
+                  {healthPrayerNeeds.map(n => (
                     <div key={n.id} className="flex items-center gap-2">
                       <button onClick={() => removePrayer(n.id)}
                         className="text-xl leading-none flex-shrink-0 opacity-100 hover:opacity-40 transition-opacity"
                         title="Remove from prayer list">🙏</button>
-                      <span className={`${FONT_SIZE_CLASS[cfg.memberNeeds.fontSize]} font-medium text-gray-800 leading-tight`}>{n.who}</span>
+                      <span className={`${FONT_SIZE_CLASS[cfg.healthNeeds.fontSize]} font-medium text-gray-800 leading-tight`}>{n.who}</span>
                       {n.what && <span className="text-xs text-gray-400 truncate">{n.what}</span>}
                     </div>
                   ))}
                 </div>
-                <form onSubmit={handleAddNeed} className="flex gap-2 pt-3 mt-3 border-t border-gray-100 flex-shrink-0">
-                  <input value={newNeed} onChange={e => setNewNeed(e.target.value)} placeholder="Add name…"
+                <form onSubmit={handleAddNeed('Health')} className="flex gap-2 pt-3 mt-3 border-t border-gray-100 flex-shrink-0">
+                  <input value={newHealthNeed} onChange={e => setNewHealthNeed(e.target.value)} placeholder="Add name…"
+                    className="flex-1 min-w-0 rounded-lg border border-gray-200 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                  <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 flex-shrink-0">Add</button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {cfg.otherNeeds.visible && (
+            <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
+              <SectionTitle link="/wc-family-needs">Other Needs</SectionTitle>
+              <div className="flex flex-col">
+                <div className="space-y-1.5">
+                  {otherPrayerNeeds.length === 0 && <p className="text-gray-300 text-lg italic">None</p>}
+                  {otherPrayerNeeds.map(n => (
+                    <div key={n.id} className="flex items-center gap-2">
+                      <button onClick={() => removePrayer(n.id)}
+                        className="text-xl leading-none flex-shrink-0 opacity-100 hover:opacity-40 transition-opacity"
+                        title="Remove from prayer list">🙏</button>
+                      <span className={`${FONT_SIZE_CLASS[cfg.otherNeeds.fontSize]} font-medium text-gray-800 leading-tight`}>{n.who}</span>
+                      {n.what && <span className="text-xs text-gray-400 truncate">{n.what}</span>}
+                    </div>
+                  ))}
+                </div>
+                <form onSubmit={handleAddNeed('Support')} className="flex gap-2 pt-3 mt-3 border-t border-gray-100 flex-shrink-0">
+                  <input value={newOtherNeed} onChange={e => setNewOtherNeed(e.target.value)} placeholder="Add name…"
                     className="flex-1 min-w-0 rounded-lg border border-gray-200 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 flex-shrink-0">Add</button>
                 </form>

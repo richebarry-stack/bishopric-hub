@@ -15,7 +15,8 @@ export interface WcMissionariesConfig extends SectionConfig {
 
 export interface WcDashboardConfig {
   meeting: WcMeetingConfig;
-  memberNeeds: SectionConfig;
+  healthNeeds: SectionConfig;
+  otherNeeds: SectionConfig;
   missionaries: WcMissionariesConfig;
   actionItems: TasksConfig;
   events: EventsConfig;
@@ -23,7 +24,8 @@ export interface WcDashboardConfig {
 
 export const WC_DEFAULT_CONFIG: WcDashboardConfig = {
   meeting:      { visible: true, fontSize: '2xl', showDate: true, showSpiritualThought: true, showOpeningPrayer: true, showClosingPrayer: true },
-  memberNeeds:  { visible: true, fontSize: 'base' },
+  healthNeeds:  { visible: true, fontSize: 'base' },
+  otherNeeds:   { visible: true, fontSize: 'base' },
   missionaries: { visible: true, fontSize: 'base', showStatus: false },
   actionItems:  { visible: true, fontSize: 'sm', showAssignedTo: true },
   events:       { visible: true, fontSize: 'sm', showDate: true },
@@ -36,9 +38,11 @@ export function loadWcDashboardConfig(): WcDashboardConfig {
     const raw = localStorage.getItem(CONFIG_KEY);
     if (!raw) return WC_DEFAULT_CONFIG;
     const saved = JSON.parse(raw);
+    // 'memberNeeds' is the pre-split legacy key; treat it as the seed for 'healthNeeds'.
     return {
       meeting:      { ...WC_DEFAULT_CONFIG.meeting,      ...saved.meeting      },
-      memberNeeds:  { ...WC_DEFAULT_CONFIG.memberNeeds,  ...saved.memberNeeds  },
+      healthNeeds:  { ...WC_DEFAULT_CONFIG.healthNeeds,  ...(saved.healthNeeds ?? saved.memberNeeds) },
+      otherNeeds:   { ...WC_DEFAULT_CONFIG.otherNeeds,   ...saved.otherNeeds   },
       missionaries: { ...WC_DEFAULT_CONFIG.missionaries, ...saved.missionaries },
       actionItems:  { ...WC_DEFAULT_CONFIG.actionItems,  ...saved.actionItems  },
       events:       { ...WC_DEFAULT_CONFIG.events,       ...saved.events       },

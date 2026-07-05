@@ -25,6 +25,7 @@ import ForceResetPassword from './pages/ForceResetPassword';
 import SecurityQuestionsSetup from './pages/SecurityQuestionsSetup';
 import Help from './pages/Help';
 import YouthActivities from './pages/YouthActivities';
+import SacramentProgram from './pages/SacramentProgram';
 import WardCouncilMembers from './pages/WardCouncilMembers';
 import SpeakersAndPrayers from './pages/SpeakersAndPrayers';
 import WardMembers from './pages/WardMembers';
@@ -32,6 +33,7 @@ import WcDashboard from './pages/WcDashboard';
 import WcMeetings from './pages/WcMeetings';
 import WcWins from './pages/WcWins';
 import WcDiscussionTopics from './pages/WcDiscussionTopics';
+import HubSuggestions from './pages/HubSuggestions';
 import ToastContainer from './components/Toast';
 
 const queryClient = new QueryClient({
@@ -74,7 +76,7 @@ function AppRoutes() {
 
   if (!user) return <Login />;
   if (user.must_reset_password) return <ForceResetPassword />;
-  if (!user.has_security_questions && !securitySkipped) return <SecurityQuestionsSetup onSkip={() => setSecuritySkipped(true)} />;
+  if (!user.has_security_questions && !securitySkipped && user.role !== 'guest') return <SecurityQuestionsSetup onSkip={() => setSecuritySkipped(true)} />;
 
   // Calendar hub users
   if (user.hub === 'cal') {
@@ -89,13 +91,26 @@ function AppRoutes() {
     );
   }
 
-  // Youth Council hub users
+  // Youth Council hub users and guests
   if (user.hub === 'yc') {
+    // Sacrament-only guest: one page, no nav elsewhere
+    if (user.role === 'guest' && user.church_role === 'sac') {
+      return (
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/sacrament-program" element={<SacramentProgram />} />
+            <Route path="*" element={<Navigate to="/sacrament-program" replace />} />
+          </Route>
+        </Routes>
+      );
+    }
+    // Youth-calendar guest or regular YC user
+    const isYcGuest = user.role === 'guest' && user.church_role === 'yc';
     return (
       <Routes>
         <Route element={<Layout />}>
           <Route path="/youth-activities" element={<YouthActivities />} />
-          <Route path="/help" element={<Help />} />
+          {!isYcGuest && <Route path="/help" element={<Help />} />}
           <Route path="*" element={<Navigate to="/youth-activities" replace />} />
         </Route>
       </Routes>
@@ -150,6 +165,7 @@ function AppRoutes() {
         <Route path="/youth-activities" element={<YouthActivities />} />
         <Route path="/speakers-and-prayers" element={<SpeakersAndPrayers />} />
         <Route path="/ward-members" element={<WardMembers />} />
+        <Route path="/hub-suggestions" element={<HubSuggestions />} />
         <Route path="/help" element={<Help />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

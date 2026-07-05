@@ -26,24 +26,43 @@ async function saveColWidths(widths: ColWidths): Promise<void> {
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
-const ORGS = [
+const DEFAULT_ORGS = [
   'Missionary', 'Primary', 'Young Men', 'Young Women',
   'Sunday School', 'Relief Society', 'Elders Quorum', 'Stake',
 ];
 
+const ORGS_SETTINGS_KEY = 'wc_discussion_orgs';
+
+async function fetchOrgs(): Promise<string[]> {
+  try {
+    const res = await fetch(`/api/ui-settings/${ORGS_SETTINGS_KEY}`);
+    if (!res.ok) return DEFAULT_ORGS;
+    const data = await res.json() as { orgs?: string[] };
+    return Array.isArray(data.orgs) && data.orgs.length ? data.orgs : DEFAULT_ORGS;
+  } catch { return DEFAULT_ORGS; }
+}
+
+async function saveOrgs(orgs: string[]): Promise<void> {
+  await fetch(`/api/ui-settings/${ORGS_SETTINGS_KEY}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orgs }),
+  });
+}
+
 const ORG_ORDER_KEY = (userId: number) => `wc_discussion_org_order_${userId}`;
 
-function loadOrgOrder(userId: number): string[] {
+function loadOrgOrder(userId: number, orgs: string[]): string[] {
   try {
     const stored = localStorage.getItem(ORG_ORDER_KEY(userId));
     if (stored) {
       const parsed: string[] = JSON.parse(stored);
-      const valid = parsed.filter(o => ORGS.includes(o));
-      const added = ORGS.filter(o => !valid.includes(o));
+      const valid = parsed.filter(o => orgs.includes(o));
+      const added = orgs.filter(o => !valid.includes(o));
       return [...valid, ...added];
     }
   } catch { /* ignore */ }
-  return [...ORGS];
+  return [...orgs];
 }
 
 function saveOrgOrder(userId: number, order: string[]): void {
@@ -162,7 +181,43 @@ interface OrgRow {
 export default function WcDiscussionTopics() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const [orgOrder, setOrgOrder] = useState<string[]>(() => user ? loadOrgOrder(user.id) : [...ORGS]);
+  const [orgs, setOrgs] = useState<string[]>(DEFAULT_ORGS);
+  const [orgOrder, setOrgOrder] = useState<string[]>(() => user ? loadOrgOrder(user.id, DEFAULT_ORGS) : [...DEFAULT_ORGS]);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [newOrgName, setNewOrgName] = useState('');
+
+  useEffect(() => {
+    fetchOrgs().then(loaded => {
+      setOrgs(loaded);
+      setOrgOrder(user ? loadOrgOrder(user.id, loaded) : [...loaded]);
+    });
+  }, [user]);
+
+  const handleAddOrg = () => {
+    const name = newOrgName.trim();
+    if (!name || orgs.includes(name)) return;
+    const next = [...orgs, name];
+    setOrgs(next);
+    saveOrgs(next);
+    setOrgOrder(prev => [...prev, name]);
+    setNewOrgName('');
+  };
+
+  const handleRenameOrg = (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName || orgs.includes(trimmed)) return;
+    const next = orgs.map(o => o === oldName ? trimmed : o);
+    setOrgs(next);
+    saveOrgs(next);
+    setOrgOrder(prev => prev.map(o => o === oldName ? trimmed : o));
+  };
+
+  const handleRemoveOrg = (name: string) => {
+    const next = orgs.filter(o => o !== name);
+    setOrgs(next);
+    saveOrgs(next);
+    setOrgOrder(prev => prev.filter(o => o !== name));
+  };
 
   // Column resizing
   const [colWidths, setColWidths] = useState<ColWidths>(DEFAULT_COL_WIDTHS);
@@ -289,7 +344,42 @@ export default function WcDiscussionTopics() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Discussion Topics</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Discussion Topics</h1>
+        {isAdmin && (
+          <button type="button" onClick={() => setManageOpen(o => !o)}
+            className="text-xs text-gray-400 hover:text-gray-700 flex items-center gap-1 px-2 py-1 rounded border border-gray-200 hover:bg-gray-50">
+            ⚙ Manage Categories
+          </button>
+        )}
+      </div>
+
+      {isAdmin && manageOpen && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
+          {orgs.map(org => (
+            <div key={org} className="flex items-center gap-2">
+              <input
+                defaultValue={org}
+                onBlur={e => handleRenameOrg(org, e.target.value)}
+                className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm"
+              />
+              <button type="button" onClick={() => handleRemoveOrg(org)}
+                className="text-red-400 hover:text-red-600 text-xs">Remove</button>
+            </div>
+          ))}
+          <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+            <input
+              value={newOrgName}
+              onChange={e => setNewOrgName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddOrg(); } }}
+              placeholder="New category name…"
+              className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm"
+            />
+            <button type="button" onClick={handleAddOrg}
+              className="px-3 py-1 bg-emerald-600 text-white rounded-md text-xs font-medium hover:bg-emerald-700">Add</button>
+          </div>
+        </div>
+      )}
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading…</p> : !nextMeeting ? (
         <div className="text-center py-12">

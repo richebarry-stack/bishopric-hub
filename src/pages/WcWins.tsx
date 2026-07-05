@@ -5,7 +5,14 @@ import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
 
 const TODAY = new Date().toISOString().slice(0, 10);
-const NINETY_DAYS_AGO = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+function startOfWeek(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - d.getDay()); // back up to Sunday
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+const WEEK_START = startOfWeek();
 
 function formatDate(iso: string): string {
   if (!iso) return '';
@@ -23,12 +30,12 @@ export default function WcWins() {
   const [showOld, setShowOld] = useState(false);
 
   const current = useMemo(() =>
-    rows.filter(w => !w.date || w.date >= NINETY_DAYS_AGO)
+    rows.filter(w => !w.date || w.date >= WEEK_START)
       .sort((a, b) => (b.date || '').localeCompare(a.date || '')),
     [rows]);
 
   const older = useMemo(() =>
-    rows.filter(w => w.date && w.date < NINETY_DAYS_AGO)
+    rows.filter(w => w.date && w.date < WEEK_START)
       .sort((a, b) => b.date.localeCompare(a.date)),
     [rows]);
 
@@ -46,18 +53,29 @@ export default function WcWins() {
     setEditing(null);
   };
 
-  const WinCard = ({ w }: { w: WcWin }) => (
-    <div className="bg-white rounded-lg border border-gray-200 px-4 py-3 flex items-start justify-between gap-3 hover:bg-gray-50">
-      <div className="flex-1 min-w-0">
-        {w.date && <p className="text-xs text-gray-400 mb-0.5">{formatDate(w.date)}</p>}
-        <p className="text-sm text-gray-800">{w.description}</p>
-      </div>
-      <div className="flex gap-2 flex-shrink-0">
-        <button onClick={() => setEditing(w)} className="text-blue-500 hover:text-blue-700 text-xs">Edit</button>
-        <button onClick={() => { if (confirm('Delete this win?')) remove(w.id); }}
-          className="text-red-400 hover:text-red-600 text-xs">Del</button>
-      </div>
-    </div>
+  const WinsTable = ({ items }: { items: WcWin[] }) => (
+    <table className="w-full border-collapse bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <thead>
+        <tr className="bg-gray-50 border-b border-gray-200">
+          <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-2 w-32">Date</th>
+          <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-2">Description</th>
+          <th className="w-20"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map(w => (
+          <tr key={w.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+            <td className="px-4 py-2 text-xs text-gray-400 whitespace-nowrap align-top">{formatDate(w.date)}</td>
+            <td className="px-4 py-2 text-sm text-gray-800">{w.description}</td>
+            <td className="px-4 py-2 text-right whitespace-nowrap align-top">
+              <button onClick={() => setEditing(w)} className="text-blue-500 hover:text-blue-700 text-xs mr-2">Edit</button>
+              <button onClick={() => { if (confirm('Delete this win?')) remove(w.id); }}
+                className="text-red-400 hover:text-red-600 text-xs">Del</button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 
   return (
@@ -72,9 +90,11 @@ export default function WcWins() {
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading…</p> : (
         <>
-          <div className="space-y-2">
-            {current.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No recent wins yet. Add one!</p>}
-            {current.map(w => <WinCard key={w.id} w={w} />)}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">This week</p>
+            {current.length === 0
+              ? <p className="text-sm text-gray-400 text-center py-6">No wins yet this week. Add one!</p>
+              : <WinsTable items={current} />}
           </div>
 
           {older.length > 0 && (
@@ -83,11 +103,7 @@ export default function WcWins() {
                 className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 mb-2">
                 {showOld ? '▼' : '▶'} Older wins ({older.length})
               </button>
-              {showOld && (
-                <div className="space-y-2">
-                  {older.map(w => <WinCard key={w.id} w={w} />)}
-                </div>
-              )}
+              {showOld && <WinsTable items={older} />}
             </div>
           )}
         </>

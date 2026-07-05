@@ -40,6 +40,7 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'wc-wins': { name: 'wc_wins', orderBy: 'date DESC' },
   'wc-family-needs': { name: 'wc_family_needs', orderBy: 'id ASC' },
   'wc-discussion-topics': { name: 'wc_discussion_topics', orderBy: 'meeting_date DESC, organization ASC' },
+  'hub-suggestions': { name: 'hub_suggestions', orderBy: 'id DESC' },
 };
 
 function json(data: unknown, status = 200) {
@@ -71,13 +72,13 @@ async function getSession(request: Request, db: D1Database): Promise<Session | n
 
 const WC_FULL_CRUD = new Set([
   'wc-wins', 'wc-family-needs', 'wc-discussion-topics',
-  'tasks', 'calendaring', 'youth-activities',
+  'tasks', 'calendaring', 'youth-activities', 'babies', 'hub-suggestions',
 ]);
 const WC_READABLE = new Set([
   'wc-meetings',
   'sacrament-speakers', 'prayers', 'sacrament-music', 'sacrament-themes',
   'sacrament-agenda-notes', 'sacrament-announcements', 'sacrament-ward-business',
-  'babies', 'missionary-pipeline',
+  'missionary-pipeline',
 ]);
 
 // Church role → hub mapping (duplicated from frontend constants for backend use)
@@ -143,6 +144,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         headers: {
           'Content-Type': 'application/json',
           'Set-Cookie': `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`,
+        },
+      });
+    }
+
+    if (routeParts[1] === 'guest' && method === 'POST') {
+      const guestType = routeParts[2]; // 'yc' or 'sac'
+      if (guestType !== 'yc' && guestType !== 'sac') return json({ error: 'Invalid guest type' }, 400);
+      const guestEmail = guestType === 'yc' ? 'guest_yc' : 'guest_sac';
+      const user = await db.prepare(
+        'SELECT id, name, email, role, church_role, hub FROM users WHERE email = ? AND role = ?'
+      ).bind(guestEmail, 'guest').first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string }>();
+      if (!user) return json({ error: 'Guest access not configured' }, 503);
+      const sessionId = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      await db.prepare('INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)').bind(sessionId, user.id, expiresAt).run();
+      return new Response(JSON.stringify({ user: { id: user.id, name: user.name, email: user.email, role: user.role, church_role: user.church_role ?? '', hub: user.hub ?? 'yc', must_reset_password: false, has_security_questions: true } }), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Set-Cookie': `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`,
         },
       });
     }
@@ -697,9 +717,38 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
   }
 
-  // Youth Council hub: full CRUD on youth-activities only
+  // Youth Council hub: full CRUD on youth-activities; guests get read-only on their permitted tables
   if (session.hub === 'yc') {
-    if (routeParts[0] !== 'youth-activities') return json({ error: 'Forbidden' }, 403);
+    const tbl = routeParts[0];
+    if (session.role === 'guest') {
+      if (method !== 'GET') return json({ error: 'Forbidden' }, 403);
+      const guestKind = session.church_role; // 'yc' = youth calendar, 'sac' = sacrament program
+      const SAC_TABLES = new Set(['sacrament-speakers', 'prayers', 'sacrament-music', 'sacrament-themes', 'sacrament-announcements']);
+      if (guestKind === 'yc') {
+        if (tbl !== 'youth-activities') return json({ error: 'Forbidden' }, 403);
+      } else if (guestKind === 'sac') {
+        if (!SAC_TABLES.has(tbl)) return json({ error: 'Forbidden' }, 403);
+        // Strip ward/stake business columns from sacrament-themes
+        if (tbl === 'sacrament-themes') {
+          if (!routeParts[1]) {
+            const results = await db.prepare(
+              'SELECT id, meeting_date, theme, references_text, conducting, meeting_link, updated_at FROM sacrament_themes ORDER BY meeting_date DESC'
+            ).all();
+            return json(results.results);
+          }
+          const row = await db.prepare(
+            'SELECT id, meeting_date, theme, references_text, conducting, meeting_link, updated_at FROM sacrament_themes WHERE id = ?'
+          ).bind(routeParts[1]).first();
+          if (!row) return json({ error: 'Not found' }, 404);
+          return json(row);
+        }
+      } else {
+        return json({ error: 'Forbidden' }, 403);
+      }
+      // fall through to generic TABLES handler
+    } else {
+      if (tbl !== 'youth-activities') return json({ error: 'Forbidden' }, 403);
+    }
     // fall through to generic TABLES handler
   }
 

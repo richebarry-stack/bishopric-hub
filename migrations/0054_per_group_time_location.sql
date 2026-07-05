@@ -1,0 +1,12 @@
+ALTER TABLE youth_activities ADD COLUMN builders_of_faith_time TEXT NOT NULL DEFAULT '';
+ALTER TABLE youth_activities ADD COLUMN builders_of_faith_location TEXT NOT NULL DEFAULT '';
+ALTER TABLE youth_activities ADD COLUMN messengers_of_hope_time TEXT NOT NULL DEFAULT '';
+ALTER TABLE youth_activities ADD COLUMN messengers_of_hope_location TEXT NOT NULL DEFAULT '';
+ALTER TABLE youth_activities ADD COLUMN gatherers_of_light_time TEXT NOT NULL DEFAULT '';
+ALTER TABLE youth_activities ADD COLUMN gatherers_of_light_location TEXT NOT NULL DEFAULT '';
+ALTER TABLE youth_activities ADD COLUMN deacons_time TEXT NOT NULL DEFAULT '';
+ALTER TABLE youth_activities ADD COLUMN deacons_location TEXT NOT NULL DEFAULT '';
+ALTER TABLE youth_activities ADD COLUMN teachers_time TEXT NOT NULL DEFAULT '';
+ALTER TABLE youth_activities ADD COLUMN teachers_location TEXT NOT NULL DEFAULT '';
+ALTER TABLE youth_activities ADD COLUMN priests_time TEXT NOT NULL DEFAULT '';
+ALTER TABLE youth_activities ADD COLUMN priests_location TEXT NOT NULL DEFAULT '';

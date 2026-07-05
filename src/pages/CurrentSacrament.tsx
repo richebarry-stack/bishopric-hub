@@ -15,15 +15,19 @@ const INPUT_CLS = 'w-full rounded-md border border-gray-300 px-3 py-2 text-sm fo
 
 // 'speakers' removed — each speaker is now its own movable item interleaved with rest_special
 const FIXED_ORDER = [
-  'conducting', 'chorister', 'organist', 'opening_hymn', 'opening_prayer',
+  'intro_remarks',
+  'presiding', 'conducting', 'chorister', 'organist', 'recognize', 'opening_hymn', 'opening_prayer',
   'announcements', 'ward_business', 'thanksgivings', 'sustainings', 'stake_business',
-  'sacrament_hymn', 'rest_special', 'closing_hymn', 'closing_prayer',
+  'sacrament_hymn', 'rest_special', 'closing_remarks', 'closing_hymn', 'closing_prayer',
 ] as const;
 type FixedKind = typeof FIXED_ORDER[number];
 const ANCHOR: Record<FixedKind, number> = {
+  intro_remarks:  0.1,
+  presiding:      0.5,
   conducting:     1,
   chorister:      2,
   organist:       3,
+  recognize:      3.5,
   opening_hymn:   4,
   opening_prayer: 5,
   announcements:  6,
@@ -33,11 +37,15 @@ const ANCHOR: Record<FixedKind, number> = {
   stake_business: 7,
   sacrament_hymn: 8,
   rest_special:   9,
+  closing_remarks: 9.5,
   closing_hymn:   10,
   closing_prayer: 11,
 };
 const LABEL: Record<FixedKind, string> = {
+  intro_remarks:  'Introductory Remarks',
+  presiding:      'Presiding',
   conducting:     'Conducting', chorister: 'Chorister', organist: 'Organist',
+  recognize:      'Recognize',
   opening_hymn:   'Opening Hymn', opening_prayer: 'Opening Prayer',
   announcements:  'Announcements',
   ward_business:  'Ward Business',
@@ -46,6 +54,7 @@ const LABEL: Record<FixedKind, string> = {
   stake_business: 'Stake Business',
   sacrament_hymn: 'Sacrament Hymn',
   rest_special:   'Rest / Special Music',
+  closing_remarks: 'Closing Remarks',
   closing_hymn:   'Closing Hymn', closing_prayer: 'Closing Prayer',
 };
 
@@ -76,7 +85,7 @@ const dk = (d: string) => (d ? d.slice(0, 10) : '');
 type SpeakerRow   = { id?: number; speaker: string; speaker_type: string; topic: string; accepted: string; position: number };
 type AnnounceRow  = { id?: number; title: string; notes: string };
 type NoteRow      = { id?: number; content: string; position: number };
-type AgendaCalling = { member: string; calling: string; organization: string };
+export type AgendaCalling = { member: string; calling: string; organization: string };
 
 // ─── top-level sub-components ─────────────────────────────────────────────────
 
@@ -99,12 +108,27 @@ function SimpleField({ label, value, onChange, readonly }: { label: string; valu
   );
 }
 
-function TextareaField({ label, value, onChange, rows = 2, readonly }: { label: string; value: string; onChange: (v: string) => void; rows?: number; readonly?: boolean }) {
+function AutoTextarea({ value, onChange, className, placeholder, rows: _, style: __, ...rest }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  return (
+    <textarea ref={ref} value={value} onChange={onChange} className={className}
+      placeholder={placeholder} rows={1}
+      style={{ overflow: 'hidden', resize: 'none' }} {...rest} />
+  );
+}
+
+function TextareaField({ label, value, onChange, readonly }: { label: string; value: string; onChange: (v: string) => void; readonly?: boolean }) {
   return (
     <Row label={label}>
       {readonly
         ? <p className="text-sm text-gray-800 py-1.5 whitespace-pre-wrap">{value || <span className="text-gray-300 italic">—</span>}</p>
-        : <textarea className={INPUT_CLS} rows={rows} value={value} onChange={e => onChange(e.target.value)} />}
+        : <AutoTextarea className={INPUT_CLS} value={value} onChange={e => onChange(e.target.value)} />}
     </Row>
   );
 }
@@ -171,7 +195,7 @@ function NoteItem({
         </div>
       </div>
       <div className="flex-1 min-w-0 flex items-start gap-2">
-        <textarea className={INPUT_CLS} rows={2} placeholder="Additional note…" value={content} onChange={e => onContentChange(e.target.value)} />
+        <AutoTextarea className={INPUT_CLS} placeholder="Additional note…" value={content} onChange={e => onContentChange(e.target.value)} />
         <button type="button" onClick={onRemove} className="text-gray-300 hover:text-red-500 text-lg leading-none pt-1">×</button>
       </div>
     </div>
@@ -237,7 +261,7 @@ function AnnouncementsSection({ rows, setRows, onCopyPrior, priorCount }: {
               className="absolute top-1 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
             <input className={INPUT_CLS + ' mb-1'} placeholder="Title" value={r.title}
               onChange={e => setRows(rs => rs.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))} />
-            <textarea className={INPUT_CLS} rows={1} placeholder="Details (optional)" value={r.notes}
+            <AutoTextarea className={INPUT_CLS} placeholder="Details (optional)" value={r.notes}
               onChange={e => setRows(rs => rs.map((x, idx) => idx === i ? { ...x, notes: e.target.value } : x))} />
           </div>
         ))}
@@ -276,7 +300,7 @@ interface EditorProps {
   viewerMode?: ViewerMode;
 }
 
-function AgendaEditor({ date, speakers, prayers, music, themes, announcements, notes, thanksgivings, sustainings, onSaveSnapshot, viewerMode }: EditorProps) {
+export function AgendaEditor({ date, speakers, prayers, music, themes, announcements, notes, thanksgivings, sustainings, onSaveSnapshot, viewerMode }: EditorProps) {
   const ro = (field: string) => viewerMode === 'readonly' || (viewerMode === 'music' && !MUSIC_EDITABLE_FIELDS.has(field));
   const existingTheme  = themes.rows.find(t => dk(t.meeting_date) === date);
   const existingMusic  = music.rows.find(m => dk(m.meeting_date) === date);
@@ -288,9 +312,13 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
   const openingExisting = prayers.rows.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Opening');
   const closingExisting = prayers.rows.find(p => dk(p.meeting_date) === date && p.opening_closing === 'Closing');
 
-  const [conducting,    setConducting]    = useState(existingTheme?.conducting    || '');
-  const [wardBusiness,  setWardBusiness]  = useState(existingTheme?.ward_business  || '');
-  const [stakeBusiness, setStakeBusiness] = useState(existingTheme?.stake_business || '');
+  const [introRemarks,   setIntroRemarks]   = useState(existingTheme?.intro_remarks   || '');
+  const [presiding,      setPresiding]      = useState(existingTheme?.presiding       || '');
+  const [conducting,     setConducting]     = useState(existingTheme?.conducting      || '');
+  const [recognize,      setRecognize]      = useState(existingTheme?.recognize       || '');
+  const [wardBusiness,   setWardBusiness]   = useState(existingTheme?.ward_business   || '');
+  const [stakeBusiness,  setStakeBusiness]  = useState(existingTheme?.stake_business  || '');
+  const [closingRemarks, setClosingRemarks] = useState(existingTheme?.closing_remarks || '');
   const [chorister,     setChorister]     = useState(existingMusic?.chorister     || '');
   const [organist,      setOrganist]      = useState(existingMusic?.organist      || '');
   const [openingHymn,   setOpeningHymn]   = useState(existingMusic?.opening_hymn  || '');
@@ -424,9 +452,12 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
     isSavingRef.current = true;
     setSaving(true);
     try {
-      const themeFields = { meeting_date: date, conducting, ward_business: wardBusiness, stake_business: stakeBusiness };
+      const themeFields = {
+        meeting_date: date, presiding, conducting, ward_business: wardBusiness, stake_business: stakeBusiness,
+        intro_remarks: introRemarks, recognize, closing_remarks: closingRemarks,
+      };
       if (existingTheme) await themes.update(existingTheme.id, themeFields);
-      else if (conducting || wardBusiness || stakeBusiness) await themes.create(themeFields);
+      else if (presiding || conducting || wardBusiness || stakeBusiness || introRemarks || recognize || closingRemarks) await themes.create(themeFields);
 
       const musicFields = { meeting_date: date, chorister, organist, opening_hymn: openingHymn, sacrament_hymn: sacramentHymn, rest_special: restSpecial, closing_hymn: closingHymn, child_blessing: childBlessing, confirmation, ordination };
       const hasMusic = !!(chorister || organist || openingHymn || sacramentHymn || restSpecial || closingHymn || childBlessing !== null || confirmation !== null || ordination !== null);
@@ -534,33 +565,47 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
         continue;
       }
       switch (item.kind as FixedKind) {
+        case 'intro_remarks':  if (introRemarks)  lines.push(`Introductory Remarks: ${introRemarks}`); break;
+        case 'presiding':      if (presiding)     lines.push(`Presiding: ${presiding}`); break;
         case 'conducting':     if (conducting)    lines.push(`Conducting: ${conducting}`); break;
         case 'chorister':      if (chorister)     lines.push(`Chorister: ${chorister}`); break;
         case 'organist':       if (organist)      lines.push(`Organist: ${organist}`); break;
+        case 'recognize':      if (recognize)     lines.push(`Recognize: ${recognize}`); break;
         case 'opening_hymn':   if (openingHymn)   lines.push(`Opening Hymn: ${openingHymn}`); break;
         case 'opening_prayer': if (openingPrayer) lines.push(`Opening Prayer: ${openingPrayer}`); break;
         case 'announcements':
           if (announceRows.some(r => r.title.trim())) {
             lines.push('Announcements:');
-            for (const r of announceRows) if (r.title.trim()) lines.push(`  • ${r.title}`);
+            for (const r of announceRows) {
+              if (!r.title.trim()) continue;
+              lines.push(`  • ${r.title}`);
+              if (r.notes?.trim()) lines.push(`    ${r.notes.trim()}`);
+            }
           }
           break;
         case 'thanksgivings':
           if (thanksgivings.length) {
-            lines.push('To Be Thanked:');
-            for (const c of thanksgivings) lines.push(`  • ${stripMd(c.member)}${c.calling ? ` — ${c.calling}` : ''}`);
+            lines.push('To Be Thanked (Releases):');
+            for (const c of thanksgivings) {
+              const name = stripMd(c.member);
+              lines.push(c.calling ? `  • ${name} has been released as ${stripMd(c.calling)}.` : `  • ${name}`);
+            }
           }
           break;
         case 'sustainings':
           if (sustainings.length) {
-            lines.push('To Be Sustained:');
-            for (const c of sustainings) lines.push(`  • ${stripMd(c.member)}${c.calling ? ` — ${c.calling}` : ''}`);
+            lines.push('To Be Sustained (Callings):');
+            for (const c of sustainings) {
+              const name = stripMd(c.member);
+              lines.push(c.calling ? `  • ${name} has been called as ${stripMd(c.calling)}.` : `  • ${name}`);
+            }
           }
           break;
         case 'ward_business':  if (wardBusiness)  lines.push(`Ward Business: ${wardBusiness}`);   break;
         case 'stake_business': if (stakeBusiness) lines.push(`Stake Business: ${stakeBusiness}`); break;
         case 'sacrament_hymn': if (sacramentHymn) lines.push(`Sacrament Hymn: ${sacramentHymn}`); break;
         case 'rest_special':   if (restSpecial)   lines.push(`Rest / Special Music: ${restSpecial}`); break;
+        case 'closing_remarks': if (closingRemarks) lines.push(`Closing Remarks: ${closingRemarks}`); break;
         case 'closing_hymn':   if (closingHymn)   lines.push(`Closing Hymn: ${closingHymn}`); break;
         case 'closing_prayer': if (closingPrayer) lines.push(`Closing Prayer: ${closingPrayer}`); break;
       }
@@ -580,6 +625,7 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
     });
     const bodyLines = generateText().split('\n').map(l => {
       if (!l.trim()) return '<br>';
+      if (l.startsWith('    ')) return `<p style="margin:0.05rem 0 0.1rem 2.5rem;color:#555;font-size:12pt">${l.trim()}</p>`;
       if (l.startsWith('  •')) return `<p style="margin:0.15rem 0 0.15rem 1.5rem">• ${l.trim().slice(1).trim()}</p>`;
       const ci = l.indexOf(':');
       if (ci > -1) return `<p style="margin:0.3rem 0"><strong>${l.slice(0, ci)}:</strong>${l.slice(ci + 1)}</p>`;
@@ -678,15 +724,19 @@ function AgendaEditor({ date, speakers, prayers, music, themes, announcements, n
           }
           const kind = item.kind as FixedKind;
           switch (kind) {
+            case 'intro_remarks':  return <TextareaField key={kind} label={LABEL[kind]} value={introRemarks}   onChange={setIntroRemarks}  readonly={ro('intro_remarks')} />;
+            case 'presiding':      return <SimpleField   key={kind} label={LABEL[kind]} value={presiding}     onChange={setPresiding}     readonly={ro('presiding')} />;
             case 'conducting':     return <SimpleField   key={kind} label={LABEL[kind]} value={conducting}    onChange={setConducting}    readonly={ro('conducting')} />;
             case 'chorister':      return <SimpleField   key={kind} label={LABEL[kind]} value={chorister}     onChange={setChorister}     readonly={ro('chorister')} />;
             case 'organist':       return <SimpleField   key={kind} label={LABEL[kind]} value={organist}      onChange={setOrganist}      readonly={ro('organist')} />;
+            case 'recognize':      return <TextareaField key={kind} label={LABEL[kind]} value={recognize}      onChange={setRecognize}     readonly={ro('recognize')} />;
             case 'opening_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={openingHymn}   onChange={setOpeningHymn}   readonly={ro('opening_hymn')} />;
             case 'opening_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={openingPrayer} onChange={setOpeningPrayer} readonly={ro('opening_prayer')} />;
             case 'stake_business': return viewerMode ? null : <TextareaField key={kind} label={LABEL[kind]} value={stakeBusiness} onChange={setStakeBusiness} />;
             case 'ward_business':  return viewerMode ? null : <TextareaField key={kind} label={LABEL[kind]} value={wardBusiness} onChange={setWardBusiness} />;
             case 'sacrament_hymn': return <SimpleField   key={kind} label={LABEL[kind]} value={sacramentHymn} onChange={setSacramentHymn} readonly={ro('sacrament_hymn')} />;
             case 'rest_special':   return <SimpleField   key={kind} label={LABEL[kind]} value={restSpecial}   onChange={setRestSpecial}   readonly={ro('rest_special')} />;
+            case 'closing_remarks': return <TextareaField key={kind} label={LABEL[kind]} value={closingRemarks} onChange={setClosingRemarks} readonly={ro('closing_remarks')} />;
             case 'closing_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={closingHymn}   onChange={setClosingHymn}   readonly={ro('closing_hymn')} />;
             case 'closing_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={closingPrayer} onChange={setClosingPrayer} readonly={ro('closing_prayer')} />;
             case 'announcements':

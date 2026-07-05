@@ -8,7 +8,10 @@ interface AuthContextType {
   loading: boolean;
   selectedHub: Hub;
   isWcReadOnly: boolean;
+  isGuest: boolean;
+  guestType: 'yc' | 'sac' | null;
   login: (email: string, password: string) => Promise<{ needsHubChoice: boolean }>;
+  loginAsGuest: (type: 'yc' | 'sac') => Promise<void>;
   chooseHub: (hub: Hub) => void;
   logout: () => Promise<void>;
   clearResetFlag: () => void;
@@ -60,6 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { needsHubChoice: false };
   };
 
+  const loginAsGuest = async (type: 'yc' | 'sac') => {
+    const { user } = await api.auth.guest(type);
+    setUser(user);
+    setSelectedHubState('yc');
+  };
+
   const logout = async () => {
     await api.auth.logout();
     setUser(null);
@@ -74,9 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isWcReadOnly = user?.hub === 'wc';
+  const isGuest = user?.role === 'guest';
+  const guestType = isGuest ? ((user?.church_role === 'sac' ? 'sac' : 'yc') as 'yc' | 'sac') : null;
 
   return (
-    <AuthContext.Provider value={{ user, loading, selectedHub, isWcReadOnly, login, chooseHub, logout, clearResetFlag, markSecurityQuestionsSetup }}>
+    <AuthContext.Provider value={{ user, loading, selectedHub, isWcReadOnly, isGuest, guestType, login, loginAsGuest, chooseHub, logout, clearResetFlag, markSecurityQuestionsSetup }}>
       {children}
     </AuthContext.Provider>
   );

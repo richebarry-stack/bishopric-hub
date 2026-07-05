@@ -27,6 +27,22 @@ function toDateOnly(v: string): string {
 }
 
 type Occasion = 'Farewell' | 'Homecoming';
+type SortKey = 'who' | 'mission_call' | 'temple_status' | 'report_date' | 'release_date' | 'farewell' | 'homecoming';
+type SortDir = 'asc' | 'desc';
+
+function SortHeader({ label, sortKey, current, dir, onSort }: {
+  label: string; sortKey: SortKey;
+  current: SortKey | null; dir: SortDir;
+  onSort: (k: SortKey) => void;
+}) {
+  const active = current === sortKey;
+  return (
+    <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none whitespace-nowrap hover:text-gray-900"
+      onClick={() => onSort(sortKey)}>
+      {label}{active ? (dir === 'asc' ? ' ↑' : ' ↓') : ' ↕'}
+    </th>
+  );
+}
 
 export default function MissionaryPipeline() {
   const { rows, isLoading, create, update, remove } = useTable<MissionaryType>('missionary-pipeline');
@@ -37,6 +53,13 @@ export default function MissionaryPipeline() {
     remove: removeSpeaker,
   } = useTable<SacramentSpeaker>('sacrament-speakers');
   const [editing, setEditing] = useState<Partial<MissionaryType> | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
   // Talk dates and topics live on linked sacrament_speakers rows; held transiently while the modal is open.
   const [farewellDate, setFarewellDate] = useState('');
   const [farewellTopic, setFarewellTopic] = useState('');
@@ -132,7 +155,20 @@ export default function MissionaryPipeline() {
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div className="space-y-6">
-          {[...grouped.entries()].map(([status, missionaries]) => (
+          {[...grouped.entries()].map(([status, missionaries]) => {
+            const sorted = sortKey ? [...missionaries].sort((a, b) => {
+              let av = '', bv = '';
+              if (sortKey === 'who')          { av = a.who || '';           bv = b.who || ''; }
+              else if (sortKey === 'mission_call')  { av = a.mission_call || '';  bv = b.mission_call || ''; }
+              else if (sortKey === 'temple_status') { av = a.temple_status || ''; bv = b.temple_status || ''; }
+              else if (sortKey === 'report_date')   { av = a.report_date || '';   bv = b.report_date || ''; }
+              else if (sortKey === 'release_date')  { av = a.release_date || '';  bv = b.release_date || ''; }
+              else if (sortKey === 'farewell')  { av = linkedSpeaker(a.id, 'Farewell')?.meeting_date  || ''; bv = linkedSpeaker(b.id, 'Farewell')?.meeting_date  || ''; }
+              else if (sortKey === 'homecoming') { av = linkedSpeaker(a.id, 'Homecoming')?.meeting_date || ''; bv = linkedSpeaker(b.id, 'Homecoming')?.meeting_date || ''; }
+              return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+            }) : missionaries;
+
+            return (
             <div key={status}>
               <h2 className="text-sm font-semibold text-gray-500 mb-2 flex items-center gap-2">
                 <StatusBadge status={status} colors={STATUS_COLORS} />
@@ -145,19 +181,19 @@ export default function MissionaryPipeline() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50">
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Who</th>
+                        <SortHeader label="Who"           sortKey="who"           current={sortKey} dir={sortDir} onSort={handleSort} />
                         <th className="text-left px-3 py-2 font-medium text-gray-600">Status</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Mission Call</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Temple</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Report</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Release</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Farewell Talk</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Homecoming Talk</th>
+                        <SortHeader label="Mission Call"  sortKey="mission_call"  current={sortKey} dir={sortDir} onSort={handleSort} />
+                        <SortHeader label="Temple"        sortKey="temple_status" current={sortKey} dir={sortDir} onSort={handleSort} />
+                        <SortHeader label="Report"        sortKey="report_date"   current={sortKey} dir={sortDir} onSort={handleSort} />
+                        <SortHeader label="Release"       sortKey="release_date"  current={sortKey} dir={sortDir} onSort={handleSort} />
+                        <SortHeader label="Farewell Talk" sortKey="farewell"      current={sortKey} dir={sortDir} onSort={handleSort} />
+                        <SortHeader label="Homecoming Talk" sortKey="homecoming"  current={sortKey} dir={sortDir} onSort={handleSort} />
                         <th className="px-3 py-2"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {missionaries.map(r => (
+                      {sorted.map(r => (
                         <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => openEdit(r)}>
                           <td className="px-3 py-2 font-medium text-gray-900">{r.who}</td>
                           <td className="px-3 py-2">
@@ -182,7 +218,8 @@ export default function MissionaryPipeline() {
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

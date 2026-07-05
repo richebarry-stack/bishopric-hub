@@ -25,6 +25,7 @@ export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?:
   { path: '/ward-members', label: 'Ward Members', icon: '♟' },
   { path: '/users', label: 'Users', icon: '⊕' },
   { path: '/email-notifications', label: 'Email Notifications', icon: '✉', adminOnly: true },
+  { path: '/hub-suggestions', label: 'Hub Suggestions', icon: '◈' },
   { path: '/help', label: 'Help', icon: '?' },
 ];
 
@@ -40,6 +41,7 @@ export const WC_NAV_ITEMS = [
   { path: '/current-sacrament', label: 'Current Sacrament Meeting', icon: '♫' },
   { path: '/babies', label: 'Babies', icon: '◌' },
   { path: '/wc-members', label: 'Ward Council Members', icon: '⊕' },
+  { path: '/hub-suggestions', label: 'Hub Suggestions', icon: '✎' },
   { path: '/help', label: 'Help', icon: '?' },
 ];
 
@@ -52,6 +54,57 @@ export const CAL_NAV_ITEMS = [
   { path: '/calendaring', label: 'Calendar of Events', icon: '▣' },
   { path: '/help', label: 'Help', icon: '?' },
 ];
+
+const BH_DASHBOARD_ITEM = { path: '/', label: 'Dashboard', icon: 'ti-home' };
+export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: string; icon: string; adminOnly?: boolean }[] }[] = [
+  {
+    label: 'Sacrament Meeting',
+    items: [
+      { path: '/sacrament-planning',   label: 'Sacrament Planning',        icon: 'ti-notebook'        },
+      { path: '/current-sacrament',    label: 'Current Sacrament Meeting', icon: 'ti-music'           },
+      { path: '/speakers-and-prayers', label: 'Speakers & Prayers',        icon: 'ti-microphone'      },
+    ],
+  },
+  {
+    label: 'Bishopric',
+    items: [
+      { path: '/bishopric-meetings',   label: 'Bishopric Meetings',     icon: 'ti-users'           },
+      { path: '/assignments',          label: 'Bishopric Assignments',  icon: 'ti-list-check'      },
+      { path: '/bishop-schedule',      label: 'Bishop Schedule',        icon: 'ti-calendar-time'   },
+      { path: '/tasks',                label: 'Action Items',           icon: 'ti-checklist'       },
+      { path: '/out-of-town',          label: 'Out of Town',            icon: 'ti-plane-departure' },
+    ],
+  },
+  {
+    label: 'Ward Care',
+    items: [
+      { path: '/calling-pipeline',     label: 'Calling Pipeline',    icon: 'ti-user-check'      },
+      { path: '/interview-pipeline',   label: 'Interview Pipeline',  icon: 'ti-clipboard-list'  },
+      { path: '/member-needs',         label: 'Member Needs',        icon: 'ti-heart'           },
+      { path: '/missionary-pipeline',  label: 'Missionary Pipeline', icon: 'ti-compass'         },
+      { path: '/babies',               label: 'Babies',              icon: 'ti-baby-carriage'   },
+    ],
+  },
+  {
+    label: 'Calendar',
+    items: [
+      { path: '/calendaring',          label: 'Calendar Events',  icon: 'ti-calendar-event' },
+      { path: '/youth-activities',     label: 'Youth Activities', icon: 'ti-run'            },
+    ],
+  },
+  {
+    label: 'Administration',
+    items: [
+      { path: '/ward-members',         label: 'Ward Members',        icon: 'ti-address-book'              },
+      { path: '/users',                label: 'Users',               icon: 'ti-user-cog'                  },
+      { path: '/email-notifications',  label: 'Email Notifications', icon: 'ti-mail',       adminOnly: true },
+      { path: '/important-links',      label: 'Important Links',     icon: 'ti-link'                      },
+      { path: '/hub-suggestions',      label: 'Hub Suggestions',     icon: 'ti-bulb'                      },
+      { path: '/help',                 label: 'Help',                icon: 'ti-help-circle'               },
+    ],
+  },
+];
+const BH_ALL_ITEMS = [BH_DASHBOARD_ITEM, ...BH_NAV_CATEGORIES.flatMap(cat => cat.items)];
 
 const NAV_ORDER_KEY = (userId: number) => `nav_order_${userId}`;
 const WC_NAV_ORDER_KEY = (userId: number) => `wc_nav_order_${userId}`;
@@ -234,9 +287,9 @@ function RenameLinksModal({ labels, onSave, onClose }: {
         </div>
         <form onSubmit={submit} className="flex flex-col flex-1 overflow-hidden">
           <div className="p-4 space-y-2 overflow-y-auto">
-            {NAV_ITEMS.map(item => (
+            {BH_ALL_ITEMS.map(item => (
               <label key={item.path} className="flex items-center gap-3">
-                <span className="w-4 text-center text-gray-400 shrink-0">{item.icon}</span>
+                <i className={`ti ${item.icon} w-4 text-center text-gray-400 shrink-0 text-base`} aria-hidden="true" />
                 <input
                   value={draft[item.path] ?? item.label}
                   onChange={e => setDraft(d => ({ ...d, [item.path]: e.target.value }))}
@@ -271,7 +324,7 @@ export default function Layout() {
   const [navLabels, setNavLabels] = useState<Record<string, string>>({});
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, selectedHub, chooseHub } = useAuth();
+  const { user, logout, selectedHub, chooseHub, isGuest, guestType } = useAuth();
 
   const HUB_DEFAULT: Record<string, string> = {
     yc: '/youth-activities',
@@ -289,6 +342,7 @@ export default function Layout() {
   const isYc = user?.hub === 'yc' || selectedHub === 'yc';
   const isWc = !isYc && (selectedHub === 'wc' || user?.hub === 'wc');
   const isAdmin = user?.role === 'admin';
+  const isBh = !isCal && !isYc && !isWc;
   const canSwitchHub = user?.hub === 'both';
   const canSwitchToYc = (user?.hub === 'both' || user?.hub === 'wc') && !isYc;
   const canSwitchToBh = canSwitchHub && (isWc || isYc);
@@ -351,15 +405,21 @@ export default function Layout() {
     else saveOrder(next);
   };
 
+  const ycNavItems = isGuest
+    ? (guestType === 'sac'
+        ? [{ path: '/sacrament-program', label: 'Sacrament Program', icon: '♫' }]
+        : [{ path: '/youth-activities', label: 'Youth Calendar', icon: '⬡' }])
+    : YC_NAV_ITEMS;
+
   const navItems = isCal
     ? CAL_NAV_ITEMS
     : isYc
-      ? YC_NAV_ITEMS
+      ? ycNavItems
       : isWc
         ? wcNavOrder.map(p => WC_NAV_ITEMS.find(n => n.path === p)).filter(Boolean) as typeof WC_NAV_ITEMS
         : navOrder.map(p => NAV_ITEMS.find(n => n.path === p)).filter(Boolean).filter(n => !n!.adminOnly || isAdmin) as typeof NAV_ITEMS;
 
-  const draggable = (!isWc && !isCal && !isYc) || (isWc && isAdmin);
+  const draggable = isWc && isAdmin;
 
   const activeCls = isCal
     ? 'bg-violet-50 text-violet-700 font-medium'
@@ -387,6 +447,12 @@ export default function Layout() {
             {isCal ? 'Calendar Hub' : isYc ? 'Youth Council Hub' : isWc ? 'Ward Council Hub' : 'Bishopric Hub'}
           </h1>
           {user && <p className={`text-xs mt-1 ${isCal ? 'text-violet-600' : isYc ? 'text-amber-600' : isWc ? 'text-emerald-600' : 'text-gray-500'}`}>{user.name}</p>}
+          {isGuest && (
+            <button onClick={logout}
+              className="mt-2 w-full text-xs px-2 py-1.5 rounded border border-amber-300 text-amber-700 hover:bg-amber-100 transition-colors font-medium">
+              ← Back to Login
+            </button>
+          )}
           {(canSwitchToBh || canSwitchToWc || canSwitchToYc) && (
             <div className="mt-2 flex flex-col gap-1">
               {canSwitchToBh && (
@@ -411,34 +477,71 @@ export default function Layout() {
           )}
         </div>
         <nav className="p-2 overflow-y-auto flex-1">
-          {navItems.map(item => (
-            <div
-              key={item.path}
-              draggable={draggable}
-              onDragStart={draggable ? e => {
-                e.dataTransfer.setData('text/plain', item.path);
-                e.dataTransfer.effectAllowed = 'move';
-              } : undefined}
-              onDragOver={draggable ? e => { e.preventDefault(); setDragOverPath(item.path); } : undefined}
-              onDragLeave={draggable ? () => setDragOverPath(null) : undefined}
-              onDrop={draggable ? e => handleDrop(e, item.path) : undefined}
-              onDragEnd={draggable ? () => setDragOverPath(null) : undefined}
-              className={`rounded-md transition-colors ${dragOverPath === item.path ? `ring-2 ring-inset ${isYc ? 'ring-amber-400' : isWc ? 'ring-emerald-400' : 'ring-blue-400'}` : ''}`}
-            >
+          {isBh ? (
+            <>
               <Link
-                to={item.path}
+                to="/"
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                  location.pathname === item.path ? activeCls : 'text-gray-700 hover:bg-gray-100'
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors mb-1 ${
+                  location.pathname === '/' ? activeCls : 'text-gray-700 hover:bg-gray-100'
                 }`}
-                draggable={false}
               >
-                {draggable && <span className="w-5 text-center text-gray-400 text-xs cursor-grab select-none" title="Drag to reorder">⠿</span>}
-                <span className="w-4 text-center">{item.icon}</span>
-                {getLabel(item)}
+                <i className="ti ti-home text-base w-4 text-center" aria-hidden="true" />
+                {getLabel(BH_DASHBOARD_ITEM)}
               </Link>
-            </div>
-          ))}
+              {BH_NAV_CATEGORIES.map(cat => (
+                <div key={cat.label} className="mt-3">
+                  <p className="px-3 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 select-none">
+                    {cat.label}
+                  </p>
+                  {cat.items
+                    .filter(item => !item.adminOnly || isAdmin)
+                    .map(item => (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`flex items-center gap-2 pl-4 pr-3 py-1.5 rounded-md text-sm transition-colors ${
+                          location.pathname === item.path ? activeCls : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        <i className={`ti ${item.icon} text-base w-4 text-center shrink-0`} aria-hidden="true" />
+                        {getLabel(item)}
+                      </Link>
+                    ))}
+                </div>
+              ))}
+            </>
+          ) : (
+            navItems.map(item => (
+              <div
+                key={item.path}
+                draggable={draggable}
+                onDragStart={draggable ? e => {
+                  e.dataTransfer.setData('text/plain', item.path);
+                  e.dataTransfer.effectAllowed = 'move';
+                } : undefined}
+                onDragOver={draggable ? e => { e.preventDefault(); setDragOverPath(item.path); } : undefined}
+                onDragLeave={draggable ? () => setDragOverPath(null) : undefined}
+                onDrop={draggable ? e => handleDrop(e, item.path) : undefined}
+                onDragEnd={draggable ? () => setDragOverPath(null) : undefined}
+                className={`rounded-md transition-colors ${dragOverPath === item.path ? `ring-2 ring-inset ${isYc ? 'ring-amber-400' : isWc ? 'ring-emerald-400' : 'ring-blue-400'}` : ''}`}
+              >
+                <Link
+                  to={item.path}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                    location.pathname === item.path ? activeCls : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                  draggable={false}
+                >
+                  {draggable && <span className="w-5 text-center text-gray-400 text-xs cursor-grab select-none" title="Drag to reorder">⠿</span>}
+                  <span className="w-4 text-center">{item.icon}</span>
+                  {getLabel(item)}
+                </Link>
+              </div>
+            ))
+          )}
         </nav>
         <div className="p-2 border-t border-gray-200 space-y-1">
           {isAdmin && !isWc && !isCal && (
@@ -447,29 +550,42 @@ export default function Layout() {
               <span className="text-xs">✎</span> Rename Links
             </button>
           )}
-          <button onClick={() => setShowChangePw(true)}
-            className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md">
-            Change Password
-          </button>
-          <button onClick={() => setShowSecurityQ(true)}
-            className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md">
-            Security Questions
-          </button>
-          <button onClick={logout}
-            className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md">
-            Sign out
-          </button>
+          {!isGuest && (
+            <>
+              <button onClick={() => setShowChangePw(true)}
+                className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md">
+                Change Password
+              </button>
+              <button onClick={() => setShowSecurityQ(true)}
+                className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md">
+                Security Questions
+              </button>
+            </>
+          )}
+          {!isGuest && (
+            <button onClick={logout}
+              className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md">
+              Sign out
+            </button>
+          )}
         </div>
       </aside>
 
       <div className="flex-1 min-w-0">
-        <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 lg:hidden">
-          <button onClick={() => setSidebarOpen(true)} className="p-1 text-gray-600">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <h1 className="text-lg font-bold text-gray-900">Bishopric Hub</h1>
+        <header className={`border-b px-4 py-3 flex items-center gap-3 lg:hidden ${isGuest ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}>
+          {isGuest ? (
+            <button onClick={logout}
+              className="px-3 py-1.5 text-sm border border-amber-300 rounded text-amber-700 hover:bg-amber-100 font-medium shrink-0">
+              ← Back to Login
+            </button>
+          ) : (
+            <button onClick={() => setSidebarOpen(true)} className="p-1 text-gray-600">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          )}
+          <h1 className={`text-lg font-bold ${isGuest ? 'text-amber-800' : 'text-gray-900'}`}>Bishopric Hub</h1>
         </header>
         <main className="p-4 lg:p-6">
           <Outlet />

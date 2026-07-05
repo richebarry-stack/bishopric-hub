@@ -135,6 +135,7 @@ export default function CallingPipeline() {
 
   const ACTION_STATUSES = new Set(['3. Approved and assigned', '7. Need to release']);
   const actionRows = rows.filter(r => ACTION_STATUSES.has(r.status));
+  const prayAboutRows = rows.filter(r => r.status === '2. Pray about');
   const callings = filtered.filter(r => r.type !== 'Release');
   const releases = filtered.filter(r => r.type === 'Release');
 
@@ -247,6 +248,15 @@ export default function CallingPipeline() {
               {s}
             </button>
           ))}
+        </div>
+      )}
+
+      {!isLoading && prayAboutRows.length > 0 && groupBy !== 'sustained' && groupBy !== 'timeline' && (
+        <div className="mb-4 bg-violet-50 border border-violet-200 rounded-lg p-4">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-violet-700 mb-3">
+            Pray About ({prayAboutRows.length})
+          </h2>
+          <Table rows={prayAboutRows} onEdit={setEditing} onDelete={remove} />
         </div>
       )}
 

@@ -1,14 +1,17 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
+import { useNavigate } from 'react-router-dom';
 import { CHURCH_ROLES } from '../lib/constants';
 
 type ForgotStep = 'email' | 'answers' | 'done';
 type Mode = 'login' | 'register';
 
 export default function Login() {
-  const { login, chooseHub } = useAuth();
+  const { login, loginAsGuest, chooseHub } = useAuth();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>('login');
+  const [guestLoading, setGuestLoading] = useState(false);
 
   // Login state
   const [email, setEmail] = useState('');
@@ -330,6 +333,30 @@ export default function Login() {
           <button onClick={() => { setMode('register'); setRegError(''); }}
             className="text-sm text-blue-600 hover:text-blue-800">
             Request access
+          </button>
+        </div>
+        <div className="mt-4 border-t border-gray-200 pt-4 space-y-2">
+          <button
+            onClick={async () => {
+              setGuestLoading(true);
+              try { await loginAsGuest('yc'); navigate('/youth-activities'); }
+              catch { /* guest not configured */ }
+              finally { setGuestLoading(false); }
+            }}
+            disabled={guestLoading}
+            className="w-full py-2 px-4 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+            {guestLoading ? 'Loading…' : 'View Youth Schedule (no login required)'}
+          </button>
+          <button
+            onClick={async () => {
+              setGuestLoading(true);
+              try { await loginAsGuest('sac'); navigate('/sacrament-program'); }
+              catch { /* guest not configured */ }
+              finally { setGuestLoading(false); }
+            }}
+            disabled={guestLoading}
+            className="w-full py-2 px-4 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+            {guestLoading ? 'Loading…' : 'View Sacrament Program (no login required)'}
           </button>
         </div>
       </div>

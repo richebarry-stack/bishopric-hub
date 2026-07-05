@@ -147,6 +147,12 @@ function DashboardSettingsModal({ config, onSave, onClose }: {
 
   const handleSave = () => { saveDashboardConfig(draft); onSave(draft); onClose(); };
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-8">

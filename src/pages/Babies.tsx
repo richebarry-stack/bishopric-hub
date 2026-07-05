@@ -23,7 +23,7 @@ function toDateOnly(v: string): string {
 }
 
 export default function Babies() {
-  const { isWcReadOnly } = useAuth();
+  const { isGuest } = useAuth();
   const { rows, isLoading, create, update, remove } = useTable<Baby>('babies');
   const [editing, setEditing] = useState<Partial<Baby> | null>(null);
 
@@ -40,19 +40,19 @@ export default function Babies() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900">Babies</h1>
-        {!isWcReadOnly && <button onClick={() => setEditing({ ...EMPTY })} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>}
+        {!isGuest && <button onClick={() => setEditing({ ...EMPTY })} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>}
       </div>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {rows.map(b => (
-            <div key={b.id} className={`bg-white rounded-lg border border-gray-200 p-4 ${!isWcReadOnly ? 'cursor-pointer hover:shadow-sm' : ''}`}
-              onClick={!isWcReadOnly ? () => setEditing(b) : undefined}>
+            <div key={b.id} className={`bg-white rounded-lg border border-gray-200 p-4 ${!isGuest ? 'cursor-pointer hover:shadow-sm' : ''}`}
+              onClick={!isGuest ? () => setEditing(b) : undefined}>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-medium text-gray-900">{b.name}</h3>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={b.status} colors={COLORS} />
-                  {!isWcReadOnly && <button onClick={e => { e.stopPropagation(); remove(b.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>}
+                  {!isGuest && <button onClick={e => { e.stopPropagation(); remove(b.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>}
                 </div>
               </div>
               <div className="text-sm text-gray-500 space-y-0.5">

@@ -1,0 +1,2 @@
+ALTER TABLE youth_activities ADD COLUMN time TEXT NOT NULL DEFAULT '';
+ALTER TABLE youth_activities ADD COLUMN location TEXT NOT NULL DEFAULT '';

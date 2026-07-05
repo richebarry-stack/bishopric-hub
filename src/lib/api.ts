@@ -33,6 +33,8 @@ export const api = {
       request('/auth/security-questions', { method: 'POST', body: JSON.stringify(data) }),
     resetByQuestions: (data: { email: string; answer1: string; answer2: string; new_password: string }) =>
       request('/auth/reset-by-questions', { method: 'POST', body: JSON.stringify(data) }),
+    guest: (type: 'yc' | 'sac') =>
+      request<{ user: User }>(`/auth/guest/${type}`, { method: 'POST' }),
   },
   users: {
     list: (filter?: 'wc') => request<User[]>(`/users${filter ? `?hub=${filter}` : ''}`),
@@ -235,10 +237,14 @@ export interface SacramentTheme {
   meeting_date: string;
   theme: string;
   references_text: string;
+  presiding: string;
   conducting: string;
   meeting_link: string;
   stake_business: string;
   ward_business: string;
+  intro_remarks: string;
+  recognize: string;
+  closing_remarks: string;
 }
 
 export interface SacramentAgendaNote {
@@ -324,12 +330,26 @@ export interface MemberWithoutCalling {
 export interface YouthActivity {
   id: number;
   date: string;
+  time: string;
+  location: string;
   builders_of_faith: string;
+  builders_of_faith_time: string;
+  builders_of_faith_location: string;
   messengers_of_hope: string;
+  messengers_of_hope_time: string;
+  messengers_of_hope_location: string;
   gatherers_of_light: string;
+  gatherers_of_light_time: string;
+  gatherers_of_light_location: string;
   deacons: string;
+  deacons_time: string;
+  deacons_location: string;
   teachers: string;
+  teachers_time: string;
+  teachers_location: string;
   priests: string;
+  priests_time: string;
+  priests_location: string;
   notes: string;
   updated_at: string;
 }
@@ -354,6 +374,17 @@ export interface BishopScheduleEntry {
 export interface PrayerOther {
   id: number;
   name: string;
+}
+
+export interface HubSuggestion {
+  id: number;
+  type: string;
+  title: string;
+  description: string;
+  submitted_by: string;
+  status: string;
+  admin_notes: string;
+  updated_at: string;
 }
 
 export interface WardMember {
