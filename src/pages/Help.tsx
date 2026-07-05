@@ -384,6 +384,8 @@ export default function Help() {
                 'Sacrament agenda: added a dedicated High Councilor field, pre-filled from the current High Councilor user and editable per week; feeds the Recognize section in the export automatically',
                 'Sacrament agenda: added an "Other Stake Representatives" field for recognizing additional stake guests when present; left blank by default and omitted from the export when empty',
                 'Export PDF no longer auto-opens the print dialog — print manually from the opened tab when ready',
+                'Sacrament export: "Bearing of Testimonies" no longer shows a trailing colon, but still bolds correctly',
+                'Sacrament export: "To Be Sustained" now introduces the names with "The following have been called to positions in the ward. If they are present then please stand." before listing name — calling',
               ],
             },
             {

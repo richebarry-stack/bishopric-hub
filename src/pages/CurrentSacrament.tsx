@@ -681,9 +681,10 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         case 'sustainings':
           if (sustainings.length) {
             lines.push('To Be Sustained (Callings):');
+            lines.push('The following have been called to positions in the ward. If they are present then please stand.');
             for (const c of sustainings) {
               const name = stripMd(c.member);
-              lines.push(c.calling ? `  • ${name} has been called as ${stripMd(c.calling)}.` : `  • ${name}`);
+              lines.push(c.calling ? `  • ${name} — ${stripMd(c.calling)}` : `  • ${name}`);
             }
             lines.push('We propose that they be sustained in these callings. Those in favor may manifest it by the uplifted hand. (pause) Those opposed, if any, may manifest it (pause)');
           }
@@ -692,7 +693,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         case 'stake_business': if (stakeBusiness) lines.push(`Stake Business: ${stakeBusiness}`); break;
         case 'sacrament_intro': if (sacramentIntro) lines.push(sacramentIntro); break;
         case 'sacrament_hymn': if (sacramentHymn) lines.push(`Sacrament Hymn: ${sacramentHymn}`); break;
-        case 'testimonies':    if (isFastSunday)  lines.push('Bearing of Testimonies:'); break;
+        case 'testimonies':    if (isFastSunday)  lines.push('Bearing of Testimonies'); break;
         case 'rest_special':   if (restSpecial)   lines.push(`Rest / Special Music: ${restSpecial}`); break;
         case 'closing_remarks': if (closingRemarks) lines.push(`Closing Remarks: ${closingRemarks}`); break;
         case 'closing_hymn':   if (closingHymn)   lines.push(`Closing Hymn: ${closingHymn}`); break;
@@ -716,6 +717,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       if (!l.trim()) return '<br>';
       if (l.startsWith('    ')) return `<p style="margin:0.05rem 0 0.1rem 2.5rem;color:#555;font-size:12pt">${l.trim()}</p>`;
       if (l.startsWith('  •')) return `<p style="margin:0.15rem 0 0.15rem 1.5rem">• ${l.trim().slice(1).trim()}</p>`;
+      if (l === 'Bearing of Testimonies') return `<p style="margin:0.3rem 0"><strong>${l}</strong></p>`;
       const ci = l.indexOf(':');
       if (ci > -1) return `<p style="margin:0.3rem 0"><strong>${l.slice(0, ci)}:</strong>${l.slice(ci + 1)}</p>`;
       return `<p style="margin:0.3rem 0">${l}</p>`;
