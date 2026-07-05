@@ -381,7 +381,8 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   }, [usersLoading, currentHighCouncilor?.name]);
 
   // Always reflects the High Councilor field above, rather than being frozen into the saved Recognize text
-  const highCouncilorThanksLine = highCouncilorName ? `${highCouncilorName} from the stake high council` : '';
+  const highCouncilorLastName = highCouncilorName.trim().split(/\s+/).pop();
+  const highCouncilorThanksLine = highCouncilorName ? `Brother ${highCouncilorLastName} from the stake high council` : '';
   const stakeRepsLine = stakeReps.trim();
 
   const [wardBusiness,   setWardBusiness]   = useState(existingTheme?.ward_business   || '');
