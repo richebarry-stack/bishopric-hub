@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTable } from '../lib/useTable';
-import type { MissionaryPipeline as MissionaryType, SacramentSpeaker } from '../lib/api';
+import type { MissionaryPipeline as MissionaryType } from '../lib/api';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Textarea } from '../components/FormFields';
@@ -26,8 +26,7 @@ function toDateOnly(v: string): string {
   return v.slice(0, 10);
 }
 
-type Occasion = 'Farewell' | 'Homecoming';
-type SortKey = 'who' | 'mission_call' | 'temple_status' | 'report_date' | 'release_date' | 'farewell' | 'homecoming';
+type SortKey = 'who' | 'mission_call' | 'temple_status' | 'report_date' | 'release_date';
 type SortDir = 'asc' | 'desc';
 
 function SortHeader({ label, sortKey, current, dir, onSort }: {
@@ -46,12 +45,6 @@ function SortHeader({ label, sortKey, current, dir, onSort }: {
 
 export default function MissionaryPipeline() {
   const { rows, isLoading, create, update, remove } = useTable<MissionaryType>('missionary-pipeline');
-  const {
-    rows: speakers,
-    create: createSpeaker,
-    update: updateSpeaker,
-    remove: removeSpeaker,
-  } = useTable<SacramentSpeaker>('sacrament-speakers');
   const [editing, setEditing] = useState<Partial<MissionaryType> | null>(null);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -60,67 +53,24 @@ export default function MissionaryPipeline() {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(key); setSortDir('asc'); }
   };
-  // Talk dates and topics live on linked sacrament_speakers rows; held transiently while the modal is open.
-  const [farewellDate, setFarewellDate] = useState('');
-  const [farewellTopic, setFarewellTopic] = useState('');
-  const [homecomingDate, setHomecomingDate] = useState('');
-  const [homecomingTopic, setHomecomingTopic] = useState('');
-
-  const linkedSpeaker = (missionaryId: number | undefined, occasion: Occasion) =>
-    missionaryId ? speakers.find(s => s.missionary_id === missionaryId && s.speaker_occasion === occasion) : undefined;
 
   const openEdit = (m: MissionaryType) => {
-    const fw = linkedSpeaker(m.id, 'Farewell');
-    const hc = linkedSpeaker(m.id, 'Homecoming');
-    setFarewellDate(toDateOnly(fw?.meeting_date || ''));
-    setFarewellTopic(fw?.topic || '');
-    setHomecomingDate(toDateOnly(hc?.meeting_date || ''));
-    setHomecomingTopic(hc?.topic || '');
     setEditing(m);
   };
 
   const openNew = () => {
-    setFarewellDate('');
-    setFarewellTopic('');
-    setHomecomingDate('');
-    setHomecomingTopic('');
     setEditing({ ...EMPTY });
-  };
-
-  // Create / update / delete the linked Adult Speaker row to match a talk date.
-  const syncTalk = async (missionaryId: number, who: string, occasion: Occasion, date: string, topic: string) => {
-    const existing = linkedSpeaker(missionaryId, occasion);
-    if (date) {
-      if (existing) {
-        await updateSpeaker(existing.id, {
-          meeting_date: date, speaker: who, speaker_type: 'Adult Speaker', topic,
-        });
-      } else {
-        await createSpeaker({
-          meeting_date: date, speaker: who, speaker_type: 'Adult Speaker',
-          accepted: 'Called and Accepted', speaking_order: 1,
-          topic, notes: '', missionary_id: missionaryId, speaker_occasion: occasion,
-        });
-      }
-    } else if (existing) {
-      await removeSpeaker(existing.id);
-    }
   };
 
   const handleSave = async () => {
     if (!editing) return;
-    const who = editing.who || '';
     const data = { ...editing };
     delete (data as Record<string, unknown>).id;
-    let missionaryId = editing.id;
-    if (missionaryId) {
-      await update(missionaryId, data as Record<string, unknown>);
+    if (editing.id) {
+      await update(editing.id, data as Record<string, unknown>);
     } else {
-      const created = await create(data as Record<string, unknown>);
-      missionaryId = created.id;
+      await create(data as Record<string, unknown>);
     }
-    await syncTalk(missionaryId, who, 'Farewell', farewellDate, farewellTopic);
-    await syncTalk(missionaryId, who, 'Homecoming', homecomingDate, homecomingTopic);
     setEditing(null);
   };
 
@@ -129,10 +79,6 @@ export default function MissionaryPipeline() {
   };
 
   const handleDelete = async (missionaryId: number) => {
-    for (const occ of ['Farewell', 'Homecoming'] as Occasion[]) {
-      const linked = linkedSpeaker(missionaryId, occ);
-      if (linked) await removeSpeaker(linked.id);
-    }
     await remove(missionaryId);
   };
 
@@ -163,8 +109,6 @@ export default function MissionaryPipeline() {
               else if (sortKey === 'temple_status') { av = a.temple_status || ''; bv = b.temple_status || ''; }
               else if (sortKey === 'report_date')   { av = a.report_date || '';   bv = b.report_date || ''; }
               else if (sortKey === 'release_date')  { av = a.release_date || '';  bv = b.release_date || ''; }
-              else if (sortKey === 'farewell')  { av = linkedSpeaker(a.id, 'Farewell')?.meeting_date  || ''; bv = linkedSpeaker(b.id, 'Farewell')?.meeting_date  || ''; }
-              else if (sortKey === 'homecoming') { av = linkedSpeaker(a.id, 'Homecoming')?.meeting_date || ''; bv = linkedSpeaker(b.id, 'Homecoming')?.meeting_date || ''; }
               return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
             }) : missionaries;
 
@@ -187,8 +131,6 @@ export default function MissionaryPipeline() {
                         <SortHeader label="Temple"        sortKey="temple_status" current={sortKey} dir={sortDir} onSort={handleSort} />
                         <SortHeader label="Report"        sortKey="report_date"   current={sortKey} dir={sortDir} onSort={handleSort} />
                         <SortHeader label="Release"       sortKey="release_date"  current={sortKey} dir={sortDir} onSort={handleSort} />
-                        <SortHeader label="Farewell Talk" sortKey="farewell"      current={sortKey} dir={sortDir} onSort={handleSort} />
-                        <SortHeader label="Homecoming Talk" sortKey="homecoming"  current={sortKey} dir={sortDir} onSort={handleSort} />
                         <th className="px-3 py-2"></th>
                       </tr>
                     </thead>
@@ -206,8 +148,6 @@ export default function MissionaryPipeline() {
                           <td className="px-3 py-2 text-gray-600 text-xs">{r.temple_status}</td>
                           <td className="px-3 py-2 text-gray-600">{toDateOnly(r.report_date)}</td>
                           <td className="px-3 py-2 text-gray-600">{toDateOnly(r.release_date)}</td>
-                          <td className="px-3 py-2 text-gray-600">{toDateOnly(linkedSpeaker(r.id, 'Farewell')?.meeting_date || '')}</td>
-                          <td className="px-3 py-2 text-gray-600">{toDateOnly(linkedSpeaker(r.id, 'Homecoming')?.meeting_date || '')}</td>
                           <td className="px-3 py-2">
                             <button onClick={e => { e.stopPropagation(); handleDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
                           </td>
@@ -233,20 +173,6 @@ export default function MissionaryPipeline() {
             <Input label="Next Steps" value={editing.next_steps || ''} onChange={v => setEditing({ ...editing, next_steps: v })} />
             <Input label="Report Date" value={toDateOnly(editing.report_date || '')} onChange={v => setEditing({ ...editing, report_date: v })} type="date" />
             <Input label="Release Date" value={toDateOnly(editing.release_date || '')} onChange={v => setEditing({ ...editing, release_date: v })} type="date" />
-            <div className="border-t border-gray-100 pt-3">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Sacrament Talks (Adult Speaker)</p>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label="Farewell Talk Date" value={farewellDate} onChange={setFarewellDate} type="date" />
-                  <Input label="Farewell Topic" value={farewellTopic} onChange={setFarewellTopic} placeholder="Talk topic" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label="Homecoming Talk Date" value={homecomingDate} onChange={setHomecomingDate} type="date" />
-                  <Input label="Homecoming Topic" value={homecomingTopic} onChange={setHomecomingTopic} placeholder="Talk topic" />
-                </div>
-              </div>
-              <p className="text-xs text-gray-400 mt-2">Setting a date adds this missionary to Sacrament Planning as an Adult Speaker on that Sunday. Clearing it removes the talk. The date and topic stay in sync on both pages.</p>
-            </div>
             <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} />
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
