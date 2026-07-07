@@ -2,7 +2,25 @@ import { useState, useMemo, useRef } from 'react';
 import { useTable } from '../lib/useTable';
 import type { BishopScheduleEntry } from '../lib/api';
 import Modal from '../components/Modal';
-import { Input, Textarea } from '../components/FormFields';
+import { Input, Textarea, Select, Checkbox } from '../components/FormFields';
+import { toast } from '../lib/toast';
+import {
+  type RecurrenceFrequency,
+  describeRecurrence,
+  getNthWeekdayInfo,
+  generateRecurrenceDates,
+} from '../lib/recurrence';
+
+const MAX_RECURRENCE_OCCURRENCES = 200;
+
+const FREQUENCY_OPTIONS: { label: string; value: RecurrenceFrequency }[] = [
+  { label: 'Daily', value: 'daily' },
+  { label: 'Weekly', value: 'weekly' },
+  { label: 'Monthly on the same weekday', value: 'monthly_nth_weekday' },
+];
+
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const ORDINAL_NAMES = ['1st', '2nd', '3rd', '4th', '5th'];
 
 function buildSlots(): string[] {
   const slots: string[] = [];
@@ -62,6 +80,10 @@ interface FormState {
   end_time: string;
   title: string;
   notes: string;
+  recurrence_id?: string | null;
+  recurrence_frequency?: RecurrenceFrequency | null;
+  recurrence_interval?: number | null;
+  recurrence_end_date?: string | null;
 }
 
 interface DragState {
@@ -90,6 +112,11 @@ export default function BishopSchedule() {
   const { rows, isLoading, create, update, remove } = useTable<BishopScheduleEntry>('bishop-schedule');
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [editing, setEditing] = useState<FormState | null>(null);
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
+  const [repeatFrequency, setRepeatFrequency] = useState<RecurrenceFrequency>('weekly');
+  const [repeatInterval, setRepeatInterval] = useState(1);
+  const [repeatEndDate, setRepeatEndDate] = useState('');
+  const [saving, setSaving] = useState(false);
   const [monthPicker, setMonthPicker] = useState(false);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const dragRef = useRef<ActiveDrag | null>(null);
@@ -184,7 +211,12 @@ export default function BishopSchedule() {
       setDragState(null);
       if (!d) return;
       if (!d.didMove) {
-        setEditing({ id: entry.id, date: entry.date.slice(0, 10), start_time: entry.start_time, end_time: entry.end_time, title: entry.title, notes: entry.notes || '' });
+        setEditing({
+          id: entry.id, date: entry.date.slice(0, 10), start_time: entry.start_time, end_time: entry.end_time,
+          title: entry.title, notes: entry.notes || '',
+          recurrence_id: entry.recurrence_id, recurrence_frequency: entry.recurrence_frequency,
+          recurrence_interval: entry.recurrence_interval, recurrence_end_date: entry.recurrence_end_date,
+        });
       } else {
         const newStart = TIME_SLOTS[d.previewStartIdx];
         const newEnd = TIME_SLOTS[Math.min(d.previewEndIdx, TIME_SLOTS.length - 1)];
@@ -207,10 +239,18 @@ export default function BishopSchedule() {
     window.addEventListener('pointercancel', onCancel, true);
   };
 
+  const resetRepeatState = () => {
+    setRepeatEnabled(false);
+    setRepeatFrequency('weekly');
+    setRepeatInterval(1);
+    setRepeatEndDate('');
+  };
+
   const handleSlotClick = (date: string, time: string) => {
     if (dragState) return;
     const si = slotIndex(time);
     const endIdx = Math.min(si + 2, TIME_SLOTS.length - 1);
+    resetRepeatState();
     setEditing({ date, start_time: time, end_time: TIME_SLOTS[endIdx], title: '', notes: '' });
   };
 
@@ -220,14 +260,73 @@ export default function BishopSchedule() {
       date: editing.date, start_time: editing.start_time, end_time: editing.end_time,
       title: editing.title, notes: editing.notes,
     };
-    if (editing.id) await update(editing.id, data);
-    else await create(data);
-    setEditing(null);
+    setSaving(true);
+    try {
+      if (editing.id) {
+        await update(editing.id, data);
+      } else if (repeatEnabled && repeatEndDate) {
+        const futureDates = generateRecurrenceDates(editing.date, repeatEndDate, repeatFrequency, repeatInterval, MAX_RECURRENCE_OCCURRENCES);
+        if (futureDates.length === MAX_RECURRENCE_OCCURRENCES && futureDates[futureDates.length - 1] < repeatEndDate) {
+          toast.error(`That would create more than ${MAX_RECURRENCE_OCCURRENCES} appointments — shorten the date range or pick a coarser frequency.`);
+          return;
+        }
+        const recurrenceId = crypto.randomUUID();
+        const recurrenceFields = {
+          recurrence_id: recurrenceId, recurrence_frequency: repeatFrequency,
+          recurrence_interval: repeatInterval, recurrence_end_date: repeatEndDate,
+        };
+        await create({ ...data, ...recurrenceFields });
+        for (const date of futureDates) {
+          await create({ ...data, date, ...recurrenceFields });
+        }
+      } else {
+        await create(data);
+      }
+      setEditing(null);
+      resetRepeatState();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Saves this occurrence normally, then copies its title/notes/times (not date or
+  // recurrence metadata) to every sibling occurrence dated on or after it.
+  const handleSaveToFutureSeries = async () => {
+    if (!editing?.id || !editing.recurrence_id) return;
+    setSaving(true);
+    try {
+      const data: Record<string, unknown> = {
+        date: editing.date, start_time: editing.start_time, end_time: editing.end_time,
+        title: editing.title, notes: editing.notes,
+      };
+      await update(editing.id, data);
+
+      const contentData = { start_time: editing.start_time, end_time: editing.end_time, title: editing.title, notes: editing.notes };
+      const futureSiblings = rows.filter(r =>
+        r.recurrence_id === editing.recurrence_id && r.id !== editing.id && r.date.slice(0, 10) >= editing.date
+      );
+      for (const sibling of futureSiblings) {
+        await update(sibling.id, contentData);
+      }
+      setEditing(null);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async () => {
     if (!editing?.id) return;
     await remove(editing.id);
+    setEditing(null);
+  };
+
+  // Deletes this occurrence and every sibling dated on or after it, leaving past occurrences intact.
+  const handleDeleteFuture = async () => {
+    if (!editing?.id || !editing.recurrence_id) return;
+    const toDelete = rows.filter(r => r.recurrence_id === editing.recurrence_id && r.date.slice(0, 10) >= editing.date);
+    for (const r of toDelete) {
+      await remove(r.id);
+    }
     setEditing(null);
   };
 
@@ -432,6 +531,46 @@ export default function BishopSchedule() {
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
             <Input label="Title" value={editing.title} onChange={v => setEditing({ ...editing, title: v })} required />
             <Input label="Date" value={editing.date} onChange={v => setEditing({ ...editing, date: v })} type="date" />
+
+            {!editing.id && (
+              <div className="border border-gray-200 rounded-md p-3 space-y-2">
+                <Checkbox label="Repeat this appointment" checked={repeatEnabled} onChange={setRepeatEnabled} />
+                {repeatEnabled && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Select label="Frequency" value={FREQUENCY_OPTIONS.find(o => o.value === repeatFrequency)?.label || ''}
+                        onChange={v => setRepeatFrequency(FREQUENCY_OPTIONS.find(o => o.label === v)?.value || 'weekly')}
+                        options={FREQUENCY_OPTIONS.map(o => o.label)} />
+                      {repeatFrequency !== 'monthly_nth_weekday' && (
+                        <Input label={`Every N ${repeatFrequency === 'daily' ? 'day(s)' : 'week(s)'}`} type="number"
+                          value={String(repeatInterval)} onChange={v => setRepeatInterval(Math.max(1, parseInt(v, 10) || 1))} />
+                      )}
+                      {repeatFrequency === 'monthly_nth_weekday' && (
+                        <Input label="Every N month(s)" type="number"
+                          value={String(repeatInterval)} onChange={v => setRepeatInterval(Math.max(1, parseInt(v, 10) || 1))} />
+                      )}
+                    </div>
+                    {repeatFrequency === 'monthly_nth_weekday' && editing.date && (() => {
+                      const { weekday, nth } = getNthWeekdayInfo(editing.date);
+                      const ordinal = ORDINAL_NAMES[nth - 1] || `${nth}th`;
+                      return (
+                        <p className="text-xs text-gray-500">
+                          Repeats on the {ordinal} {WEEKDAY_NAMES[weekday]} of the month.
+                        </p>
+                      );
+                    })()}
+                    <Input label="Stop date" type="date" value={repeatEndDate} onChange={setRepeatEndDate} required />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {editing.id && editing.recurrence_id && editing.recurrence_frequency && editing.recurrence_end_date && (
+              <p className="text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+                Part of a recurring series — {describeRecurrence(editing.recurrence_frequency, editing.recurrence_interval || 1, editing.recurrence_end_date, editing.date).toLowerCase()}. Saving below only changes this appointment.
+              </p>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
               <select value={editing.start_time} onChange={e => {
@@ -455,14 +594,27 @@ export default function BishopSchedule() {
             </div>
             <Textarea label="Notes" value={editing.notes} onChange={v => setEditing({ ...editing, notes: v })} />
             <div className="flex justify-between pt-2">
-              <div>
+              <div className="flex gap-3">
                 {editing.id && (
                   <button type="button" onClick={handleDelete} className="px-4 py-2 text-sm text-red-600 hover:text-red-800">Delete</button>
+                )}
+                {editing.id && editing.recurrence_id && (
+                  <button type="button" onClick={handleDeleteFuture} className="px-4 py-2 text-sm text-red-600 hover:text-red-800">
+                    Delete this and future
+                  </button>
                 )}
               </div>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">Save</button>
+                {editing.id && editing.recurrence_id && (
+                  <button type="button" disabled={saving} onClick={handleSaveToFutureSeries}
+                    className="px-4 py-2 border border-blue-600 text-blue-600 rounded-md text-sm hover:bg-blue-50 disabled:opacity-50">
+                    Save + apply to future
+                  </button>
+                )}
+                <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
               </div>
             </div>
           </form>

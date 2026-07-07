@@ -353,6 +353,12 @@ export default function Help() {
         <div className="space-y-4">
           {([
             {
+              date: 'Jul 6, 2026',
+              items: [
+                'Bishop\'s Schedule: added recurring appointments (daily, weekly, or monthly on the same weekday) with a stop date instead of a fixed count; edit one occurrence independently, "Save + apply to future" to update the rest of the series, and "Delete this and future" to remove upcoming occurrences without touching past ones',
+              ],
+            },
+            {
               date: 'Jul 5, 2026',
               items: [
                 'Guest login flows added for viewing the youth schedule and sacrament program without an account',

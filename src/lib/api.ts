@@ -375,6 +375,10 @@ export interface BishopScheduleEntry {
   end_time: string;
   title: string;
   notes: string;
+  recurrence_id?: string | null;
+  recurrence_frequency?: 'daily' | 'weekly' | 'monthly_nth_weekday' | null;
+  recurrence_interval?: number | null;
+  recurrence_end_date?: string | null;
 }
 
 export interface PrayerOther {
