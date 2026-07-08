@@ -345,7 +345,7 @@ export default function Users() {
                       <th className="text-left px-3 py-2 font-medium text-gray-600">Role</th>
                       <th className="text-left px-3 py-2 font-medium text-gray-600">Calling</th>
                       {isAdmin && <th className="text-left px-3 py-2 font-medium text-gray-600">Hub</th>}
-                      {isAdmin && <th className="text-left px-3 py-2 font-medium text-gray-600">Last Login</th>}
+                      {isAdmin && <th className="text-left px-3 py-2 font-medium text-gray-600">Last Access</th>}
                       {isAdmin && <th className="px-3 py-2 font-medium text-gray-600">Actions</th>}
                     </tr>
                   </thead>
@@ -397,8 +397,8 @@ export default function Users() {
                         )}
                         {isAdmin && (
                           <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">
-                            {u.last_login
-                              ? new Date(u.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                            {u.last_access
+                              ? new Date(u.last_access).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                               : <span className="italic">Never</span>}
                           </td>
                         )}

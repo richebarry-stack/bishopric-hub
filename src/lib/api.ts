@@ -93,6 +93,7 @@ export interface User {
   church_role: string;
   hub: string;
   last_login?: string;
+  last_access?: string;
   must_reset_password?: boolean;
   has_security_questions?: boolean;
 }

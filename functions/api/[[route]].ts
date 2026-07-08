@@ -67,6 +67,12 @@ async function getSession(request: Request, db: D1Database): Promise<Session | n
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.id = ? AND s.expires_at > datetime("now")`
   ).bind(sessionId).first<Session>();
+  if (session) {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    await db.prepare(
+      `UPDATE users SET last_access = ? WHERE id = ? AND (last_access = '' OR last_access < ?)`
+    ).bind(new Date().toISOString(), session.user_id, oneDayAgo).run();
+  }
   return session;
 }
 
@@ -330,13 +336,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (method === 'GET') {
       // WC-hub users only see WC users
       if (session.hub === 'wc') {
-        const users = await db.prepare("SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE hub IN ('wc','both') ORDER BY name ASC").all();
+        const users = await db.prepare("SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE hub IN ('wc','both') ORDER BY name ASC").all();
         return json(users.results);
       }
       const filterHub = url.searchParams.get('hub');
       const users = filterHub === 'wc'
-        ? await db.prepare("SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE hub IN ('wc','both') ORDER BY name ASC").all()
-        : await db.prepare('SELECT id, name, email, role, church_role, hub, last_login FROM users ORDER BY name ASC').all();
+        ? await db.prepare("SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE hub IN ('wc','both') ORDER BY name ASC").all()
+        : await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users ORDER BY name ASC').all();
       return json(users.results);
     }
 
@@ -349,7 +355,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const result = await db.prepare(
           'INSERT INTO users (name, email, password_hash, role, church_role, hub) VALUES (?, ?, ?, ?, ?, ?)'
         ).bind(name, email, hash, newRole, church_role || '', newHub).run();
-        const newUser = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE id = ?').bind(result.meta.last_row_id).first();
+        const newUser = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(result.meta.last_row_id).first();
         return json(newUser, 201);
       } catch {
         return json({ error: 'User already exists' }, 400);
@@ -366,7 +372,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const requiredHub = target?.church_role ? hubForChurchRole(target.church_role) : null;
       if (requiredHub && requiredHub !== hub) return json({ error: `Users with the calling "${target!.church_role}" must be assigned to the ${requiredHub === 'both' ? 'Bishopric' : requiredHub === 'cal' ? 'Calendar' : 'Ward Council'} hub.` }, 400);
       await db.prepare('UPDATE users SET hub = ? WHERE id = ?').bind(hub, userId).run();
-      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE id = ?').bind(userId).first();
+      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(userId).first();
       return json(updated);
     }
 
@@ -377,7 +383,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const { church_role } = await request.json() as { church_role: string };
       const newHub = hubForChurchRole(church_role || '');
       await db.prepare('UPDATE users SET church_role = ?, hub = ? WHERE id = ?').bind(church_role ?? '', newHub, userId).run();
-      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE id = ?').bind(userId).first();
+      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(userId).first();
       return json(updated);
     }
 
@@ -400,7 +406,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (!updates.length) return json({ error: 'Nothing to update' }, 400);
       vals.push(targetId);
       await db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...vals).run();
-      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE id = ?').bind(targetId).first();
+      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(targetId).first();
       return json(updated);
     }
 
@@ -421,7 +427,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         }
       }
       await db.prepare('UPDATE users SET role = ? WHERE id = ?').bind(role, userId).run();
-      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login FROM users WHERE id = ?').bind(userId).first();
+      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(userId).first();
       return json(updated);
     }
 
@@ -603,7 +609,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (conflict) return json({ error: 'Email already in use by an existing account' }, 409);
       const hub = hubForChurchRole(req.church_role);
       await db.prepare(
-        "INSERT INTO users (name, email, password_hash, role, church_role, hub, last_login) VALUES (?, ?, ?, 'user', ?, ?, '')"
+        "INSERT INTO users (name, email, password_hash, role, church_role, hub, last_login, last_access) VALUES (?, ?, ?, 'user', ?, ?, '', '')"
       ).bind(req.name, req.email, req.password_hash, req.church_role, hub).run();
       await db.prepare('DELETE FROM registration_requests WHERE id = ?').bind(reqId).run();
       return json({ ok: true });

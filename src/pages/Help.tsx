@@ -356,6 +356,7 @@ export default function Help() {
               date: 'Jul 7, 2026',
               items: [
                 'Missionary Pipeline: removed automatic Farewell/Homecoming talk syncing to Sacrament Planning — name-format mismatches (nicknames, "First Last" vs "Last, First") were creating duplicate/confusing speaker entries; add these talks directly in Sacrament Planning instead',
+                'Users page: "Last Login" column replaced with "Last Access", which updates as users use the app (not just when they sign in) — more informative now that sessions stay active for weeks at a time',
               ],
             },
             {
