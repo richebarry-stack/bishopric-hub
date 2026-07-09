@@ -58,6 +58,7 @@ export function useTable<T extends { id: number }>(tableName: string, options?: 
     create: (data: Record<string, unknown>, opts?: { silent?: boolean }) => createMutation.mutateAsync({ data, silent: opts?.silent }),
     update: (id: number, data: Record<string, unknown>, opts?: { silent?: boolean }) => updateMutation.mutateAsync({ id, data, silent: opts?.silent }),
     remove: deleteMutation.mutateAsync,
+    refetch: () => queryClient.invalidateQueries({ queryKey }),
     creating: createMutation.isPending,
     updating: updateMutation.isPending,
   };

@@ -79,6 +79,15 @@ export const api = {
     preview: (type: string) =>
       request<Record<string, unknown>>('/email-preview', { method: 'POST', body: JSON.stringify({ type }) }),
   },
+  wardMembers: {
+    import: (data: {
+      updates: { id: number; birth_date: string }[];
+      creates: { name: string; birth_date: string | null }[];
+      deactivate: number[];
+    }) => request<{ ok: true; updated: number; created: number; deactivated: number }>('/ward-members/import', {
+      method: 'POST', body: JSON.stringify(data),
+    }),
+  },
   syncConduct: () => {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');

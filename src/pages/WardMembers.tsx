@@ -2,6 +2,8 @@ import { useState, useMemo, useCallback } from 'react';
 import { useTable } from '../lib/useTable';
 import { toast } from '../lib/toast';
 import { useConfirm } from '../components/ConfirmDialog';
+import { useAuth } from '../lib/auth';
+import WardMemberImport from '../components/WardMemberImport';
 
 interface WardMember {
   id: number;
@@ -38,6 +40,28 @@ function AgeTag({ birthDate }: { birthDate: string | null }) {
   return <span className="text-xs text-gray-400 font-normal ml-1.5">age {age}</span>;
 }
 
+function BirthDateCell({ member, onSave }: { member: WardMember; onSave: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  if (editing) {
+    return (
+      <input
+        type="date"
+        autoFocus
+        defaultValue={member.birth_date || ''}
+        onBlur={e => { setEditing(false); if (e.target.value && e.target.value !== member.birth_date) onSave(e.target.value); }}
+        onKeyDown={e => { if (e.key === 'Escape') setEditing(false); }}
+        className="text-xs rounded border border-gray-300 px-1.5 py-0.5"
+      />
+    );
+  }
+  return (
+    <button type="button" onClick={() => setEditing(true)}
+      className="text-xs text-gray-500 hover:text-blue-600 hover:underline" aria-label={`Edit birth date for ${member.name}`}>
+      {member.birth_date || 'Set birth date'}
+    </button>
+  );
+}
+
 interface GroupedRows {
   adults: WardMember[];
   youth: WardMember[];
@@ -45,11 +69,13 @@ interface GroupedRows {
   unknown: WardMember[];
 }
 
-function MemberSection({ title, members, onToggleActive, onDelete }: {
+function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate }: {
   title: string;
   members: WardMember[];
   onToggleActive: (m: WardMember) => void;
   onDelete: (m: WardMember) => void;
+  onToggleExclude: (m: WardMember, field: 'exclude_speakers' | 'exclude_prayers') => void;
+  onSaveBirthDate: (m: WardMember, v: string) => void;
 }) {
   if (members.length === 0) return null;
   return (
@@ -62,6 +88,7 @@ function MemberSection({ title, members, onToggleActive, onDelete }: {
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
               <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
+              <th className="text-left px-4 py-2 font-medium text-gray-600 w-28">Birth Date</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-24">Status</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Speakers</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Prayers</th>
@@ -75,6 +102,9 @@ function MemberSection({ title, members, onToggleActive, onDelete }: {
                   {m.name}
                   <AgeTag birthDate={m.birth_date} />
                 </td>
+                <td className="px-4 py-2">
+                  <BirthDateCell member={m} onSave={v => onSaveBirthDate(m, v)} />
+                </td>
                 <td className="px-4 py-2 text-center">
                   {m.active ? (
                     <span className="text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5">Active</span>
@@ -83,14 +113,18 @@ function MemberSection({ title, members, onToggleActive, onDelete }: {
                   )}
                 </td>
                 <td className="px-4 py-2 text-center">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${m.exclude_speakers ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                  <button type="button" onClick={() => onToggleExclude(m, 'exclude_speakers')}
+                    aria-label={`Toggle speaker eligibility for ${m.name}`}
+                    className={`text-xs px-2 py-0.5 rounded-full min-h-[28px] ${m.exclude_speakers ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
                     {m.exclude_speakers ? 'Excluded' : 'Included'}
-                  </span>
+                  </button>
                 </td>
                 <td className="px-4 py-2 text-center">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${m.exclude_prayers ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                  <button type="button" onClick={() => onToggleExclude(m, 'exclude_prayers')}
+                    aria-label={`Toggle prayer eligibility for ${m.name}`}
+                    className={`text-xs px-2 py-0.5 rounded-full min-h-[28px] ${m.exclude_prayers ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
                     {m.exclude_prayers ? 'Excluded' : 'Included'}
-                  </span>
+                  </button>
                 </td>
                 <td className="px-4 py-2 text-right space-x-2">
                   <button onClick={() => onToggleActive(m)}
@@ -116,10 +150,13 @@ function MemberSection({ title, members, onToggleActive, onDelete }: {
 }
 
 export default function WardMembers() {
-  const { rows, create, update, remove } = useTable<WardMember>('ward-members');
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const { rows, create, update, remove, refetch } = useTable<WardMember>('ward-members');
   const [filter, setFilter] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -167,19 +204,40 @@ export default function WardMembers() {
     update(m.id, { active: m.active ? 0 : 1 } as unknown as Record<string, unknown>);
   }, [update]);
 
+  const toggleExclude = useCallback((m: WardMember, field: 'exclude_speakers' | 'exclude_prayers') => {
+    update(m.id, { [field]: m[field] ? 0 : 1 } as unknown as Record<string, unknown>);
+  }, [update]);
+
+  const saveBirthDate = useCallback((m: WardMember, v: string) => {
+    update(m.id, { birth_date: v } as unknown as Record<string, unknown>);
+  }, [update]);
+
   const confirm = useConfirm();
   const handleDelete = useCallback(async (m: WardMember) => {
     if (await confirm({ message: `Permanently delete ${m.name}? This cannot be undone.` })) remove(m.id);
   }, [remove, confirm]);
 
-  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete };
+  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude, onSaveBirthDate: saveBirthDate };
 
   return (
     <div>
+      {importing && (
+        <WardMemberImport
+          roster={rows}
+          onClose={() => setImporting(false)}
+          onImported={refetch}
+        />
+      )}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900">Ward Members</h1>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">{activeCount} active{inactiveCount > 0 && `, ${inactiveCount} inactive`}</span>
+          {isAdmin && (
+            <button onClick={() => setImporting(true)}
+              className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-50">
+              Import CSV
+            </button>
+          )}
           <button onClick={() => setAdding(true)}
             className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700">
             + Add Member

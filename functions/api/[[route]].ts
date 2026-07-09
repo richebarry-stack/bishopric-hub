@@ -866,6 +866,37 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ ok: true, created, updated });
   }
 
+  // Bulk ward-roster import from a CSV upload (admin only). Must be matched before the
+  // generic TABLES dispatch below, or "import" would be parsed as a record id.
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'import' && method === 'POST') {
+    if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+    const body = await request.json() as {
+      updates?: { id: number; birth_date: string }[];
+      creates?: { name: string; birth_date: string | null }[];
+      deactivate?: number[];
+    };
+    const updates = (body.updates || []).slice(0, 1000);
+    const creates = (body.creates || []).slice(0, 1000);
+    const deactivate = (body.deactivate || []).slice(0, 1000);
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    for (const u of updates) {
+      if (!u.birth_date || !dateRe.test(u.birth_date)) return json({ error: `Invalid birth_date for id ${u.id}` }, 400);
+    }
+    for (const c of creates) {
+      if (c.birth_date && !dateRe.test(c.birth_date)) return json({ error: `Invalid birth_date for "${c.name}"` }, 400);
+      if (!c.name || !c.name.trim()) return json({ error: 'Name required for new member' }, 400);
+    }
+
+    const now = new Date().toISOString();
+    const stmts = [
+      ...updates.map(u => db.prepare('UPDATE ward_members SET birth_date = ?, updated_at = ? WHERE id = ?').bind(u.birth_date, now, u.id)),
+      ...creates.map(c => db.prepare('INSERT INTO ward_members (name, active, birth_date, updated_at) VALUES (?, 1, ?, ?)').bind(c.name.trim(), c.birth_date || null, now)),
+      ...deactivate.map(id => db.prepare('UPDATE ward_members SET active = 0, updated_at = ? WHERE id = ?').bind(now, id)),
+    ];
+    if (stmts.length > 0) await db.batch(stmts);
+    return json({ ok: true, updated: updates.length, created: creates.length, deactivated: deactivate.length });
+  }
+
   // CRUD endpoints: /api/{table} and /api/{table}/{id}
   const tableName = routeParts[0];
   const recordId = routeParts[1];

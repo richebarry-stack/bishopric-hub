@@ -358,6 +358,7 @@ export default function Help() {
                 'Youth Activities: an activity no longer moves to the "past" list until 24 hours after its date, so it stays visible as upcoming for viewers in any time zone through the day of the event',
                 'Multi-user editing safety: the app now checks every 30 seconds for changes made by other users, and if two people edit the same record at the same time, the second save is blocked with a "reloaded — please re-apply your change" message instead of silently overwriting the first person\'s edit',
                 'Every delete button across the app now asks for confirmation before removing anything, and saves show a "Saved" confirmation so it\'s clear when a change has gone through',
+                'Ward Members: birth date and Speakers/Prayers eligibility can now be edited directly on the page, and admins can bulk-update the roster with "Import CSV" — it matches names against the existing roster, flags anything it can\'t confidently match for manual review, and lets you choose which members no longer on the list should be deactivated',
               ],
             },
             {
