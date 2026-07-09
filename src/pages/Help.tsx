@@ -359,6 +359,8 @@ export default function Help() {
                 'Multi-user editing safety: the app now checks every 30 seconds for changes made by other users, and if two people edit the same record at the same time, the second save is blocked with a "reloaded — please re-apply your change" message instead of silently overwriting the first person\'s edit',
                 'Every delete button across the app now asks for confirmation before removing anything, and saves show a "Saved" confirmation so it\'s clear when a change has gone through',
                 'Ward Members: birth date and Speakers/Prayers eligibility can now be edited directly on the page, and admins can bulk-update the roster with "Import CSV" — it matches names against the existing roster, flags anything it can\'t confidently match for manual review, and lets you choose which members no longer on the list should be deactivated',
+                'Add User no longer requires typing a password — a temporary one is generated automatically and shown once, the same way password resets already worked',
+                'Adding a user (or approving a request) with a calling not on the standard list now requires explicitly choosing which hub they should access, instead of silently defaulting to Ward Council',
               ],
             },
             {

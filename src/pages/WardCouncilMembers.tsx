@@ -10,17 +10,17 @@ import { useConfirm } from '../components/ConfirmDialog';
 
 const API = '/api/users';
 
-function AddMemberModal({ onClose }: { onClose: () => void }) {
+function AddMemberModal({ onClose, onCreated }: { onClose: () => void; onCreated: (name: string, tempPassword: string) => void }) {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '' });
   const [error, setError] = useState('');
 
   const mutation = useMutation({
     mutationFn: () =>
-      api.create<User>('users', { ...form, role: 'user', hub: 'wc' }),
-    onSuccess: () => {
+      api.create<User & { temp_password: string }>('users', { ...form, role: 'user', hub: 'wc' }),
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['wc-users'] });
-      onClose();
+      onCreated(data.name, data.temp_password);
     },
     onError: (e: Error) => setError(e.message),
   });
@@ -30,8 +30,7 @@ function AddMemberModal({ onClose }: { onClose: () => void }) {
       <form onSubmit={e => { e.preventDefault(); mutation.mutate(); }} className="space-y-3">
         <Input label="Name" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} required />
         <Input label="Email" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} type="email" required />
-        <Input label="Temporary Password" value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} type="password" required />
-        <p className="text-xs text-gray-500">This account will have Ward Council Hub access.</p>
+        <p className="text-xs text-gray-500">This account will have Ward Council Hub access. A temporary password will be generated.</p>
         {error && <p className="text-red-600 text-sm">{error}</p>}
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
@@ -133,7 +132,12 @@ export default function WardCouncilMembers() {
         )}
       </div>
 
-      {adding && <AddMemberModal onClose={() => setAdding(false)} />}
+      {adding && (
+        <AddMemberModal
+          onClose={() => setAdding(false)}
+          onCreated={(name, password) => { setAdding(false); setTempPassword({ name, password }); }}
+        />
+      )}
       {editing && <EditMemberModal member={editing} onClose={() => setEditing(null)} />}
 
       {members.length === 0 ? (

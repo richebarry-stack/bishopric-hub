@@ -60,8 +60,8 @@ export const api = {
     list: () => request<RegistrationRequest[]>('/registration-requests'),
     update: (id: number, data: Partial<RegistrationRequest>) =>
       request<RegistrationRequest>(`/registration-requests/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    approve: (id: number) =>
-      request(`/registration-requests/${id}/approve`, { method: 'POST' }),
+    approve: (id: number, hub?: string) =>
+      request(`/registration-requests/${id}/approve`, { method: 'POST', body: JSON.stringify({ hub }) }),
     reject: (id: number) =>
       request(`/registration-requests/${id}`, { method: 'DELETE' }),
     submit: (data: { name: string; email: string; church_role: string; password: string }) =>

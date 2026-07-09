@@ -55,7 +55,7 @@ export default function Users() {
   const confirmDialog = useConfirm();
 
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'user', church_role: '' });
+  const [form, setForm] = useState({ name: '', email: '', role: 'user', church_role: '', hub: '' });
   const [addError, setAddError] = useState('');
 
   const [changingPassword, setChangingPassword] = useState(false);
@@ -72,6 +72,7 @@ export default function Users() {
     enabled: isAdmin,
   });
   const [regEdits, setRegEdits] = useState<Record<number, Partial<RegistrationRequest>>>({});
+  const [regHub, setRegHub] = useState<Record<number, string>>({});
   const [regLoading, setRegLoading] = useState<Record<number, string>>({});
 
   const getRegField = (req: RegistrationRequest, field: keyof RegistrationRequest) =>
@@ -87,9 +88,10 @@ export default function Users() {
       if (edits && Object.keys(edits).length > 0) {
         await api.registrationRequests.update(req.id, edits);
       }
-      await api.registrationRequests.approve(req.id);
+      await api.registrationRequests.approve(req.id, regHub[req.id]);
       await Promise.all([refetchRegs(), queryClient.invalidateQueries({ queryKey: ['users'] })]);
       setRegEdits(prev => { const n = { ...prev }; delete n[req.id]; return n; });
+      setRegHub(prev => { const n = { ...prev }; delete n[req.id]; return n; });
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Approval failed');
     }
@@ -130,9 +132,15 @@ export default function Users() {
     mutationFn: async (data: typeof form) => {
       const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
-      return res.json();
+      return res.json() as Promise<User & { temp_password: string }>;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['users'] }); setAdding(false); setForm({ name: '', email: '', password: '', role: 'user', church_role: '' }); setAddError(''); },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setAdding(false);
+      setForm({ name: '', email: '', role: 'user', church_role: '', hub: '' });
+      setAddError('');
+      setTempPassword({ name: data.name, password: data.temp_password });
+    },
     onError: (e: Error) => setAddError(e.message),
   });
 
@@ -229,6 +237,7 @@ export default function Users() {
     setPwForm({ current: '', newPw: '', confirm: '' });
   };
 
+  const isKnownCalling = !form.church_role || CHURCH_ROLES.includes(form.church_role);
   const derivedHub = hubForChurchRole(form.church_role);
 
   return (
@@ -298,6 +307,16 @@ export default function Users() {
                       onChange={e => handleRegChange(req.id, 'church_role', e.target.value)}
                       className="rounded border border-gray-300 px-2 py-1 text-sm w-full min-w-[160px]"
                     />
+                    {getRegField(req, 'church_role') && !CHURCH_ROLES.includes(getRegField(req, 'church_role')) && (
+                      <select value={regHub[req.id] || ''} onChange={e => setRegHub(prev => ({ ...prev, [req.id]: e.target.value }))}
+                        className="mt-1 rounded border border-amber-300 px-2 py-1 text-xs w-full min-w-[160px]">
+                        <option value="">New calling — choose a hub…</option>
+                        <option value="both">Bishopric and WC Hubs</option>
+                        <option value="wc">Ward Council Only</option>
+                        <option value="yc">Youth Council</option>
+                        <option value="cal">Calendar</option>
+                      </select>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">
                     {new Date(req.requested_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -384,7 +403,7 @@ export default function Users() {
                         </td>
                         {isAdmin && (
                           <td className="px-3 py-2">
-                            {u.church_role ? (
+                            {u.church_role && CHURCH_ROLES.includes(u.church_role) ? (
                               <span className="text-sm text-gray-500 italic">{HUB_LABELS[hubForChurchRole(u.church_role)] ?? '—'}</span>
                             ) : (
                               <select value={u.hub === 'bh' ? 'both' : u.hub ?? 'both'} onChange={e => hubMutation.mutate({ id: u.id, hub: e.target.value })}
@@ -488,14 +507,13 @@ export default function Users() {
         <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-3">
           <Input label="Name" value={form.name} onChange={v => setForm({ ...form, name: v })} required />
           <Input label="Email" value={form.email} onChange={v => setForm({ ...form, email: v })} type="email" required />
-          <Input label="Password" value={form.password} onChange={v => setForm({ ...form, password: v })} type="password" required />
           <label className="block">
             <span className="text-sm font-medium text-gray-700">Calling</span>
             <input
               list={DATALIST_ID}
               value={form.church_role}
-              onChange={e => setForm(f => ({ ...f, church_role: e.target.value }))}
-              placeholder="Select or type…"
+              onChange={e => setForm(f => ({ ...f, church_role: e.target.value, hub: '' }))}
+              placeholder="Select or type a new calling…"
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </label>
@@ -504,15 +522,34 @@ export default function Users() {
               <Select label="Role" value={form.role} onChange={v => setForm({ ...form, role: v })} options={['user', 'admin']} />
             </div>
             <div className="flex-1">
-              <label className="block">
-                <span className="text-sm font-medium text-gray-700">Hub Access</span>
-                <div className="mt-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                  {HUB_LABELS[derivedHub] || derivedHub}
-                </div>
-              </label>
+              {isKnownCalling ? (
+                <label className="block">
+                  <span className="text-sm font-medium text-gray-700">Hub Access</span>
+                  <div className="mt-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                    {HUB_LABELS[derivedHub] || derivedHub}
+                  </div>
+                </label>
+              ) : (
+                <label className="block">
+                  <span className="text-sm font-medium text-gray-700">Hub Access</span>
+                  <select value={form.hub} onChange={e => setForm(f => ({ ...f, hub: e.target.value }))} required
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    <option value="">Choose a hub…</option>
+                    <option value="both">Bishopric and WC Hubs</option>
+                    <option value="wc">Ward Council Only</option>
+                    <option value="yc">Youth Council</option>
+                    <option value="cal">Calendar</option>
+                  </select>
+                </label>
+              )}
             </div>
           </div>
-          <p className="text-xs text-gray-400">Hub access is automatically set based on calling.</p>
+          <p className="text-xs text-gray-400">
+            {isKnownCalling
+              ? 'Hub access is automatically set based on calling.'
+              : "This is a new calling not on the standard list — please choose which hub this person should access."}
+          </p>
+          <p className="text-xs text-gray-400">A temporary password will be generated and shown after creating this user.</p>
           {addError && <p className="text-red-600 text-sm">{addError}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => { setAdding(false); setAddError(''); }} className="px-4 py-2 text-sm text-gray-600">Cancel</button>

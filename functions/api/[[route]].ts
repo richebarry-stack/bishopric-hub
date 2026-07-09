@@ -124,12 +124,27 @@ const YC_CALLINGS = new Set([
   'Deacons Quorum President', 'Deacons Quorum First Counselor', 'Deacons Quorum Second Counselor', 'Deacons Quorum Secretary',
 ]);
 const CAL_CALLINGS = new Set(['Music Coordinator', 'Ward Bulletin Specialist']);
+const WC_CALLINGS = new Set([
+  'Elders Quorum President', 'Elders Quorum First Counselor', 'Elders Quorum Second Counselor',
+  'Relief Society President', 'Relief Society First Counselor', 'Relief Society Second Counselor',
+  'Young Women President', 'Young Women First Counselor', 'Young Women Second Counselor',
+  'Primary President', 'Primary First Counselor', 'Primary Second Counselor',
+  'Sunday School President', 'Sunday School First Counselor', 'Sunday School Second Counselor',
+  'Ward Mission Leader', 'Ward Temple and Family History Leader',
+]);
+const KNOWN_CALLINGS = new Set([...BISHOPRIC_CALLINGS, ...WC_CALLINGS, ...YC_CALLINGS, ...CAL_CALLINGS]);
+const VALID_HUBS = new Set(['both', 'wc', 'yc', 'cal']);
 
 function hubForChurchRole(role: string): string {
   if (BISHOPRIC_CALLINGS.has(role)) return 'both';
   if (YC_CALLINGS.has(role)) return 'yc';
   if (CAL_CALLINGS.has(role)) return 'cal';
   return 'wc';
+}
+
+function generateTempPassword(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  return Array.from(bytes, b => b.toString(36).padStart(2, '0')).join('').slice(0, 10);
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -358,16 +373,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     if (method === 'POST') {
-      const { name, email, password, role, church_role } = await request.json() as { name: string; email: string; password: string; role: string; church_role?: string };
-      const hash = await hashPassword(password);
-      const newHub = hubForChurchRole(church_role || '');
+      const { name, email, role, church_role, hub } = await request.json() as { name: string; email: string; role: string; church_role?: string; hub?: string };
+      let newHub: string;
+      if (church_role && !KNOWN_CALLINGS.has(church_role)) {
+        if (!hub || !VALID_HUBS.has(hub)) return json({ error: 'This calling is not on the standard list — please choose a hub for this person.' }, 400);
+        newHub = hub;
+      } else {
+        newHub = hubForChurchRole(church_role || '');
+      }
+      const tempPassword = generateTempPassword();
+      const hash = await hashPassword(tempPassword);
       const newRole = role === 'admin' ? 'admin' : 'user';
       try {
         const result = await db.prepare(
-          'INSERT INTO users (name, email, password_hash, role, church_role, hub) VALUES (?, ?, ?, ?, ?, ?)'
+          'INSERT INTO users (name, email, password_hash, role, church_role, hub, must_reset_password) VALUES (?, ?, ?, ?, ?, ?, 1)'
         ).bind(name, email, hash, newRole, church_role || '', newHub).run();
         const newUser = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(result.meta.last_row_id).first();
-        return json(newUser, 201);
+        return json({ ...newUser as object, temp_password: tempPassword }, 201);
       } catch {
         return json({ error: 'User already exists' }, 400);
       }
@@ -378,10 +400,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (caller?.role !== 'admin') return json({ error: 'Admin only' }, 403);
       const userId = Number(routeParts[1]);
       const { hub } = await request.json() as { hub: string };
-      if (!['both', 'wc', 'cal'].includes(hub)) return json({ error: 'Invalid hub' }, 400);
+      if (!VALID_HUBS.has(hub)) return json({ error: 'Invalid hub' }, 400);
       const target = await db.prepare('SELECT church_role FROM users WHERE id = ?').bind(userId).first<{ church_role: string }>();
-      const requiredHub = target?.church_role ? hubForChurchRole(target.church_role) : null;
-      if (requiredHub && requiredHub !== hub) return json({ error: `Users with the calling "${target!.church_role}" must be assigned to the ${requiredHub === 'both' ? 'Bishopric' : requiredHub === 'cal' ? 'Calendar' : 'Ward Council'} hub.` }, 400);
+      const requiredHub = target?.church_role && KNOWN_CALLINGS.has(target.church_role) ? hubForChurchRole(target.church_role) : null;
+      if (requiredHub && requiredHub !== hub) return json({ error: `Users with the calling "${target!.church_role}" must be assigned to the ${requiredHub === 'both' ? 'Bishopric' : requiredHub === 'cal' ? 'Calendar' : requiredHub === 'yc' ? 'Youth Council' : 'Ward Council'} hub.` }, 400);
       await db.prepare('UPDATE users SET hub = ? WHERE id = ?').bind(hub, userId).run();
       const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(userId).first();
       return json(updated);
@@ -391,8 +413,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const caller = await db.prepare('SELECT role FROM users WHERE id = ?').bind(session.user_id).first<{ role: string }>();
       if (caller?.role !== 'admin') return json({ error: 'Admin only' }, 403);
       const userId = Number(routeParts[1]);
-      const { church_role } = await request.json() as { church_role: string };
-      const newHub = hubForChurchRole(church_role || '');
+      const { church_role, hub } = await request.json() as { church_role: string; hub?: string };
+      let newHub: string;
+      if (church_role && !KNOWN_CALLINGS.has(church_role)) {
+        // Custom calling: use an explicitly supplied hub, or fall back to whatever hub this
+        // user already has (never silently reassign an existing user to Ward Council).
+        if (hub && VALID_HUBS.has(hub)) {
+          newHub = hub;
+        } else {
+          const current = await db.prepare('SELECT hub FROM users WHERE id = ?').bind(userId).first<{ hub: string }>();
+          newHub = current?.hub && VALID_HUBS.has(current.hub) ? current.hub : 'wc';
+        }
+      } else {
+        newHub = hubForChurchRole(church_role || '');
+      }
       await db.prepare('UPDATE users SET church_role = ?, hub = ? WHERE id = ?').bind(church_role ?? '', newHub, userId).run();
       const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(userId).first();
       return json(updated);
@@ -446,10 +480,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const caller = await db.prepare('SELECT role FROM users WHERE id = ?').bind(session.user_id).first<{ role: string }>();
       if (caller?.role !== 'admin') return json({ error: 'Admin only' }, 403);
       const userId = Number(routeParts[1]);
-      const tempHash = await hashPassword('temp' + userId);
+      const tempPassword = generateTempPassword();
+      const tempHash = await hashPassword(tempPassword);
       await db.prepare('UPDATE users SET password_hash = ?, must_reset_password = 1 WHERE id = ?').bind(tempHash, userId).run();
       await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
-      return json({ ok: true, temp_password: 'temp' + userId });
+      return json({ ok: true, temp_password: tempPassword });
     }
 
     if (method === 'DELETE' && routeParts[1]) {
@@ -618,7 +653,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (!req) return json({ error: 'Not found' }, 404);
       const conflict = await db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)').bind(req.email).first();
       if (conflict) return json({ error: 'Email already in use by an existing account' }, 409);
-      const hub = hubForChurchRole(req.church_role);
+      let hub: string;
+      if (req.church_role && !KNOWN_CALLINGS.has(req.church_role)) {
+        const body = await request.json().catch(() => ({})) as { hub?: string };
+        if (!body.hub || !VALID_HUBS.has(body.hub)) return json({ error: 'This calling is not on the standard list — please choose a hub for this person.' }, 400);
+        hub = body.hub;
+      } else {
+        hub = hubForChurchRole(req.church_role);
+      }
       await db.prepare(
         "INSERT INTO users (name, email, password_hash, role, church_role, hub, last_login, last_access) VALUES (?, ?, ?, 'user', ?, ?, '', '')"
       ).bind(req.name, req.email, req.password_hash, req.church_role, hub).run();
