@@ -37,7 +37,7 @@ import HubSuggestions from './pages/HubSuggestions';
 import ToastContainer from './components/Toast';
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 0, retry: 1 } },
+  defaultOptions: { queries: { staleTime: 10_000, retry: 1, refetchInterval: 30_000 } },
 });
 
 function WcGuard({ children }: { children: React.ReactNode }) {

@@ -50,6 +50,17 @@ function json(data: unknown, status = 200) {
   });
 }
 
+// Returns a 409 response if the row's current updated_at doesn't match the
+// client's base version (i.e. someone else saved a change in between), else null.
+async function checkConflict(db: D1Database, tableName: string, recordId: string, baseUpdatedAt: string): Promise<Response | null> {
+  const row = await db.prepare(`SELECT updated_at FROM ${tableName} WHERE id = ?`).bind(recordId).first<{ updated_at: string | null }>();
+  if (row && row.updated_at && row.updated_at !== baseUpdatedAt) {
+    const current = await db.prepare(`SELECT * FROM ${tableName} WHERE id = ?`).bind(recordId).first();
+    return json({ error: 'conflict', current }, 409);
+  }
+  return null;
+}
+
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
@@ -663,6 +674,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         if (!row || !row.shared_with_wc) return json({ error: 'Forbidden' }, 403);
         if (method === 'PUT') {
           const body = await request.json() as Record<string, unknown>;
+          const baseUpdatedAt = body._base_updated_at as string | null | undefined;
+          delete body._base_updated_at;
+          if (baseUpdatedAt) {
+            const conflictCheck = await checkConflict(db, 'member_needs', needId, baseUpdatedAt);
+            if (conflictCheck) return conflictCheck;
+          }
           body.shared_with_wc = 1;
           body.updated_at = new Date().toISOString();
           const keys = Object.keys(body);
@@ -889,6 +906,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   if (method === 'PUT' && recordId) {
     const body = await request.json() as Record<string, unknown>;
+    const baseUpdatedAt = body._base_updated_at as string | null | undefined;
+    delete body._base_updated_at;
+    delete body.updated_at;
+
+    if (baseUpdatedAt) {
+      const conflictCheck = await checkConflict(db, tableConfig.name, recordId, baseUpdatedAt);
+      if (conflictCheck) return conflictCheck;
+    }
+
     body.updated_at = new Date().toISOString();
     const keys = Object.keys(body);
     const setClause = keys.map(k => `${k} = ?`).join(', ');

@@ -1,5 +1,15 @@
 const API_BASE = '/api';
 
+export class ApiError extends Error {
+  status: number;
+  data: unknown;
+  constructor(message: string, status: number, data?: unknown) {
+    super(message);
+    this.status = status;
+    this.data = data;
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -10,10 +20,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   if (res.status === 401 && !path.startsWith('/auth/')) {
     window.location.href = '/login';
-    throw new Error('Unauthorized');
+    throw new ApiError('Unauthorized', 401);
   }
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+  if (!res.ok) throw new ApiError(data.error || 'Request failed', res.status, data);
   return data as T;
 }
 
