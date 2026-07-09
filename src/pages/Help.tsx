@@ -459,6 +459,7 @@ export default function Help() {
                 'Dashboard panels now stack into a single column on narrow screens instead of squeezing side by side',
                 'Help now shows Ward Council- and Youth Council-specific content instead of the bishopric-centric list for those hubs',
                 'Close (×) and remove buttons across the app now have accessible labels for screen readers',
+                'Security: passwords are now stored with a much stronger hash (existing passwords upgrade automatically the next time you sign in — no action needed), and repeated failed sign-in attempts are now temporarily blocked',
               ],
             },
             {

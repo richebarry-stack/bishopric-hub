@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 const JOB_LABELS: Record<string, string> = {
   syncConduct: 'Sacrament conducting sync',
   cleanupSessions: 'Expired session cleanup',
+  cleanupLoginAttempts: 'Login attempt log cleanup',
 };
 
 function formatWhen(iso: string | null): string {

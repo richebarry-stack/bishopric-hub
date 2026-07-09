@@ -91,6 +91,12 @@ export async function cleanupSessions(db: D1Database): Promise<JobResult> {
   return { ok: true, deleted: result.meta.changes ?? 0 };
 }
 
+/** Purges login-attempt records older than a day (the rate-limit window is 15 minutes). */
+export async function cleanupLoginAttempts(db: D1Database): Promise<JobResult> {
+  const result = await db.prepare("DELETE FROM login_attempts WHERE attempted_at < datetime('now', '-1 day')").run();
+  return { ok: true, deleted: result.meta.changes ?? 0 };
+}
+
 export async function runDailyJobs(db: D1Database): Promise<Record<string, JobResult>> {
   const todayStr = new Date().toISOString().slice(0, 10);
   const results: Record<string, JobResult> = {};
@@ -100,6 +106,9 @@ export async function runDailyJobs(db: D1Database): Promise<Record<string, JobRe
 
   try { results.cleanupSessions = await cleanupSessions(db); }
   catch (e) { results.cleanupSessions = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+
+  try { results.cleanupLoginAttempts = await cleanupLoginAttempts(db); }
+  catch (e) { results.cleanupLoginAttempts = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 
   return results;
 }

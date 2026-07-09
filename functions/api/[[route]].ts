@@ -63,11 +63,45 @@ async function checkConflict(db: D1Database, tableName: string, recordId: string
   return null;
 }
 
+// Legacy unsalted SHA-256 — kept only for security-question answers (low entropy anyway;
+// upgrading them is a separate follow-up) and to recognize old password hashes for migration.
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const hash = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+const PBKDF2_ITERATIONS = 100_000;
+const bufToBase64 = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const base64ToBuf = (b64: string) => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+
+// Current password hash format: pbkdf2$<iterations>$<saltB64>$<hashB64> (PBKDF2-HMAC-SHA256).
+async function hashPasswordSecure(password: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' }, key, 256);
+  return `pbkdf2$${PBKDF2_ITERATIONS}$${bufToBase64(salt.buffer as ArrayBuffer)}$${bufToBase64(bits)}`;
+}
+
+async function verifyPasswordSecure(password: string, stored: string): Promise<boolean> {
+  const parts = stored.split('$');
+  if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false;
+  const iterations = parseInt(parts[1], 10);
+  const salt = base64ToBuf(parts[2]);
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, key, 256);
+  return bufToBase64(bits) === parts[3];
+}
+
+// Verifies against either format; returns whether it matched the legacy (unsalted SHA-256)
+// format so the caller can transparently rehash on successful legacy login.
+async function verifyPassword(password: string, stored: string): Promise<{ valid: boolean; legacy: boolean }> {
+  if (stored.startsWith('pbkdf2$')) {
+    return { valid: await verifyPasswordSecure(password, stored), legacy: false };
+  }
+  const legacyHash = await hashPassword(password);
+  return { valid: legacyHash === stored, legacy: true };
 }
 
 async function getSession(request: Request, db: D1Database): Promise<Session | null> {
@@ -160,11 +194,29 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (routeParts[0] === 'auth') {
     if (routeParts[1] === 'login' && method === 'POST') {
       const { email, password } = await request.json() as { email: string; password: string };
-      const hash = await hashPassword(password);
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const emailLower = email.toLowerCase();
+      const attempts = await db.prepare(
+        "SELECT COUNT(*) as cnt FROM login_attempts WHERE identifier IN (?, ?) AND attempted_at > datetime('now', '-15 minutes')"
+      ).bind(emailLower, ip).first<{ cnt: number }>();
+      if (attempts && attempts.cnt >= 5) {
+        return json({ error: 'Too many attempts — please try again in a few minutes.' }, 429);
+      }
+
       const user = await db.prepare(
-        'SELECT id, name, email, role, church_role, hub, must_reset_password FROM users WHERE email = ? AND password_hash = ?'
-      ).bind(email, hash).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number }>();
-      if (!user) return json({ error: 'Invalid credentials' }, 401);
+        'SELECT id, name, email, role, church_role, hub, must_reset_password, password_hash FROM users WHERE email = ?'
+      ).bind(email).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number; password_hash: string }>();
+      const check = user ? await verifyPassword(password, user.password_hash) : { valid: false, legacy: false };
+      if (!user || !check.valid) {
+        await db.prepare('INSERT INTO login_attempts (identifier) VALUES (?)').bind(emailLower).run();
+        await db.prepare('INSERT INTO login_attempts (identifier) VALUES (?)').bind(ip).run();
+        return json({ error: 'Invalid credentials' }, 401);
+      }
+      await db.prepare('DELETE FROM login_attempts WHERE identifier IN (?, ?)').bind(emailLower, ip).run();
+      if (check.legacy) {
+        const upgraded = await hashPasswordSecure(password);
+        await db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(upgraded, user.id).run();
+      }
 
       const sessionId = crypto.randomUUID();
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -232,10 +284,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const user = await db.prepare('SELECT id, password_hash, must_reset_password FROM users WHERE id = ?').bind(session.user_id).first<{ id: number; password_hash: string; must_reset_password: number }>();
       if (!user) return json({ error: 'User not found' }, 404);
       if (!user.must_reset_password && current_password) {
-        const currentHash = await hashPassword(current_password);
-        if (currentHash !== user.password_hash) return json({ error: 'Current password is incorrect' }, 400);
+        const check = await verifyPassword(current_password, user.password_hash);
+        if (!check.valid) return json({ error: 'Current password is incorrect' }, 400);
       }
-      const newHash = await hashPassword(new_password);
+      const newHash = await hashPasswordSecure(new_password);
       await db.prepare('UPDATE users SET password_hash = ?, must_reset_password = 0 WHERE id = ?').bind(newHash, session.user_id).run();
       return json({ ok: true });
     }
@@ -275,15 +327,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // Public: verify answers and reset password
     if (routeParts[1] === 'reset-by-questions' && method === 'POST') {
       const { email, answer1, answer2, new_password } = await request.json() as { email: string; answer1: string; answer2: string; new_password: string };
+      const emailLower = email.toLowerCase();
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const attempts = await db.prepare(
+        "SELECT COUNT(*) as cnt FROM login_attempts WHERE identifier IN (?, ?) AND attempted_at > datetime('now', '-15 minutes')"
+      ).bind('rbq:' + emailLower, ip).first<{ cnt: number }>();
+      if (attempts && attempts.cnt >= 5) return json({ error: 'Too many attempts — please try again in a few minutes.' }, 429);
+
       if (!new_password || new_password.length < 6) return json({ error: 'Password must be at least 6 characters' }, 400);
       const user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: number }>();
-      if (!user) return json({ error: 'No account found for that email' }, 404);
-      const sq = await db.prepare('SELECT answer1_hash, answer2_hash FROM security_questions WHERE user_id = ?').bind(user.id).first<{ answer1_hash: string; answer2_hash: string }>();
-      if (!sq) return json({ error: 'This account has no security questions set up' }, 404);
+      const sq = user ? await db.prepare('SELECT answer1_hash, answer2_hash FROM security_questions WHERE user_id = ?').bind(user.id).first<{ answer1_hash: string; answer2_hash: string }>() : null;
       const a1hash = await hashPassword(answer1.trim().toLowerCase());
       const a2hash = await hashPassword(answer2.trim().toLowerCase());
-      if (a1hash !== sq.answer1_hash || a2hash !== sq.answer2_hash) return json({ error: 'One or more answers are incorrect' }, 400);
-      const newHash = await hashPassword(new_password);
+      if (!user || !sq || a1hash !== sq.answer1_hash || a2hash !== sq.answer2_hash) {
+        await db.prepare('INSERT INTO login_attempts (identifier) VALUES (?)').bind('rbq:' + emailLower).run();
+        await db.prepare('INSERT INTO login_attempts (identifier) VALUES (?)').bind(ip).run();
+        return json({ error: !user ? 'No account found for that email' : !sq ? 'This account has no security questions set up' : 'One or more answers are incorrect' }, user && sq ? 400 : 404);
+      }
+      await db.prepare('DELETE FROM login_attempts WHERE identifier IN (?, ?)').bind('rbq:' + emailLower, ip).run();
+      const newHash = await hashPasswordSecure(new_password);
       await db.prepare('UPDATE users SET password_hash = ?, must_reset_password = 0 WHERE id = ?').bind(newHash, user.id).run();
       await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id).run();
       return json({ ok: true });
@@ -295,7 +357,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: number }>();
       if (!user) return json({ error: 'User not found' }, 404);
       if (!new_password || new_password.length < 6) return json({ error: 'Password must be at least 6 characters' }, 400);
-      const newHash = await hashPassword(new_password);
+      const newHash = await hashPasswordSecure(new_password);
       await db.prepare('UPDATE users SET password_hash = ?, must_reset_password = 0 WHERE id = ?').bind(newHash, user.id).run();
       await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id).run();
       return json({ ok: true });
@@ -310,7 +372,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (existing) return json({ error: 'An account with this email already exists' }, 409);
       const alreadyPending = await db.prepare('SELECT id FROM registration_requests WHERE LOWER(email) = LOWER(?)').bind(email).first();
       if (alreadyPending) return json({ error: 'A request for this email is already awaiting approval' }, 409);
-      const hash = await hashPassword(password);
+      const hash = await hashPasswordSecure(password);
       await db.prepare(
         'INSERT INTO registration_requests (name, email, church_role, password_hash, requested_at) VALUES (?, ?, ?, ?, ?)'
       ).bind(name, email, church_role, hash, new Date().toISOString()).run();
@@ -324,7 +386,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (admin?.role !== 'admin') return json({ error: 'Admin only' }, 403);
 
       const { name, email, password, role } = await request.json() as { name: string; email: string; password: string; role: string };
-      const hash = await hashPassword(password);
+      const hash = await hashPasswordSecure(password);
       try {
         await db.prepare(
           'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)'
@@ -384,7 +446,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         newHub = hubForChurchRole(church_role || '');
       }
       const tempPassword = generateTempPassword();
-      const hash = await hashPassword(tempPassword);
+      const hash = await hashPasswordSecure(tempPassword);
       const newRole = role === 'admin' ? 'admin' : 'user';
       try {
         const result = await db.prepare(
@@ -483,7 +545,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (caller?.role !== 'admin') return json({ error: 'Admin only' }, 403);
       const userId = Number(routeParts[1]);
       const tempPassword = generateTempPassword();
-      const tempHash = await hashPassword(tempPassword);
+      const tempHash = await hashPasswordSecure(tempPassword);
       await db.prepare('UPDATE users SET password_hash = ?, must_reset_password = 1 WHERE id = ?').bind(tempHash, userId).run();
       await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
       return json({ ok: true, temp_password: tempPassword });
