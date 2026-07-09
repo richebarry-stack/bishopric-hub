@@ -3,6 +3,8 @@ import { useTable } from '../lib/useTable';
 import type { BishopricMeeting } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Textarea, Checkbox, Select } from '../components/FormFields';
+import { useConfirm } from '../components/ConfirmDialog';
+import { toast } from '../lib/toast';
 
 const EMPTY: Partial<BishopricMeeting> = {
   date: '', spiritual_thought: '', opening_prayer: '', closing_prayer: '',
@@ -34,6 +36,7 @@ function addWeeks(dateStr: string, weeks: number): string {
 export default function BishopricMeetings() {
   const { rows, isLoading, create, update, remove } = useTable<BishopricMeeting>('bishopric-meetings');
   const [editing, setEditing] = useState<Partial<BishopricMeeting> | null>(null);
+  const confirm = useConfirm();
   const [repeatEnabled, setRepeatEnabled] = useState(false);
   const [repeatWeeks, setRepeatWeeks] = useState(1);
   const [repeatCount, setRepeatCount] = useState(12);
@@ -63,14 +66,15 @@ export default function BishopricMeetings() {
         await update(editing.id, data as Record<string, unknown>);
       } else if (repeatEnabled && editing.date) {
         const recurrenceId = crypto.randomUUID();
-        await create({ ...data, recurrence_id: recurrenceId, recurrence_interval_weeks: repeatWeeks });
+        await create({ ...data, recurrence_id: recurrenceId, recurrence_interval_weeks: repeatWeeks }, { silent: true });
         let date = editing.date;
         for (let i = 1; i < repeatCount; i++) {
           date = addWeeks(date, repeatWeeks);
           await create({
             ...EMPTY, date, recurrence_id: recurrenceId, recurrence_interval_weeks: repeatWeeks,
-          });
+          }, { silent: true });
         }
+        toast.success(`Saved ${repeatCount} meetings`);
       } else {
         await create(data as Record<string, unknown>);
       }
@@ -91,7 +95,7 @@ export default function BishopricMeetings() {
     try {
       const ownData = { ...editing };
       delete (ownData as Record<string, unknown>).id;
-      await update(editing.id, ownData as Record<string, unknown>);
+      await update(editing.id, ownData as Record<string, unknown>, { silent: true });
 
       const contentData = { ...ownData };
       delete (contentData as Record<string, unknown>).date;
@@ -102,8 +106,9 @@ export default function BishopricMeetings() {
         m.recurrence_id === editing.recurrence_id && m.id !== editing.id && m.date.slice(0, 10) >= (editing.date || '').slice(0, 10)
       );
       for (const sibling of futureSiblings) {
-        await update(sibling.id, contentData as Record<string, unknown>);
+        await update(sibling.id, contentData as Record<string, unknown>, { silent: true });
       }
+      toast.success(`Saved ${futureSiblings.length + 1} meetings`);
       setEditing(null);
     } finally {
       setSaving(false);
@@ -166,7 +171,7 @@ export default function BishopricMeetings() {
                   )}
                 </div>
                 <button
-                  onClick={e => { e.stopPropagation(); remove(m.id); }}
+                  onClick={async e => { e.stopPropagation(); if (await confirm(`Delete the ${formatDate(m.date)} meeting?`)) remove(m.id); }}
                   className="text-red-400 hover:text-red-600 text-xs shrink-0">Del</button>
               </div>
             </div>

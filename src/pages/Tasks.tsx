@@ -5,6 +5,7 @@ import type { Task } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
 import { SHARE_WITH_OPTIONS } from '../lib/constants';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const EMPTY: Partial<Task> = { task: '', assigned_to: '', done: 0, share_with: '', due_date: '' };
 
@@ -56,6 +57,7 @@ export default function Tasks() {
   const { rows, isLoading, create, update, remove } = useTable<Task>('tasks');
   const [editing, setEditing] = useState<Partial<Task> | null>(null);
   const [showDone, setShowDone] = useState(false);
+  const confirm = useConfirm();
   const [filter, setFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
 
@@ -134,7 +136,7 @@ export default function Tasks() {
                   ))}
                 </div>
               </div>
-              <button onClick={() => remove(t.id)} className="text-red-400 hover:text-red-600 text-xs">Del</button>
+              <button onClick={async () => { if (await confirm({ message: `Delete "${t.task}"?` })) remove(t.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
             </div>
           ))}
           {filtered.length === 0 && <p className="text-sm text-gray-400 text-center py-8">No action items found</p>}

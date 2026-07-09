@@ -7,6 +7,7 @@ import { Input, Select, Textarea } from '../components/FormFields';
 import { SPEAKER_TYPES } from '../lib/constants';
 import { useAuth } from '../lib/auth';
 import { resolveMemberName } from '../lib/nameUtils';
+import { toast } from '../lib/toast';
 
 const toDateKey = (d: string) => d ? d.slice(0, 10) : '';
 
@@ -447,8 +448,8 @@ function CrudTable<T extends { id: number }>({ rows, columns, onAdd, onEdit, onD
   );
 }
 
-type CreateFn<T> = (data: Record<string, unknown>) => Promise<T>;
-type UpdateFn<T> = (id: number, data: Record<string, unknown>) => Promise<T>;
+type CreateFn<T> = (data: Record<string, unknown>, opts?: { silent?: boolean }) => Promise<T>;
+type UpdateFn<T> = (id: number, data: Record<string, unknown>, opts?: { silent?: boolean }) => Promise<T>;
 type RemoveFn = (id: number) => Promise<unknown>;
 
 interface AgendaModalProps {
@@ -521,16 +522,16 @@ function AgendaModal(props: AgendaModalProps) {
       // Theme
       const themeHas = !!(theme.theme || theme.presiding || theme.conducting || theme.references_text || isFastSunday);
       const themeData = { meeting_date: date, theme: theme.theme, presiding: theme.presiding, conducting: theme.conducting, references_text: theme.references_text, is_fast_sunday: isFastSunday ? 1 : 0 };
-      if (existingTheme && themeHas) await props.updateTheme(existingTheme.id, themeData);
+      if (existingTheme && themeHas) await props.updateTheme(existingTheme.id, themeData, { silent: true });
       else if (existingTheme && !themeHas) await props.removeTheme(existingTheme.id);
-      else if (!existingTheme && themeHas) await props.createTheme(themeData);
+      else if (!existingTheme && themeHas) await props.createTheme(themeData, { silent: true });
 
       // Music
       const musHas = Object.values(mus).some(v => v.trim());
       const musData = { meeting_date: date, ...mus };
-      if (existingMusic && musHas) await props.updateMusic(existingMusic.id, musData);
+      if (existingMusic && musHas) await props.updateMusic(existingMusic.id, musData, { silent: true });
       else if (existingMusic && !musHas) await props.removeMusic(existingMusic.id);
-      else if (!existingMusic && musHas) await props.createMusic(musData);
+      else if (!existingMusic && musHas) await props.createMusic(musData, { silent: true });
 
       // Speakers (delete removed, upsert the rest, renumber by order) — none for a fast/testimony meeting
       const keepSpeakers = isFastSunday ? [] : speakerRows.filter(r => r.speaker.trim());
@@ -539,14 +540,14 @@ function AgendaModal(props: AgendaModalProps) {
       for (let i = 0; i < keepSpeakers.length; i++) {
         const r = keepSpeakers[i];
         const data = { meeting_date: date, speaker: r.speaker, speaker_type: r.speaker_type || 'Adult Speaker', topic: r.topic, accepted: r.accepted, speaking_order: i + 1 };
-        if (r.id) await props.updateSpeaker(r.id, data); else await props.createSpeaker(data);
+        if (r.id) await props.updateSpeaker(r.id, data, { silent: true }); else await props.createSpeaker(data, { silent: true });
       }
 
       // Prayers (opening / closing)
       const syncPrayer = async (label: string, name: string, existing?: Prayer) => {
         if (name.trim()) {
           const data = { meeting_date: date, name: resolveMemberName(name, wardMembers), opening_closing: label };
-          if (existing) await props.updatePrayer(existing.id, data); else await props.createPrayer(data);
+          if (existing) await props.updatePrayer(existing.id, data, { silent: true }); else await props.createPrayer(data, { silent: true });
         } else if (existing) await props.removePrayer(existing.id);
       };
       await syncPrayer('Opening', openingName, openingExisting);
@@ -558,9 +559,10 @@ function AgendaModal(props: AgendaModalProps) {
       for (const a of existingAnnouncements) if (!keepAnnounceIds.has(a.id)) await props.removeAnnouncement(a.id);
       for (const r of keepAnnounce) {
         const data = { meeting_date: date, title: r.title, notes: r.notes };
-        if (r.id) await props.updateAnnouncement(r.id, data); else await props.createAnnouncement(data);
+        if (r.id) await props.updateAnnouncement(r.id, data, { silent: true }); else await props.createAnnouncement(data, { silent: true });
       }
 
+      toast.success('Saved');
       onClose();
     } finally {
       setSaving(false);

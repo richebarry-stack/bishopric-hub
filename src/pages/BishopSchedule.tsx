@@ -4,6 +4,7 @@ import type { BishopScheduleEntry } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Textarea, Select, Checkbox } from '../components/FormFields';
 import { toast } from '../lib/toast';
+import { useConfirm } from '../components/ConfirmDialog';
 import {
   type RecurrenceFrequency,
   describeRecurrence,
@@ -112,6 +113,7 @@ export default function BishopSchedule() {
   const { rows, isLoading, create, update, remove } = useTable<BishopScheduleEntry>('bishop-schedule');
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [editing, setEditing] = useState<FormState | null>(null);
+  const confirm = useConfirm();
   const [repeatEnabled, setRepeatEnabled] = useState(false);
   const [repeatFrequency, setRepeatFrequency] = useState<RecurrenceFrequency>('weekly');
   const [repeatInterval, setRepeatInterval] = useState(1);
@@ -275,10 +277,11 @@ export default function BishopSchedule() {
           recurrence_id: recurrenceId, recurrence_frequency: repeatFrequency,
           recurrence_interval: repeatInterval, recurrence_end_date: repeatEndDate,
         };
-        await create({ ...data, ...recurrenceFields });
+        await create({ ...data, ...recurrenceFields }, { silent: true });
         for (const date of futureDates) {
-          await create({ ...data, date, ...recurrenceFields });
+          await create({ ...data, date, ...recurrenceFields }, { silent: true });
         }
+        toast.success(`Saved ${futureDates.length + 1} appointments`);
       } else {
         await create(data);
       }
@@ -299,15 +302,16 @@ export default function BishopSchedule() {
         date: editing.date, start_time: editing.start_time, end_time: editing.end_time,
         title: editing.title, notes: editing.notes,
       };
-      await update(editing.id, data);
+      await update(editing.id, data, { silent: true });
 
       const contentData = { start_time: editing.start_time, end_time: editing.end_time, title: editing.title, notes: editing.notes };
       const futureSiblings = rows.filter(r =>
         r.recurrence_id === editing.recurrence_id && r.id !== editing.id && r.date.slice(0, 10) >= editing.date
       );
       for (const sibling of futureSiblings) {
-        await update(sibling.id, contentData);
+        await update(sibling.id, contentData, { silent: true });
       }
+      toast.success(`Saved ${futureSiblings.length + 1} appointments`);
       setEditing(null);
     } finally {
       setSaving(false);
@@ -316,6 +320,7 @@ export default function BishopSchedule() {
 
   const handleDelete = async () => {
     if (!editing?.id) return;
+    if (!await confirm({ message: `Delete "${editing.title}"?` })) return;
     await remove(editing.id);
     setEditing(null);
   };
@@ -324,6 +329,7 @@ export default function BishopSchedule() {
   const handleDeleteFuture = async () => {
     if (!editing?.id || !editing.recurrence_id) return;
     const toDelete = rows.filter(r => r.recurrence_id === editing.recurrence_id && r.date.slice(0, 10) >= editing.date);
+    if (!await confirm({ message: `Delete "${editing.title}" and ${toDelete.length - 1} future occurrence(s)? Past occurrences are kept.` })) return;
     for (const r of toDelete) {
       await remove(r.id);
     }

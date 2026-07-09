@@ -3,6 +3,7 @@ import { useTable } from '../lib/useTable';
 import type { RotatingAssignment, User } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input } from '../components/FormFields';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const DL_ID = 'bishopric-names-dl';
 const CLS = 'mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500';
@@ -16,6 +17,7 @@ export default function Assignments() {
     .filter(u => u.church_role && /bishop|counselor/i.test(u.church_role))
     .map(u => u.name);
   const [editing, setEditing] = useState<Partial<RotatingAssignment> | null>(null);
+  const confirm = useConfirm();
 
   const handleSave = async () => {
     if (!editing) return;
@@ -51,7 +53,7 @@ export default function Assignments() {
                   <td className="px-3 py-2 text-gray-700">{r.plan_conduct}</td>
                   <td className="px-3 py-2 text-gray-700">{r.primary_message}</td>
                   <td className="px-3 py-2">
-                    <button onClick={e => { e.stopPropagation(); remove(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
+                    <button onClick={async e => { e.stopPropagation(); if (await confirm(`Delete the ${r.month} assignment?`)) remove(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
                   </td>
                 </tr>
               ))}

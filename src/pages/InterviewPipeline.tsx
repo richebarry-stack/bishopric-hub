@@ -5,6 +5,7 @@ import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Textarea } from '../components/FormFields'; // Select still used for Status
 import { INTERVIEW_TYPES, INTERVIEW_STATUSES, INTERVIEW_STATUS_COLORS } from '../lib/constants';
+import { toast } from '../lib/toast';
 
 const EMPTY: Partial<InterviewType> = {
   member: '', date_recommend_expires: '', type_of_interview: '', status: 'Unassigned',
@@ -178,7 +179,8 @@ export default function InterviewPipeline() {
 
   const handleBulkStatus = async () => {
     if (!bulkStatus || selected.size === 0) return;
-    await Promise.all([...selected].map(id => update(id, { status: bulkStatus })));
+    await Promise.all([...selected].map(id => update(id, { status: bulkStatus }, { silent: true })));
+    toast.success(`Updated ${selected.size} interview${selected.size === 1 ? '' : 's'}`);
     setSelected(new Set());
     setBulkStatus('');
   };

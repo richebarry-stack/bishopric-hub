@@ -3,12 +3,14 @@ import { useTable } from '../lib/useTable';
 import type { OutOfTown as OutOfTownType } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const EMPTY: Partial<OutOfTownType> = { who: '', start_date: '', end_date: '', notes: '' };
 
 export default function OutOfTown() {
   const { rows, isLoading, create, update, remove } = useTable<OutOfTownType>('out-of-town');
   const [editing, setEditing] = useState<Partial<OutOfTownType> | null>(null);
+  const confirm = useConfirm();
 
   const handleSave = async () => {
     if (!editing) return;
@@ -50,7 +52,7 @@ export default function OutOfTown() {
                   <td className="px-3 py-2 text-gray-700 font-mono">{(r.end_date || '').slice(0, 10)}</td>
                   <td className="px-3 py-2 text-gray-600">{r.notes}</td>
                   <td className="px-3 py-2">
-                    <button onClick={e => { e.stopPropagation(); remove(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
+                    <button onClick={async e => { e.stopPropagation(); if (await confirm(`Delete this entry for ${r.who}?`)) remove(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
                   </td>
                 </tr>
               ))}

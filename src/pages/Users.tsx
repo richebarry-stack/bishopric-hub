@@ -7,6 +7,7 @@ import Modal from '../components/Modal';
 import { Input, Select } from '../components/FormFields';
 import { CHURCH_ROLES, BISHOPRIC_CALLINGS, WC_CALLINGS, YC_CALLINGS, CAL_CALLINGS, hubForChurchRole, HUB_LABELS } from '../lib/constants';
 import { toast } from '../lib/toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const API = '/api/users';
 const DATALIST_ID = 'church-roles-list';
@@ -51,6 +52,7 @@ export default function Users() {
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'admin';
   const { data: users = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: fetchUsers });
+  const confirmDialog = useConfirm();
 
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'user', church_role: '' });
@@ -95,7 +97,7 @@ export default function Users() {
   };
 
   const handleReject = async (req: RegistrationRequest) => {
-    if (!confirm(`Reject request from ${req.name}?`)) return;
+    if (!await confirmDialog({ message: `Reject request from ${req.name}?` })) return;
     setRegLoading(prev => ({ ...prev, [req.id]: 'reject' }));
     try {
       await api.registrationRequests.reject(req.id);
@@ -410,7 +412,7 @@ export default function Users() {
                               <button onClick={() => resetMutation.mutate({ id: u.id, name: u.name })}
                                 className="text-yellow-600 hover:text-yellow-800 text-xs font-medium">Reset PW</button>
                               {u.id !== currentUser?.id && (
-                                <button onClick={() => { if (confirm(`Delete ${u.name}?`)) deleteMutation.mutate(u.id); }}
+                                <button onClick={async () => { if (await confirmDialog({ message: `Delete ${u.name}?` })) deleteMutation.mutate(u.id); }}
                                   className="text-red-400 hover:text-red-600 text-xs">Del</button>
                               )}
                             </div>

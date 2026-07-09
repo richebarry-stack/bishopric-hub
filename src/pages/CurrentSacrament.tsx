@@ -538,18 +538,18 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         is_fast_sunday: isFastSunday ? 1 : 0, sacrament_intro: sacramentIntro, high_councilor: highCouncilorName,
         stake_reps: stakeReps,
       };
-      if (existingTheme) await themes.update(existingTheme.id, themeFields);
-      else if (presiding || conducting || wardBusiness || stakeBusiness || introRemarks || recognizeValue || closingRemarks || isFastSunday || sacramentIntro || highCouncilorName || stakeReps) await themes.create(themeFields);
+      if (existingTheme) await themes.update(existingTheme.id, themeFields, { silent: true });
+      else if (presiding || conducting || wardBusiness || stakeBusiness || introRemarks || recognizeValue || closingRemarks || isFastSunday || sacramentIntro || highCouncilorName || stakeReps) await themes.create(themeFields, { silent: true });
 
       const musicFields = { meeting_date: date, chorister, organist, opening_hymn: openingHymn, sacrament_hymn: sacramentHymn, rest_special: restSpecial, closing_hymn: closingHymn, child_blessing: childBlessing, confirmation, ordination };
       const hasMusic = !!(chorister || organist || openingHymn || sacramentHymn || restSpecial || closingHymn || childBlessing !== null || confirmation !== null || ordination !== null);
-      if (existingMusic) await music.update(existingMusic.id, musicFields);
-      else if (hasMusic) await music.create(musicFields);
+      if (existingMusic) await music.update(existingMusic.id, musicFields, { silent: true });
+      else if (hasMusic) await music.create(musicFields, { silent: true });
 
       const syncPrayer = async (lbl: string, name: string, existing?: Prayer) => {
         if (name.trim()) {
           const d = { meeting_date: date, name: resolveMemberName(name, wardMembers), opening_closing: lbl };
-          if (existing) await prayers.update(existing.id, d); else await prayers.create(d);
+          if (existing) await prayers.update(existing.id, d, { silent: true }); else await prayers.create(d, { silent: true });
         } else if (existing) await prayers.remove(existing.id);
       };
       await syncPrayer('Opening', openingPrayer, openingExisting);
@@ -563,7 +563,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       for (let i = 0; i < keepSpk.length; i++) {
         const r = keepSpk[i];
         const d = { meeting_date: date, speaker: resolveMemberName(r.speaker, wardMembers), speaker_type: r.speaker_type || 'Adult Speaker', topic: r.topic, accepted: r.accepted, speaking_order: i + 1, position: r.position };
-        if (r.id) await speakers.update(r.id, d); else await speakers.create(d);
+        if (r.id) await speakers.update(r.id, d, { silent: true }); else await speakers.create(d, { silent: true });
       }
 
       const keepAnn = announceRows.filter(r => r.title.trim());
@@ -571,7 +571,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       for (const a of existingAnnouncements) if (!keepAnnIds.has(a.id)) await announcements.remove(a.id);
       for (const r of keepAnn) {
         const d = { meeting_date: date, title: r.title, notes: r.notes };
-        if (r.id) await announcements.update(r.id, d); else await announcements.create(d);
+        if (r.id) await announcements.update(r.id, d, { silent: true }); else await announcements.create(d, { silent: true });
       }
 
       const keepNotes = noteRows.filter(r => r.content.trim());
@@ -579,7 +579,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       for (const n of existingNotes) if (!keepNoteIds.has(n.id)) await notes.remove(n.id);
       for (const r of keepNotes) {
         const d = { meeting_date: date, content: r.content, position: r.position };
-        if (r.id) await notes.update(r.id, d); else await notes.create(d);
+        if (r.id) await notes.update(r.id, d, { silent: true }); else await notes.create(d, { silent: true });
       }
 
       await onSaveSnapshot(sustainings, thanksgivings);
@@ -597,8 +597,8 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
     setSaving(true);
     try {
       const musicFields = { meeting_date: date, chorister, organist, opening_hymn: openingHymn, sacrament_hymn: sacramentHymn, rest_special: restSpecial, closing_hymn: closingHymn };
-      if (existingMusic) await music.update(existingMusic.id, musicFields);
-      else await music.create(musicFields);
+      if (existingMusic) await music.update(existingMusic.id, musicFields, { silent: true });
+      else await music.create(musicFields, { silent: true });
       setSavedAt(new Date().toLocaleTimeString()); setDirty(false);
     } finally {
       isSavingRef.current = false;
@@ -1000,7 +1000,7 @@ export default function CurrentSacrament() {
     }
     for (const d of pastDates) {
       if (!savedDates.has(d)) {
-        wardBusiness.create({ meeting_date: d, sustainings_snapshot: '[]', thanksgivings_snapshot: '[]' });
+        wardBusiness.create({ meeting_date: d, sustainings_snapshot: '[]', thanksgivings_snapshot: '[]' }, { silent: true });
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1013,9 +1013,9 @@ export default function CurrentSacrament() {
       thanksgivings_snapshot: JSON.stringify(t),
     };
     if (wardBusinessForDate) {
-      await wardBusiness.update(wardBusinessForDate.id, data);
+      await wardBusiness.update(wardBusinessForDate.id, data, { silent: true });
     } else {
-      await wardBusiness.create(data);
+      await wardBusiness.create(data, { silent: true });
     }
   };
 

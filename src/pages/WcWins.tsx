@@ -3,6 +3,7 @@ import { useTable } from '../lib/useTable';
 import type { WcWin } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -28,6 +29,7 @@ export default function WcWins() {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ date: TODAY, description: '' });
   const [showOld, setShowOld] = useState(false);
+  const confirm = useConfirm();
 
   const current = useMemo(() =>
     rows.filter(w => !w.date || w.date >= WEEK_START)
@@ -69,7 +71,7 @@ export default function WcWins() {
             <td className="px-4 py-2 text-sm text-gray-800">{w.description}</td>
             <td className="px-4 py-2 text-right whitespace-nowrap align-top">
               <button onClick={() => setEditing(w)} className="text-blue-500 hover:text-blue-700 text-xs mr-2">Edit</button>
-              <button onClick={() => { if (confirm('Delete this win?')) remove(w.id); }}
+              <button onClick={async () => { if (await confirm('Delete this win?')) remove(w.id); }}
                 className="text-red-400 hover:text-red-600 text-xs">Del</button>
             </td>
           </tr>

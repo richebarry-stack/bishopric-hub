@@ -3,12 +3,14 @@ import { useTable } from '../lib/useTable';
 import type { WcFamilyNeed } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const EMPTY = { family_name: '', details: '', status: '', assignments: '' };
 
 export default function WcFamilyNeeds() {
   const { rows, isLoading, create, update, remove } = useTable<WcFamilyNeed>('wc-family-needs');
   const [editing, setEditing] = useState<Partial<WcFamilyNeed> | null>(null);
+  const confirm = useConfirm();
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +56,7 @@ export default function WcFamilyNeeds() {
                   <td className="px-4 py-2">
                     <div className="flex gap-2">
                       <button onClick={() => setEditing(n)} className="text-blue-500 hover:text-blue-700 text-xs font-medium">Edit</button>
-                      <button onClick={() => { if (confirm(`Remove ${n.family_name}?`)) remove(n.id); }}
+                      <button onClick={async () => { if (await confirm({ message: `Remove ${n.family_name}?` })) remove(n.id); }}
                         className="text-red-400 hover:text-red-600 text-xs">Del</button>
                     </div>
                   </td>

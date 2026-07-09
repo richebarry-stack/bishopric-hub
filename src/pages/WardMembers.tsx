@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTable } from '../lib/useTable';
 import { toast } from '../lib/toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 interface WardMember {
   id: number;
@@ -166,9 +167,10 @@ export default function WardMembers() {
     update(m.id, { active: m.active ? 0 : 1 } as unknown as Record<string, unknown>);
   }, [update]);
 
-  const handleDelete = useCallback((m: WardMember) => {
-    if (confirm(`Permanently delete ${m.name}? This cannot be undone.`)) remove(m.id);
-  }, [remove]);
+  const confirm = useConfirm();
+  const handleDelete = useCallback(async (m: WardMember) => {
+    if (await confirm({ message: `Permanently delete ${m.name}? This cannot be undone.` })) remove(m.id);
+  }, [remove, confirm]);
 
   const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete };
 

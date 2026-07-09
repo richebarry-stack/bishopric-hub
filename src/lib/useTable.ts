@@ -25,18 +25,24 @@ export function useTable<T extends { id: number }>(tableName: string, options?: 
   };
 
   const createMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) => api.create<T>(tableName, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+    mutationFn: ({ data }: { data: Record<string, unknown>; silent?: boolean }) => api.create<T>(tableName, data),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey });
+      if (!variables.silent) toast.success('Saved');
+    },
     onError,
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) => {
+    mutationFn: ({ id, data }: { id: number; data: Record<string, unknown>; silent?: boolean }) => {
       const cached = queryClient.getQueryData<T[]>(queryKey);
       const baseUpdatedAt = (cached?.find(r => r.id === id) as { updated_at?: string } | undefined)?.updated_at ?? null;
       return api.update<T>(tableName, id, { ...data, _base_updated_at: baseUpdatedAt });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey });
+      if (!variables.silent) toast.success('Saved');
+    },
     onError,
   });
 
@@ -49,8 +55,8 @@ export function useTable<T extends { id: number }>(tableName: string, options?: 
   return {
     rows,
     isLoading,
-    create: createMutation.mutateAsync,
-    update: (id: number, data: Record<string, unknown>) => updateMutation.mutateAsync({ id, data }),
+    create: (data: Record<string, unknown>, opts?: { silent?: boolean }) => createMutation.mutateAsync({ data, silent: opts?.silent }),
+    update: (id: number, data: Record<string, unknown>, opts?: { silent?: boolean }) => updateMutation.mutateAsync({ id, data, silent: opts?.silent }),
     remove: deleteMutation.mutateAsync,
     creating: createMutation.isPending,
     updating: updateMutation.isPending,

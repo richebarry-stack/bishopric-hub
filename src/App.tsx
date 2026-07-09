@@ -35,6 +35,7 @@ import WcWins from './pages/WcWins';
 import WcDiscussionTopics from './pages/WcDiscussionTopics';
 import HubSuggestions from './pages/HubSuggestions';
 import ToastContainer from './components/Toast';
+import { ConfirmProvider } from './components/ConfirmDialog';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 10_000, retry: 1, refetchInterval: 30_000 } },
@@ -179,8 +180,10 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
-          <AppRoutes />
-          <ToastContainer />
+          <ConfirmProvider>
+            <AppRoutes />
+            <ToastContainer />
+          </ConfirmProvider>
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>

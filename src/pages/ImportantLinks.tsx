@@ -3,6 +3,7 @@ import { useTable } from '../lib/useTable';
 import type { ImportantLink } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const EMPTY: Partial<ImportantLink> = { title: '', url: '', description: '' };
 
@@ -15,6 +16,7 @@ export default function ImportantLinks() {
   const { rows, isLoading, create, update, remove } = useTable<ImportantLink>('important-links');
   const [editing, setEditing] = useState<Partial<ImportantLink> | null>(null);
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
 
   const handleSave = async () => {
     if (!editing || saving) return;
@@ -61,7 +63,7 @@ export default function ImportantLinks() {
                 <div className="flex gap-2 shrink-0">
                   <button onClick={() => setEditing({ ...link })}
                     className="text-gray-400 hover:text-gray-600 text-xs">Edit</button>
-                  <button onClick={() => { if (confirm(`Delete "${link.title}"?`)) remove(link.id); }}
+                  <button onClick={async () => { if (await confirm({ message: `Delete "${link.title}"?` })) remove(link.id); }}
                     className="text-gray-400 hover:text-red-500 text-xs">Del</button>
                 </div>
               </div>

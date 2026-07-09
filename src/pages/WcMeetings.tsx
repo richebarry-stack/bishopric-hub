@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth';
 import type { WcMeeting } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input } from '../components/FormFields';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -36,6 +37,7 @@ export default function WcMeetings() {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ ...EMPTY });
   const [showPast, setShowPast] = useState(false);
+  const confirm = useConfirm();
 
   const upcoming = rows.filter(m => m.date.slice(0, 10) >= TODAY).sort((a, b) => a.date.localeCompare(b.date));
   const past = rows.filter(m => m.date.slice(0, 10) < TODAY).sort((a, b) => b.date.localeCompare(a.date));
@@ -87,7 +89,7 @@ export default function WcMeetings() {
               </td>
               <td className="px-3 py-2">
                 {!readOnly && (
-                  <button onClick={() => { if (confirm('Delete this meeting?')) remove(m.id); }}
+                  <button onClick={async () => { if (await confirm('Delete this meeting?')) remove(m.id); }}
                     className="text-red-400 hover:text-red-600 text-xs">Del</button>
                 )}
               </td>

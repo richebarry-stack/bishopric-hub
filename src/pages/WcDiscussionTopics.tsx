@@ -2,6 +2,8 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useTable } from '../lib/useTable';
 import { useAuth } from '../lib/auth';
 import type { WcMeeting, WcDiscussionTopic } from '../lib/api';
+import { useConfirm } from '../components/ConfirmDialog';
+import { toast } from '../lib/toast';
 
 const COL_SETTINGS_KEY = 'wc_discussion_col_widths';
 const DEFAULT_COL_WIDTHS = { status: 220, next_steps: 220, help_needed: 220 };
@@ -184,6 +186,7 @@ export default function WcDiscussionTopics() {
   const [orgs, setOrgs] = useState<string[]>(DEFAULT_ORGS);
   const [orgOrder, setOrgOrder] = useState<string[]>(() => user ? loadOrgOrder(user.id, DEFAULT_ORGS) : [...DEFAULT_ORGS]);
   const [manageOpen, setManageOpen] = useState(false);
+  const confirm = useConfirm();
   const [newOrgName, setNewOrgName] = useState('');
 
   useEffect(() => {
@@ -310,7 +313,7 @@ export default function WcDiscussionTopics() {
   const handleCopyFromPrior = useCallback(async () => {
     if (!activeMeetingDate || prevTopics.length === 0) return;
     const hasContent = activeTopics.some(t => t.status || t.next_steps || t.help_needed);
-    if (hasContent && !window.confirm('This will replace existing content for this meeting. Continue?')) return;
+    if (hasContent && !await confirm({ message: 'This will replace existing content for this meeting. Continue?', destructive: false, confirmLabel: 'Replace' })) return;
     setCopyingPrior(true);
     try {
       for (const org of orgOrder) {
@@ -319,15 +322,16 @@ export default function WcDiscussionTopics() {
         const current = activeTopics.find(t => t.organization === org);
         const payload = { status: prev.status ?? '', next_steps: prev.next_steps ?? '', help_needed: prev.help_needed ?? '' };
         if (current) {
-          await update(current.id, payload);
+          await update(current.id, payload, { silent: true });
         } else {
-          await create({ meeting_date: activeMeetingDate, organization: org, topic: '', ...payload });
+          await create({ meeting_date: activeMeetingDate, organization: org, topic: '', ...payload }, { silent: true });
         }
       }
+      toast.success('Copied from prior meeting');
     } finally {
       setCopyingPrior(false);
     }
-  }, [activeMeetingDate, prevTopics, activeTopics, orgOrder, create, update]);
+  }, [activeMeetingDate, prevTopics, activeTopics, orgOrder, create, update, confirm]);
 
   const handleSave = useCallback(async (org: string, field: 'status' | 'next_steps' | 'help_needed', value: string) => {
     if (!activeMeetingDate) return;

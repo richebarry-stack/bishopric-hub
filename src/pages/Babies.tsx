@@ -6,6 +6,7 @@ import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Textarea } from '../components/FormFields';
 import { BABY_STATUSES } from '../lib/constants';
 import { useAuth } from '../lib/auth';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const COLORS: Record<string, { bg: string; text: string }> = {
   Expecting: { bg: 'bg-blue-100', text: 'text-blue-700' },
@@ -26,6 +27,7 @@ export default function Babies() {
   const { isGuest } = useAuth();
   const { rows, isLoading, create, update, remove } = useTable<Baby>('babies');
   const [editing, setEditing] = useState<Partial<Baby> | null>(null);
+  const confirm = useConfirm();
 
   const handleSave = async () => {
     if (!editing) return;
@@ -52,7 +54,7 @@ export default function Babies() {
                 <h3 className="font-medium text-gray-900">{b.name}</h3>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={b.status} colors={COLORS} />
-                  {!isGuest && <button onClick={e => { e.stopPropagation(); remove(b.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>}
+                  {!isGuest && <button onClick={async e => { e.stopPropagation(); if (await confirm(`Delete ${b.name}?`)) remove(b.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>}
                 </div>
               </div>
               <div className="text-sm text-gray-500 space-y-0.5">

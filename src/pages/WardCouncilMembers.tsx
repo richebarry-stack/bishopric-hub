@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth';
 import Modal from '../components/Modal';
 import { Input } from '../components/FormFields';
 import { toast } from '../lib/toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 
 const API = '/api/users';
@@ -91,6 +92,7 @@ export default function WardCouncilMembers() {
   const [editing, setEditing] = useState<User | null>(null);
   const [tempPassword, setTempPassword] = useState<{ name: string; password: string } | null>(null);
   const isAdmin = user?.role === 'admin';
+  const confirmDialog = useConfirm();
 
   const { data: members = [], isLoading } = useQuery({
     queryKey: ['wc-users'],
@@ -161,7 +163,7 @@ export default function WardCouncilMembers() {
                         <button onClick={() => resetMutation.mutate({ id: m.id, name: m.name })}
                           className="text-yellow-600 hover:text-yellow-800 text-xs font-medium">Reset PW</button>
                         {m.id !== user?.id && (
-                          <button onClick={() => { if (confirm(`Delete ${m.name}?`)) deleteMutation.mutate(m.id); }}
+                          <button onClick={async () => { if (await confirmDialog({ message: `Delete ${m.name}?` })) deleteMutation.mutate(m.id); }}
                             className="text-red-400 hover:text-red-600 text-xs">Del</button>
                         )}
                       </div>
