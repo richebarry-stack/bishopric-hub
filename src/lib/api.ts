@@ -342,6 +342,13 @@ export interface SacramentWardBusiness {
   thanksgivings_snapshot: string; // JSON: AgendaCalling[]
 }
 
+export interface SacramentAgendaExclusion {
+  id: number;
+  meeting_date: string;
+  calling_id: number;
+  type: 'sustain' | 'thank';
+}
+
 export interface SacramentAnnouncement {
   id: number;
   meeting_date: string;

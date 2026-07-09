@@ -35,6 +35,7 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'prayer-others': { name: 'prayer_others', orderBy: 'id ASC' },
   'sacrament-agenda-notes': { name: 'sacrament_agenda_notes', orderBy: 'position ASC' },
   'sacrament-ward-business': { name: 'sacrament_ward_business', orderBy: 'meeting_date DESC' },
+  'sacrament-agenda-exclusions': { name: 'sacrament_agenda_exclusions', orderBy: 'id ASC' },
   'important-links': { name: 'important_links', orderBy: 'id ASC' },
   'ward-members': { name: 'ward_members', orderBy: 'name ASC' },
   'youth-activities': { name: 'youth_activities', orderBy: 'date ASC' },

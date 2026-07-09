@@ -447,6 +447,12 @@ export default function Help() {
         <div className="space-y-4">
           {([
             {
+              date: 'Jul 9, 2026',
+              items: [
+                'Current Sacrament Meeting: each person in "To Be Sustained" and "To Be Thanked" can now be removed individually for just that week (click the × next to their name) — useful when a sustaining or release is deferred to a later Sunday. They stay off that week\'s agenda and history, but reappear automatically the following week since their calling status hasn\'t changed.',
+              ],
+            },
+            {
               date: 'Jul 8, 2026',
               items: [
                 'Youth Activities: an activity no longer moves to the "past" list until 24 hours after its date, so it stays visible as upcoming for viewers in any time zone through the day of the event',

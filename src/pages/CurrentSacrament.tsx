@@ -3,12 +3,13 @@ import { useAuth } from '../lib/auth';
 import { useTable } from '../lib/useTable';
 import type {
   SacramentSpeaker, Prayer, SacramentMusic, SacramentTheme, SacramentAnnouncement, SacramentAgendaNote,
-  CallingPipeline, SacramentWardBusiness, User, WardMember,
+  CallingPipeline, SacramentWardBusiness, SacramentAgendaExclusion, User, WardMember,
 } from '../lib/api';
 // CallingPipeline is used only in the page shell (toAgendaCalling); SacramentWardBusiness for snapshot table
 import { SPEAKER_TYPES } from '../lib/constants';
 import { renderRichText } from '../lib/richText';
 import { resolveMemberName } from '../lib/nameUtils';
+import { useConfirm } from '../components/ConfirmDialog';
 
 // ─── module-level constants ───────────────────────────────────────────────────
 
@@ -102,7 +103,7 @@ const dk = (d: string) => (d ? d.slice(0, 10) : '');
 type SpeakerRow   = { id?: number; speaker: string; speaker_type: string; topic: string; accepted: string; position: number };
 type AnnounceRow  = { id?: number; title: string; notes: string };
 type NoteRow      = { id?: number; content: string; position: number };
-export type AgendaCalling = { member: string; calling: string; organization: string };
+export type AgendaCalling = { id?: number; member: string; calling: string; organization: string };
 
 // ─── top-level sub-components ─────────────────────────────────────────────────
 
@@ -221,19 +222,27 @@ function NoteItem({
 
 const stripMd = (s: string) => s.replace(/\*\*(.*?)\*\*/g, '$1');
 
-function CallingsList({ label, callings, script }: {
+function CallingsList({ label, callings, script, onRemove }: {
   label: string;
   callings: AgendaCalling[];
   script?: string;
+  onRemove?: (c: AgendaCalling) => void;
 }) {
   if (callings.length === 0) return null;
   return (
     <Row label={label}>
       <div className="space-y-0.5">
         {callings.map((c, i) => (
-          <p key={i} className="text-sm text-gray-800">
-            {renderRichText(c.member)}{c.calling ? ` — ${c.calling}` : ''}
-            {c.organization ? <span className="text-xs text-gray-400"> ({c.organization})</span> : null}
+          <p key={i} className="text-sm text-gray-800 flex items-start gap-1.5">
+            <span className="flex-1">
+              {renderRichText(c.member)}{c.calling ? ` — ${c.calling}` : ''}
+              {c.organization ? <span className="text-xs text-gray-400"> ({c.organization})</span> : null}
+            </span>
+            {onRemove && c.id !== undefined && (
+              <button type="button" onClick={() => onRemove(c)} aria-label={`Not this week — remove ${c.member} from ${label}`}
+                title="Not this week — defer to a later Sunday"
+                className="text-gray-300 hover:text-red-500 text-xs leading-none shrink-0 pt-0.5">×</button>
+            )}
           </p>
         ))}
         {script && (
@@ -344,10 +353,11 @@ interface EditorProps {
   thanksgivings: AgendaCalling[];
   sustainings: AgendaCalling[];
   onSaveSnapshot: (sustainings: AgendaCalling[], thanksgivings: AgendaCalling[]) => Promise<void>;
+  onRemoveCalling?: (c: AgendaCalling, type: 'sustain' | 'thank') => void;
   viewerMode?: ViewerMode;
 }
 
-export function AgendaEditor({ date, speakers, prayers, music, themes, announcements, notes, thanksgivings, sustainings, onSaveSnapshot, viewerMode }: EditorProps) {
+export function AgendaEditor({ date, speakers, prayers, music, themes, announcements, notes, thanksgivings, sustainings, onSaveSnapshot, onRemoveCalling, viewerMode }: EditorProps) {
   const ro = (field: string) => viewerMode === 'readonly' || (viewerMode === 'music' && !MUSIC_EDITABLE_FIELDS.has(field));
   const existingTheme  = themes.rows.find(t => dk(t.meeting_date) === date);
   const existingMusic  = music.rows.find(m => dk(m.meeting_date) === date);
@@ -887,8 +897,10 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
               return <AnnouncementsSection key={kind} rows={announceRows} setRows={setAnnounceRows}
                 onCopyPrior={handleCopyPrior} priorCount={priorNewCount} />;
             case 'thanksgivings':  return viewerMode ? null : <CallingsList key={kind} label={LABEL[kind]} callings={thanksgivings}
+              onRemove={onRemoveCalling ? c => onRemoveCalling(c, 'thank') : undefined}
               script={"[Name] has been released as [position]. Those who would like to express thanks for [his or her] service may show it by the uplifted hand."} />;
             case 'sustainings':    return viewerMode ? null : <CallingsList key={kind} label={LABEL[kind]} callings={sustainings}
+              onRemove={onRemoveCalling ? c => onRemoveCalling(c, 'sustain') : undefined}
               script={"[Name] has been called as [position]. Those in favor of sustaining [him or her] may show it by the uplifted hand. [Pause briefly.] Those opposed, if any, may also show it. [Pause briefly.]"} />;
 
           }
@@ -940,7 +952,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
 // ─── Page shell ───────────────────────────────────────────────────────────────
 
 function toAgendaCalling(c: CallingPipeline): AgendaCalling {
-  return { member: c.member, calling: c.calling || '', organization: c.organization || '' };
+  return { id: c.id, member: c.member, calling: c.calling || '', organization: c.organization || '' };
 }
 
 function parseSnapshot(json: string): AgendaCalling[] {
@@ -966,20 +978,28 @@ export default function CurrentSacrament() {
   const notes         = useTable<SacramentAgendaNote>('sacrament-agenda-notes');
   const callings      = useTable<CallingPipeline>('calling-pipeline', { enabled: !isWcContext });
   const wardBusiness  = useTable<SacramentWardBusiness>('sacrament-ward-business');
+  const exclusions    = useTable<SacramentAgendaExclusion>('sacrament-agenda-exclusions', { enabled: !isWcContext });
+  const confirm = useConfirm();
 
   const today = new Date().toISOString().slice(0, 10);
   const isCurrentDate = date >= today;
 
   const wardBusinessForDate = wardBusiness.rows.find(r => dk(r.meeting_date) === date);
 
+  // Callings/releases removed from this specific week (e.g. deferred to a later Sunday)
+  // without changing their status, so they don't show up as having happened this week.
+  const excludedForDate = exclusions.rows.filter(e => dk(e.meeting_date) === date);
+  const excludedThankIds = new Set(excludedForDate.filter(e => e.type === 'thank').map(e => e.calling_id));
+  const excludedSustainIds = new Set(excludedForDate.filter(e => e.type === 'sustain').map(e => e.calling_id));
+
   // For current/upcoming dates use live calling-pipeline data.
   // For past dates use the snapshot saved when the agenda was last saved.
   const displayThanksgivings: AgendaCalling[] = isCurrentDate
-    ? callings.rows.filter(c => c.status === '8. Need to thank at pulpit').map(toAgendaCalling)
+    ? callings.rows.filter(c => c.status === '8. Need to thank at pulpit' && !excludedThankIds.has(c.id)).map(toAgendaCalling)
     : parseSnapshot(wardBusinessForDate?.thanksgivings_snapshot ?? '[]');
 
   const displaySustainingsList: AgendaCalling[] = isCurrentDate
-    ? callings.rows.filter(c => c.status === '4. Called & accepted').map(toAgendaCalling)
+    ? callings.rows.filter(c => c.status === '4. Called & accepted' && !excludedSustainIds.has(c.id)).map(toAgendaCalling)
     : parseSnapshot(wardBusinessForDate?.sustainings_snapshot ?? '[]');
 
   // When viewing the current week, lock any past meeting dates that have no snapshot yet
@@ -1019,8 +1039,18 @@ export default function CurrentSacrament() {
     }
   };
 
+  const handleRemoveCalling = async (c: AgendaCalling, type: 'sustain' | 'thank') => {
+    if (c.id === undefined) return;
+    const action = type === 'sustain' ? 'sustaining' : 'thanking';
+    if (!await confirm({
+      message: `Remove ${c.member} from this week's ${action}? They'll stay off this week's agenda but will still appear again next week until they're actually ${type === 'sustain' ? 'sustained' : 'thanked'}.`,
+      confirmLabel: 'Remove',
+    })) return;
+    await exclusions.create({ meeting_date: date, calling_id: c.id, type }, { silent: true });
+  };
+
   const loading = speakers.isLoading || prayers.isLoading || music.isLoading || themes.isLoading
-    || announcements.isLoading || notes.isLoading || callings.isLoading || wardBusiness.isLoading;
+    || announcements.isLoading || notes.isLoading || callings.isLoading || wardBusiness.isLoading || exclusions.isLoading;
 
   const shiftSunday = (weeks: number) => {
     const d = new Date(date + 'T12:00:00');
@@ -1055,6 +1085,7 @@ export default function CurrentSacrament() {
           announcements={announcements} notes={notes}
           thanksgivings={displayThanksgivings} sustainings={displaySustainingsList}
           onSaveSnapshot={onSaveSnapshot}
+          onRemoveCalling={isCurrentDate ? handleRemoveCalling : undefined}
           viewerMode={viewerMode}
         />
       )}
