@@ -88,6 +88,9 @@ export const api = {
       method: 'POST', body: JSON.stringify(data),
     }),
   },
+  automationStatus: {
+    get: () => request<{ last_run: string | null; results: Record<string, { ok: boolean; error?: string; [key: string]: unknown }> }>('/automation-status'),
+  },
   syncConduct: () => {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');

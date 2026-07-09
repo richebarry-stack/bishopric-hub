@@ -361,6 +361,7 @@ export default function Help() {
                 'Ward Members: birth date and Speakers/Prayers eligibility can now be edited directly on the page, and admins can bulk-update the roster with "Import CSV" — it matches names against the existing roster, flags anything it can\'t confidently match for manual review, and lets you choose which members no longer on the list should be deactivated',
                 'Add User no longer requires typing a password — a temporary one is generated automatically and shown once, the same way password resets already worked',
                 'Adding a user (or approving a request) with a calling not on the standard list now requires explicitly choosing which hub they should access, instead of silently defaulting to Ward Council',
+                '"Email Notifications" renamed to "Automation & Notifications" and now shows when background jobs (sacrament conducting sync, expired-session cleanup) last ran and whether they succeeded — these run automatically once a day',
               ],
             },
             {

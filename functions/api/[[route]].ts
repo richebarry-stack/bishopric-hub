@@ -1,3 +1,5 @@
+import { syncConduct, runDailyJobs } from './jobs';
+
 interface Env {
   DB: D1Database;
   RECOVERY_KEY?: string;
@@ -148,7 +150,7 @@ function generateTempPassword(): string {
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
-  const { request, env, params } = context;
+  const { request, env, params, waitUntil } = context;
   const db = env.DB;
   const url = new URL(request.url);
   const routeParts = (params.route as string[]) || [];
@@ -507,6 +509,27 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const session = await getSession(request, db);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
+  // Lazy cron: Pages Functions have no scheduled triggers, so once a day, whichever
+  // authenticated (non-guest) request happens to land here claims and runs the daily
+  // jobs in the background. The conditional UPDATE ensures only one request wins the
+  // claim even if several land at once.
+  if (session.role !== 'guest') {
+    const nowIso = new Date().toISOString();
+    const cutoffIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const claim = await db.prepare(
+      `INSERT INTO ui_settings (key, value, updated_at) VALUES ('daily_jobs', ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+       WHERE ui_settings.updated_at < ?`
+    ).bind(JSON.stringify({ last_run: nowIso, results: {}, status: 'running' }), nowIso, cutoffIso).run();
+    if (claim.meta.changes === 1) {
+      waitUntil((async () => {
+        const results = await runDailyJobs(db);
+        await db.prepare("UPDATE ui_settings SET value = ?, updated_at = ? WHERE key = 'daily_jobs'")
+          .bind(JSON.stringify({ last_run: nowIso, results }), new Date().toISOString()).run();
+      })());
+    }
+  }
+
   // Nav label customisation (admin writes, all authenticated users read)
   if (routeParts[0] === 'nav-labels') {
     if (method === 'GET') {
@@ -824,88 +847,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   // Sync conducting field on sacrament_themes for the next 12 months from rotating_assignments
+  // (also runs automatically once a day — see runDailyJobs below)
   if (routeParts[0] === 'sync-conduct' && method === 'POST') {
     const body = await request.json() as { today?: string };
     const todayStr = body.today || new Date().toISOString().slice(0, 10);
+    const result = await syncConduct(db, todayStr);
+    return json(result);
+  }
 
-    // rotating_assignments.plan_conduct may hold just a last name or a full name —
-    // match by last name so lookups work either way.
-    const usersResult = await db.prepare('SELECT name, church_role FROM users').all();
-    const roleByLastName = new Map<string, string>();
-    for (const u of usersResult.results as { name: string; church_role: string }[]) {
-      if (!u.name) continue;
-      const lastName = u.name.trim().split(/\s+/).pop();
-      if (lastName) roleByLastName.set(lastName, u.church_role || '');
-    }
-    const formatConductor = (rawName: string): string => {
-      const lastName = rawName.trim().split(/\s+/).pop() || rawName;
-      const title = roleByLastName.get(lastName) === 'Bishop' ? 'Bishop' : 'Brother';
-      return `${title} ${lastName}`;
-    };
-
-    const assignmentMap = new Map<string, string>(); // month abbr -> formatted name
-    const assignmentsResult = await db.prepare('SELECT month, plan_conduct FROM rotating_assignments').all();
-    for (const a of assignmentsResult.results as { month: string; plan_conduct: string }[]) {
-      if (a.month && a.plan_conduct) {
-        const key = a.month.trim().slice(0, 3);
-        assignmentMap.set(key.charAt(0).toUpperCase() + key.slice(1).toLowerCase(), formatConductor(a.plan_conduct.trim()));
-      }
-    }
-    if (assignmentMap.size === 0) return json({ ok: true, created: 0, updated: 0 });
-    const TITLED_RE = /^(Bishop|Brother|Sister)\s/i;
-
-    const themesResult = await db.prepare('SELECT id, meeting_date, conducting FROM sacrament_themes').all();
-    const themeMap = new Map<string, { id: number; conducting: string | null }>();
-    for (const t of themesResult.results as { id: number; meeting_date: string; conducting: string | null }[]) {
-      if (t.meeting_date) themeMap.set(t.meeting_date.slice(0, 10), { id: t.id, conducting: t.conducting });
-    }
-
-    const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const now = new Date().toISOString();
-    const [startYear, startMonthNum] = todayStr.split('-').map(Number);
-
-    const stmts: D1PreparedStatement[] = [];
-    let created = 0, updated = 0;
-
-    for (let i = 0; i < 12; i++) {
-      const monthIdx = (startMonthNum - 1 + i) % 12; // 0-based
-      const year = startYear + Math.floor((startMonthNum - 1 + i) / 12);
-      const assignment = assignmentMap.get(MONTH_ABBR[monthIdx]);
-      if (!assignment) continue;
-
-      // Find first Sunday of month then step by 7
-      const firstDay = new Date(year, monthIdx, 1);
-      const firstSundayDay = 1 + (7 - firstDay.getDay()) % 7;
-
-      for (let day = firstSundayDay; day <= 37; day += 7) {
-        const probe = new Date(year, monthIdx, day);
-        if (probe.getMonth() !== monthIdx) break;
-        const dateStr = `${year}-${pad(monthIdx + 1)}-${pad(day)}`;
-        if (dateStr < todayStr) continue;
-
-        const existing = themeMap.get(dateStr);
-        if (existing) {
-          const cur = (existing.conducting || '').trim();
-          if (!cur) {
-            // Blank — fill from this month's current assignment
-            stmts.push(db.prepare('UPDATE sacrament_themes SET conducting = ?, updated_at = ? WHERE id = ?').bind(assignment, now, existing.id));
-            updated++;
-          } else if (!TITLED_RE.test(cur)) {
-            // Retroactively title whoever is already listed, without changing who it is
-            stmts.push(db.prepare('UPDATE sacrament_themes SET conducting = ?, updated_at = ? WHERE id = ?').bind(formatConductor(cur), now, existing.id));
-            updated++;
-          }
-        } else {
-          stmts.push(db.prepare('INSERT INTO sacrament_themes (meeting_date, conducting, theme, references_text, meeting_link, stake_business, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(dateStr, assignment, '', '', '', '', now));
-          created++;
-          themeMap.set(dateStr, { id: -1, conducting: assignment });
-        }
-      }
-    }
-
-    if (stmts.length > 0) await db.batch(stmts);
-    return json({ ok: true, created, updated });
+  // Automation status (admin only) — last daily-jobs run time and per-job results
+  if (routeParts[0] === 'automation-status' && method === 'GET') {
+    if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+    const row = await db.prepare("SELECT value FROM ui_settings WHERE key = 'daily_jobs'").first<{ value: string }>();
+    return json(row ? JSON.parse(row.value) : { last_run: null, results: {} });
   }
 
   // Bulk ward-roster import from a CSV upload (admin only). Must be matched before the

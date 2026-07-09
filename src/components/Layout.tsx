@@ -24,7 +24,7 @@ export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?:
   { path: '/speakers-and-prayers', label: 'Speakers & Prayers', icon: '⊞' },
   { path: '/ward-members', label: 'Ward Members', icon: '♟' },
   { path: '/users', label: 'Users', icon: '⊕' },
-  { path: '/email-notifications', label: 'Email Notifications', icon: '✉', adminOnly: true },
+  { path: '/email-notifications', label: 'Automation & Notifications', icon: '✉', adminOnly: true },
   { path: '/hub-suggestions', label: 'Hub Suggestions', icon: '◈' },
   { path: '/help', label: 'Help', icon: '?' },
 ];
@@ -122,7 +122,7 @@ export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: s
     items: [
       { path: '/ward-members',         label: 'Ward Members',        icon: 'ti-address-book'              },
       { path: '/users',                label: 'Users',               icon: 'ti-user-cog'                  },
-      { path: '/email-notifications',  label: 'Email Notifications', icon: 'ti-mail',       adminOnly: true },
+      { path: '/email-notifications',  label: 'Automation & Notifications', icon: 'ti-mail', adminOnly: true },
       { path: '/important-links',      label: 'Important Links',     icon: 'ti-link'                      },
       { path: '/hub-suggestions',      label: 'Hub Suggestions',     icon: 'ti-bulb'                      },
       { path: '/help',                 label: 'Help',                icon: 'ti-help-circle'               },
