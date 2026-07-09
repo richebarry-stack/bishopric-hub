@@ -495,10 +495,13 @@ export default function YouthActivities() {
   const [showPast, setShowPast] = useState(false);
   const [viewTab, setViewTab] = useState<ViewTab>('all');
 
-  const today = new Date().toISOString().slice(0, 10);
+  // Use a 24-hour grace period (rather than local midnight) before moving an
+  // activity to the past list, so viewers in any time zone still see today's
+  // activity as upcoming.
+  const pastCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
-  const upcoming = sorted.filter(r => r.date >= today);
-  const past     = sorted.filter(r => r.date <  today).reverse();
+  const upcoming = sorted.filter(r => r.date >= pastCutoff);
+  const past     = sorted.filter(r => r.date <  pastCutoff).reverse();
 
   const handleSave = async (form: FormData) => {
     if (modal?.id) await update(modal.id, form);

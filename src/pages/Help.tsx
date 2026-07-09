@@ -353,6 +353,12 @@ export default function Help() {
         <div className="space-y-4">
           {([
             {
+              date: 'Jul 8, 2026',
+              items: [
+                'Youth Activities: an activity no longer moves to the "past" list until 24 hours after its date, so it stays visible as upcoming for viewers in any time zone through the day of the event',
+              ],
+            },
+            {
               date: 'Jul 7, 2026',
               items: [
                 'Missionary Pipeline: removed automatic Farewell/Homecoming talk syncing to Sacrament Planning — name-format mismatches (nicknames, "First Last" vs "Last, First") were creating duplicate/confusing speaker entries; add these talks directly in Sacrament Planning instead',
