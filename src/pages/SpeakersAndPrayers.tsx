@@ -75,7 +75,7 @@ function AgendaOverlayModal({ date, onClose }: { date: string; onClose: () => vo
       <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[94vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 shrink-0">
           <h2 className="font-semibold text-gray-900">Sacrament Meeting — {dateLabel}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
         </div>
         <div className="overflow-y-auto flex-1 p-4">
           {isLoading ? (

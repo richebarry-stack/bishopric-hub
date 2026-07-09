@@ -125,7 +125,7 @@ function AddDateModal({ onSave, onClose }: {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-xs flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0">
           <h2 className="font-semibold text-gray-900">Add Activity Date</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
         <form onSubmit={submit} className="p-4 space-y-4">
           <label className="block">
@@ -172,7 +172,7 @@ function EventModal({ initial, onSave, onClose }: {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0">
           <h2 className="font-semibold text-gray-900">Youth Activity</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
         <form onSubmit={submit} className="flex flex-col flex-1 overflow-hidden">
           <div className="p-4 space-y-4 overflow-y-auto">
@@ -275,7 +275,7 @@ function GroupCellModal({ row, groupKey, groupLabel, onSave, onClose }: {
             <h2 className="font-semibold text-gray-900">{groupLabel}</h2>
             <p className="text-xs text-gray-500 mt-0.5">{formatDate(row.date)}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
         <form onSubmit={submit} className="p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">

@@ -62,7 +62,7 @@ function SuggestionModal({ initial, isAdmin, onSave, onClose }: {
           <h2 className="font-semibold text-gray-900">
             {initial.title ? 'Edit Suggestion' : 'Submit Suggestion'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
         <form onSubmit={submit} className="flex flex-col flex-1 overflow-hidden">
           <div className="p-4 space-y-4 overflow-y-auto">

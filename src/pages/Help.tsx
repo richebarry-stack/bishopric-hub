@@ -78,6 +78,96 @@ const VIEWER_SECTIONS: Section[] = [
   },
 ];
 
+const WC_SECTIONS: Section[] = [
+  {
+    title: 'Getting Started (Ward Council)',
+    icon: '⌂',
+    content: (
+      <div className="space-y-2">
+        <p>Ward Council Hub is for ward council members — use the sidebar to move between pages. Your Dashboard can be customized (⚙ Customize) to show the panels you care about most.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'WC Meeting Assignments',
+    icon: '▦',
+    content: (
+      <div className="space-y-2">
+        <p>Upcoming and past ward council meetings, with opening prayer, spiritual thought, and closing prayer assignments for each.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Discussion Topics',
+    icon: '◈',
+    content: (
+      <div className="space-y-2">
+        <p>Each organization (Elders Quorum, Relief Society, Primary, etc.) has a Status, Next Steps, and Help Needed field for the upcoming meeting. "Copy from prior meeting" carries forward last week's entries so you can update rather than retype them.</p>
+        <p>Categories are editable via "Manage Categories" if your organizations don't match the defaults.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Wins for the Ward',
+    icon: '★',
+    content: (
+      <div className="space-y-2">
+        <p>A running log of good things happening in the ward, grouped by week — useful for ward council discussion and sharing with leadership.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Ward Council Members',
+    icon: '⊕',
+    content: (
+      <div className="space-y-2">
+        <p>The people with Ward Council Hub access. Admins can add members, reset passwords, and edit names/emails here.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Member Needs',
+    icon: '♥',
+    content: (
+      <div className="space-y-2">
+        <p>Health and support needs shared with ward council. Toggle <strong>Pray for</strong> to flag someone for prayer, and mark entries resolved when addressed.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Calendar of Events & Youth Calendar',
+    icon: '⇗',
+    content: (
+      <div className="space-y-2">
+        <p>Ward and youth activity calendars. Events flagged "Announce in sacrament" surface automatically in the sacrament meeting agenda.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Changing Your Password',
+    icon: '⚿',
+    content: <p>Use the "Change Password" link in the sidebar footer at any time.</p>,
+  },
+];
+
+const YC_SECTIONS: Section[] = [
+  {
+    title: 'Getting Started (Youth Council)',
+    icon: '⌂',
+    content: (
+      <div className="space-y-2">
+        <p>Youth Council Hub gives access to the Youth Calendar — activity dates, times, and locations for each youth organization (Builders of Faith, Messengers of Hope, Gatherers of Light, Deacons, Teachers, Priests).</p>
+        <p>Click a date to edit that week's activities, or add a new date with "+ Add Date".</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Changing Your Password',
+    icon: '⚿',
+    content: <p>Use the "Change Password" link in the sidebar footer at any time.</p>,
+  },
+];
+
 const FULL_SECTIONS: Section[] = [
   {
     title: 'Getting Started',
@@ -332,12 +422,16 @@ const FULL_SECTIONS: Section[] = [
 declare const __APP_VERSION__: string;
 
 export default function Help() {
-  const { user } = useAuth();
+  const { user, selectedHub } = useAuth();
   const isViewer = user?.role === 'viewer';
   const isMusicCoord = /music.?coordinator/i.test(user?.church_role || '');
+  // hub='both' users see whichever hub they're currently viewing; single-hub accounts always see their own.
+  const effectiveHub = user?.hub === 'both' ? selectedHub : user?.hub;
 
   const sections = isViewer
     ? (isMusicCoord ? VIEWER_SECTIONS : VIEWER_SECTIONS.filter(s => s.title !== 'Music Coordinator — Editing Music'))
+    : effectiveHub === 'wc' ? WC_SECTIONS
+    : effectiveHub === 'yc' ? YC_SECTIONS
     : FULL_SECTIONS;
 
   return (
@@ -362,6 +456,9 @@ export default function Help() {
                 'Add User no longer requires typing a password — a temporary one is generated automatically and shown once, the same way password resets already worked',
                 'Adding a user (or approving a request) with a calling not on the standard list now requires explicitly choosing which hub they should access, instead of silently defaulting to Ward Council',
                 '"Email Notifications" renamed to "Automation & Notifications" and now shows when background jobs (sacrament conducting sync, expired-session cleanup) last ran and whether they succeeded — these run automatically once a day',
+                'Dashboard panels now stack into a single column on narrow screens instead of squeezing side by side',
+                'Help now shows Ward Council- and Youth Council-specific content instead of the bishopric-centric list for those hubs',
+                'Close (×) and remove buttons across the app now have accessible labels for screen readers',
               ],
             },
             {

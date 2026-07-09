@@ -175,7 +175,7 @@ function SpeakerItem({
       </div>
       <div className="flex-1 min-w-0">
         <div className="rounded-md border border-gray-200 p-2 relative">
-          <button type="button" onClick={onRemove}
+          <button type="button" onClick={onRemove} aria-label="Remove"
             className="absolute top-1 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
           <input className={INPUT_CLS + ' mb-1 pr-6'} placeholder="Speaker name" value={row.speaker}
             onChange={e => onUpdate({ speaker: e.target.value })} />
@@ -213,7 +213,7 @@ function NoteItem({
       </div>
       <div className="flex-1 min-w-0 flex items-start gap-2">
         <AutoTextarea className={INPUT_CLS} placeholder="Additional note…" value={content} onChange={e => onContentChange(e.target.value)} />
-        <button type="button" onClick={onRemove} className="text-gray-300 hover:text-red-500 text-lg leading-none pt-1">×</button>
+        <button type="button" onClick={onRemove} aria-label="Remove" className="text-gray-300 hover:text-red-500 text-lg leading-none pt-1">×</button>
       </div>
     </div>
   );
@@ -274,7 +274,7 @@ function AnnouncementsSection({ rows, setRows, onCopyPrior, priorCount }: {
         {rows.length === 0 && <p className="text-xs text-gray-300 italic">None</p>}
         {rows.map((r, i) => (
           <div key={i} className="rounded-md border border-gray-200 p-2 relative">
-            <button type="button" onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))}
+            <button type="button" onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))} aria-label="Remove"
               className="absolute top-1 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
             <input className={INPUT_CLS + ' mb-1'} placeholder="Title" value={r.title}
               onChange={e => setRows(rs => rs.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))} />
@@ -316,7 +316,7 @@ function RecognizeSection({ rows, setRows, autoLines }: {
           <div key={i} className="flex items-start gap-2">
             <AutoTextarea className={INPUT_CLS} value={r}
               onChange={e => setRows(rs => rs.map((x, idx) => idx === i ? e.target.value : x))} />
-            <button type="button" onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))}
+            <button type="button" onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))} aria-label="Remove"
               className="text-gray-300 hover:text-red-500 text-sm leading-none shrink-0 mt-2">×</button>
           </div>
         ))}

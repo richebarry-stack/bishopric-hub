@@ -12,6 +12,7 @@ import {
   loadDashboardConfig, saveDashboardConfig,
 } from '../lib/dashboardConfig';
 import { NAV_ITEMS, LAST_VISITED_KEY } from '../components/Layout';
+import { responsiveGridCols } from '../lib/gridCols';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const ACTION_STATUSES = new Set(['3. Approved and assigned', '7. Need to release']);
@@ -158,7 +159,7 @@ function DashboardSettingsModal({ config, onSave, onClose }: {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-8">
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <h2 className="font-bold text-gray-900">Dashboard Settings</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
         </div>
 
         <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
@@ -298,7 +299,7 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 7rem)' }}>
+    <div className="flex flex-col lg:h-[calc(100vh-7rem)]">
 
       {showSettings && (
         <DashboardSettingsModal config={config} onSave={setConfig} onClose={() => setShowSettings(false)} />
@@ -331,7 +332,7 @@ export default function Dashboard() {
 
       {/* TOP panels */}
       {topCount > 0 && (
-        <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: `repeat(${topCount}, 1fr)` }}>
+        <div className={`grid gap-4 mb-4 ${responsiveGridCols(topCount)}`}>
 
           {cfg.bishopricMeeting.visible && (
             <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
@@ -429,7 +430,7 @@ export default function Dashboard() {
 
       {/* BOTTOM panels */}
       {bottomCount > 0 && (
-        <div className="grid gap-4 min-h-0 flex-1" style={{ gridTemplateColumns: `repeat(${bottomCount}, 1fr)` }}>
+        <div className={`grid gap-4 min-h-0 flex-1 ${responsiveGridCols(bottomCount)}`}>
 
           {cfg.tasks.visible && (
             <div className="bg-white rounded-xl border border-gray-200 flex flex-col overflow-hidden">

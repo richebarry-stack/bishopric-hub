@@ -8,6 +8,7 @@ import {
   WC_DEFAULT_CONFIG, FONT_SIZE_LABELS, FONT_SIZE_CLASS,
   loadWcDashboardConfig, saveWcDashboardConfig,
 } from '../lib/wcDashboardConfig';
+import { responsiveGridCols } from '../lib/gridCols';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const ACTIVE_MISSIONARY_STATUSES = new Set(['1-Considering', '2-Papers Started', '3-Papers Submitted', '4-Call Accepted']);
@@ -104,7 +105,7 @@ function SettingsModal({ config, onSave, onClose }: {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-8">
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <h2 className="font-bold text-gray-900">Dashboard Settings</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
         </div>
         <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Top panels</p>
@@ -205,7 +206,7 @@ export default function WcDashboard() {
   const bottomCount = [cfg.actionItems.visible, cfg.events.visible].filter(Boolean).length;
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 7rem)' }}>
+    <div className="flex flex-col lg:h-[calc(100vh-7rem)]">
       {showSettings && <SettingsModal config={config} onSave={setConfig} onClose={() => setShowSettings(false)} />}
 
       <div className="flex items-center justify-between mb-3">
@@ -217,7 +218,7 @@ export default function WcDashboard() {
       </div>
 
       {topCount > 0 && (
-        <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: `repeat(${topCount}, 1fr)` }}>
+        <div className={`grid gap-4 mb-4 ${responsiveGridCols(topCount)}`}>
 
           {cfg.meeting.visible && (
             <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
@@ -335,7 +336,7 @@ export default function WcDashboard() {
       )}
 
       {bottomCount > 0 && (
-        <div className="grid gap-4 min-h-0 flex-1" style={{ gridTemplateColumns: `repeat(${bottomCount}, 1fr)` }}>
+        <div className={`grid gap-4 min-h-0 flex-1 ${responsiveGridCols(bottomCount)}`}>
 
           {cfg.actionItems.visible && (
             <div className="bg-white rounded-xl border border-gray-200 flex flex-col overflow-hidden">

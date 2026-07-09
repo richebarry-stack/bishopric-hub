@@ -617,7 +617,7 @@ function AgendaModal(props: AgendaModalProps) {
               {speakerRows.length === 0 && <p className="text-xs text-gray-400">No speakers yet.</p>}
               {speakerRows.map((r, i) => (
                 <div key={i} className="rounded-md border border-gray-200 p-3 space-y-2 relative">
-                  <button type="button" onClick={() => { setSpeakerRows(rows => rows.filter((_, idx) => idx !== i)); mark(); }}
+                  <button type="button" onClick={() => { setSpeakerRows(rows => rows.filter((_, idx) => idx !== i)); mark(); }} aria-label="Remove"
                     className="absolute top-2 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
                   <Input label={`Speaker ${i + 1}`} value={r.speaker} onChange={v => updateSpeakerRow(i, { speaker: v })} />
                   <div className="grid grid-cols-2 gap-3">
@@ -650,7 +650,7 @@ function AgendaModal(props: AgendaModalProps) {
           {announceRows.length === 0 && <p className="text-xs text-gray-400">None.</p>}
           {announceRows.map((r, i) => (
             <div key={i} className="rounded-md border border-gray-200 p-3 space-y-2 relative">
-              <button type="button" onClick={() => { setAnnounceRows(rows => rows.filter((_, idx) => idx !== i)); mark(); }}
+              <button type="button" onClick={() => { setAnnounceRows(rows => rows.filter((_, idx) => idx !== i)); mark(); }} aria-label="Remove"
                 className="absolute top-2 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
               <Input label="Title" value={r.title} onChange={v => updateAnnounceRow(i, { title: v })} />
               <Textarea label="Details" value={r.notes} onChange={v => updateAnnounceRow(i, { notes: v })} rows={2} />
