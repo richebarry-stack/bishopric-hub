@@ -13,6 +13,7 @@ interface Session {
   church_role: string;
   hub: string;
   name: string;
+  last_access?: string;
 }
 
 const TABLES: Record<string, { name: string; orderBy?: string }> = {
@@ -106,22 +107,48 @@ async function verifyPassword(password: string, stored: string): Promise<{ valid
   return { valid: legacyHash === stored, legacy: true };
 }
 
+// The app's configured local time zone (IANA name), used to decide calendar-day
+// boundaries for things like "last access". Admin-configurable via ui_settings;
+// cached briefly in memory since getSession runs on every request.
+let cachedTimeZone: { value: string; expiresAt: number } | null = null;
+const DEFAULT_TIME_ZONE = 'America/Denver';
+
+async function getAppTimeZone(db: D1Database): Promise<string> {
+  if (cachedTimeZone && cachedTimeZone.expiresAt > Date.now()) return cachedTimeZone.value;
+  const row = await db.prepare("SELECT value FROM ui_settings WHERE key = 'app_timezone'").first<{ value: string }>();
+  const value = row?.value || DEFAULT_TIME_ZONE;
+  cachedTimeZone = { value, expiresAt: Date.now() + 5 * 60 * 1000 };
+  return value;
+}
+
+function localDateString(iso: string, timeZone: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('en-CA', { timeZone });
+  } catch {
+    return new Date(iso).toLocaleDateString('en-CA', { timeZone: DEFAULT_TIME_ZONE });
+  }
+}
+
 async function getSession(request: Request, db: D1Database): Promise<Session | null> {
   const cookie = request.headers.get('Cookie') || '';
   const match = cookie.match(/session=([^;]+)/);
   if (!match) return null;
   const sessionId = match[1];
   const session = await db.prepare(
-    `SELECT s.id, s.user_id, s.expires_at, u.role, u.church_role, u.hub, u.name
+    `SELECT s.id, s.user_id, s.expires_at, u.role, u.church_role, u.hub, u.name, u.last_access
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.id = ? AND s.expires_at > datetime("now")`
   ).bind(sessionId).first<Session>();
   if (session) {
-    // Update once per calendar day (not just once per rolling 24h) so a login
-    // shows up as "today" immediately, even if the previous update was <24h ago.
-    await db.prepare(
-      `UPDATE users SET last_access = ? WHERE id = ? AND (last_access = '' OR date(last_access) < date('now'))`
-    ).bind(new Date().toISOString(), session.user_id).run();
+    // Update once per local calendar day (not just once per rolling 24h) so a
+    // login shows up as "today" immediately, even if the previous update was
+    // less than 24h ago. Day boundary uses the app's configured time zone.
+    const timeZone = await getAppTimeZone(db);
+    const nowIso = new Date().toISOString();
+    const alreadyUpdatedToday = session.last_access && localDateString(session.last_access, timeZone) === localDateString(nowIso, timeZone);
+    if (!alreadyUpdatedToday) {
+      await db.prepare('UPDATE users SET last_access = ? WHERE id = ?').bind(nowIso, session.user_id).run();
+    }
   }
   return session;
 }
@@ -684,6 +711,32 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       await db.prepare(
         "INSERT INTO ui_settings (key, value, updated_at) VALUES ('email_settings', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
       ).bind(JSON.stringify(body), now).run();
+      return json({ ok: true });
+    }
+    return json({ error: 'Method not allowed' }, 405);
+  }
+
+  // App time zone (used for "same day" calculations like Last Access) — admin only
+  if (routeParts[0] === 'app-timezone') {
+    if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+    if (method === 'GET') {
+      const row = await db.prepare("SELECT value FROM ui_settings WHERE key = 'app_timezone'").first<{ value: string }>();
+      return json({ timeZone: row?.value || DEFAULT_TIME_ZONE });
+    }
+    if (method === 'PUT') {
+      const body = await request.json() as { timeZone?: string };
+      const timeZone = (body.timeZone || '').trim();
+      if (!timeZone) return json({ error: 'timeZone is required' }, 400);
+      try {
+        Intl.DateTimeFormat('en-US', { timeZone });
+      } catch {
+        return json({ error: 'Invalid IANA time zone' }, 400);
+      }
+      const now = new Date().toISOString();
+      await db.prepare(
+        "INSERT INTO ui_settings (key, value, updated_at) VALUES ('app_timezone', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
+      ).bind(timeZone, now).run();
+      cachedTimeZone = null;
       return json({ ok: true });
     }
     return json({ error: 'Method not allowed' }, 405);

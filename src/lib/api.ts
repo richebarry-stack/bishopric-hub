@@ -79,6 +79,11 @@ export const api = {
     preview: (type: string) =>
       request<Record<string, unknown>>('/email-preview', { method: 'POST', body: JSON.stringify({ type }) }),
   },
+  appTimezone: {
+    get: () => request<{ timeZone: string }>('/app-timezone'),
+    save: (timeZone: string) =>
+      request('/app-timezone', { method: 'PUT', body: JSON.stringify({ timeZone }) }),
+  },
   wardMembers: {
     import: (data: {
       updates: { id: number; birth_date: string }[];

@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 
 const JOB_LABELS: Record<string, string> = {
@@ -8,9 +9,68 @@ const JOB_LABELS: Record<string, string> = {
   cleanupPresence: 'Stale presence cleanup',
 };
 
+const COMMON_TIME_ZONES = [
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Phoenix',
+  'America/Chicago',
+  'America/New_York',
+  'America/Anchorage',
+  'Pacific/Honolulu',
+  'UTC',
+];
+
 function formatWhen(iso: string | null): string {
   if (!iso) return 'Never';
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function TimeZoneSetting() {
+  const queryClient = useQueryClient();
+  const { data } = useQuery({ queryKey: ['app-timezone'], queryFn: () => api.appTimezone.get() });
+  const [timeZone, setTimeZone] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (data?.timeZone) setTimeZone(data.timeZone);
+  }, [data?.timeZone]);
+
+  const mutation = useMutation({
+    mutationFn: (tz: string) => api.appTimezone.save(tz),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['app-timezone'] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    },
+  });
+
+  const options = COMMON_TIME_ZONES.includes(timeZone) || !timeZone ? COMMON_TIME_ZONES : [timeZone, ...COMMON_TIME_ZONES];
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+      <h2 className="font-semibold text-gray-800 text-sm">Time Zone</h2>
+      <p className="text-xs text-gray-400">
+        Used to decide calendar-day boundaries, e.g. when "Last Access" on the Users page counts as "today".
+      </p>
+      <div className="flex items-center gap-2">
+        <select
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+          value={timeZone}
+          onChange={(e) => setTimeZone(e.target.value)}
+        >
+          {options.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+        </select>
+        <button
+          className="px-3 py-1.5 text-sm rounded-lg bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50"
+          disabled={!timeZone || mutation.isPending}
+          onClick={() => mutation.mutate(timeZone)}
+        >
+          Save
+        </button>
+        {saved && <span className="text-xs text-green-600">Saved</span>}
+      </div>
+    </div>
+  );
 }
 
 export default function EmailNotifications() {
@@ -51,6 +111,8 @@ export default function EmailNotifications() {
           </>
         )}
       </div>
+
+      <TimeZoneSetting />
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 text-amber-800 space-y-2">
         <p className="font-semibold">Email sending not yet enabled</p>
