@@ -7,6 +7,7 @@ const JOB_LABELS: Record<string, string> = {
   cleanupSessions: 'Expired session cleanup',
   cleanupLoginAttempts: 'Login attempt log cleanup',
   cleanupPresence: 'Stale presence cleanup',
+  syncYouthInterviews: 'Youth interview roster sync',
 };
 
 const COMMON_TIME_ZONES = [

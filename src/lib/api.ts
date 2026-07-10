@@ -148,6 +148,7 @@ export interface CallingPipeline {
 export interface InterviewPipeline {
   id: number;
   member: string;
+  ward_member_id: number | null;
   date_recommend_expires: string;
   type_of_interview: string;
   status: string;
@@ -452,6 +453,7 @@ export interface WardMember {
   exclude_prayers: number;
   birth_date: string | null;
   gender: string | null;
+  preferred_name: string | null;
   updated_at: string;
 }
 

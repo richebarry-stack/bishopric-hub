@@ -5,6 +5,7 @@ import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Textarea } from '../components/FormFields'; // Select still used for Status
 import { INTERVIEW_TYPES, INTERVIEW_STATUSES, INTERVIEW_STATUS_COLORS } from '../lib/constants';
+import { displayName } from '../lib/displayName';
 import { toast } from '../lib/toast';
 
 const EMPTY: Partial<InterviewType> = {
@@ -40,16 +41,66 @@ function formatRecommendDate(dateStr: string): string {
   return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
+const YOUTH_TYPES = new Set(['Annual Youth', 'Semi-Annual Youth']);
+
+type YouthState = 'Due' | 'Scheduled' | 'Up to date';
+const YOUTH_STATE_RANK: Record<YouthState, number> = { Due: 0, Scheduled: 1, 'Up to date': 2 };
+const YOUTH_STATE_COLORS: Record<string, { bg: string; text: string }> = {
+  Due: { bg: 'bg-rose-100', text: 'text-rose-800' },
+  Scheduled: { bg: 'bg-blue-100', text: 'text-blue-800' },
+  'Up to date': { bg: 'bg-green-100', text: 'text-green-800' },
+};
+
+// Computed from dates instead of a manually-set status: a future next_interview_date
+// means it's Scheduled; otherwise a last_interview_datetime within the age-based
+// cadence means Up to date; otherwise it's Due (never interviewed, or lapsed).
+function computeYouthState(row: { next_interview_date?: string; last_interview_datetime?: string }, age: number): YouthState {
+  const cadenceMonths = age >= 16 ? 6 : 12;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (row.next_interview_date) {
+    const nid = new Date(row.next_interview_date.slice(0, 10) + 'T12:00:00');
+    if (nid >= today) return 'Scheduled';
+  }
+  if (row.last_interview_datetime) {
+    const cutoff = new Date(); cutoff.setMonth(cutoff.getMonth() - cadenceMonths);
+    const lid = new Date(row.last_interview_datetime.slice(0, 10) + 'T12:00:00');
+    if (lid >= cutoff) return 'Up to date';
+  }
+  return 'Due';
+}
+
+function computeAge(birthDate: string, asOf?: Date): number {
+  const bd = new Date(birthDate.slice(0, 10) + 'T12:00:00');
+  const ref = asOf ?? new Date();
+  let age = ref.getFullYear() - bd.getFullYear();
+  const m = ref.getMonth() - bd.getMonth();
+  if (m < 0 || (m === 0 && ref.getDate() < bd.getDate())) age--;
+  return age;
+}
+
+// Returns current age if the member is still youth-eligible, otherwise null.
+// Youth eligibility ends September 1 of the year they turn 18, so members
+// who turn 18 any time during the year remain youth through August.
+function computeYouthAge(birthDate: string): number | null {
+  const bd = new Date(birthDate.slice(0, 10) + 'T12:00:00');
+  const ageOutDate = new Date(bd.getFullYear() + 18, 8, 1); // Sep 1 of 18th year
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (today >= ageOutDate) return null;
+  return computeAge(birthDate);
+}
+
+interface RowMeta { age?: number; displayName: string; youthState?: YouthState; }
+
 type SortKey = 'member' | 'age' | 'status' | 'assigned_to' | 'date_recommend_expires' | 'next_interview_date' | 'last_interview_datetime' | 'comments';
 
-function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSelect, dueRowIds }: {
+function InterviewTable({ rows, onEdit, onDelete, showAge, rowMetaById, selected, onToggleSelect }: {
   rows: InterviewType[];
   onEdit: (r: InterviewType) => void;
   onDelete: (id: number) => void;
-  ageMap?: Map<string, number>;
+  showAge?: boolean;
+  rowMetaById: Map<number, RowMeta>;
   selected: Set<number>;
   onToggleSelect: (id: number) => void;
-  dueRowIds?: Set<number>;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('member');
   const [sortAsc, setSortAsc] = useState(true);
@@ -60,16 +111,28 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSele
   };
 
   const sorted = useMemo(() => [...rows].sort((a, b) => {
-    if (sortKey === 'age' && ageMap) {
-      const av = ageMap.get(a.member.toLowerCase()) ?? 999;
-      const bv = ageMap.get(b.member.toLowerCase()) ?? 999;
+    const metaA = rowMetaById.get(a.id);
+    const metaB = rowMetaById.get(b.id);
+    if (sortKey === 'age') {
+      const av = metaA?.age ?? 999;
+      const bv = metaB?.age ?? 999;
+      return sortAsc ? av - bv : bv - av;
+    }
+    if (sortKey === 'member') {
+      const av = metaA?.displayName ?? a.member;
+      const bv = metaB?.displayName ?? b.member;
+      return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+    }
+    if (sortKey === 'status' && (metaA?.youthState || metaB?.youthState)) {
+      const av = metaA?.youthState ? YOUTH_STATE_RANK[metaA.youthState] : 99;
+      const bv = metaB?.youthState ? YOUTH_STATE_RANK[metaB.youthState] : 99;
       return sortAsc ? av - bv : bv - av;
     }
     const sk = sortKey as keyof InterviewType;
     const av = ((a[sk] ?? '') as string).slice(0, 10);
     const bv = ((b[sk] ?? '') as string).slice(0, 10);
     return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
-  }), [rows, sortKey, sortAsc, ageMap]);
+  }), [rows, sortKey, sortAsc, rowMetaById]);
 
   const Th = ({ col, label }: { col: SortKey; label: string }) => (
     <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap"
@@ -80,8 +143,9 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSele
   );
 
   const rowTint = (r: InterviewType): { overdueInterview: boolean; rowColor: string } => {
+    const meta = rowMetaById.get(r.id);
     const rowColor = recommendRowClass(r.date_recommend_expires);
-    const overdueInterview = !rowColor && (isPast(r.next_interview_date) || !!dueRowIds?.has(r.id));
+    const overdueInterview = !rowColor && (meta?.youthState ? meta.youthState === 'Due' : isPast(r.next_interview_date));
     return { overdueInterview, rowColor };
   };
 
@@ -93,7 +157,7 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSele
             <tr className="border-b border-gray-100 bg-gray-50">
               <th className="px-3 py-2 w-8"></th>
               <Th col="member" label="Member" />
-              {ageMap && <Th col="age" label="Age" />}
+              {showAge && <Th col="age" label="Age" />}
               <Th col="status" label="Status" />
               <Th col="assigned_to" label="Assigned To" />
               <Th col="date_recommend_expires" label="Rec. Expires" />
@@ -106,19 +170,19 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSele
           <tbody>
             {sorted.map(r => {
               const { overdueInterview, rowColor } = rowTint(r);
+              const meta = rowMetaById.get(r.id);
               return (
               <tr key={r.id} className={`border-b border-gray-50 cursor-pointer hover:brightness-95 ${overdueInterview ? 'bg-rose-50' : rowColor || 'hover:bg-gray-50'}`} onClick={() => onEdit(r)}>
                 <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                   <input type="checkbox" checked={selected.has(r.id)} onChange={() => onToggleSelect(r.id)}
                     className="rounded border-gray-300 text-blue-600" />
                 </td>
-                <td className="px-3 py-2 font-medium text-gray-900">{r.member}</td>
-                {ageMap && <td className="px-3 py-2 text-gray-600 text-center">{ageMap.get(r.member.toLowerCase()) ?? '—'}</td>}
+                <td className="px-3 py-2 font-medium text-gray-900">{meta?.displayName ?? r.member}</td>
+                {showAge && <td className="px-3 py-2 text-gray-600 text-center">{meta?.age ?? '—'}</td>}
                 <td className="px-3 py-2">
-                  <StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} />
-                  {dueRowIds?.has(r.id) && (
-                    <span className="ml-1.5 inline-block text-[10px] px-1.5 py-0.5 rounded-full bg-rose-600 text-white align-middle whitespace-nowrap">Interview due</span>
-                  )}
+                  {meta?.youthState
+                    ? <StatusBadge status={meta.youthState} colors={YOUTH_STATE_COLORS} />
+                    : <StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} />}
                 </td>
                 <td className="px-3 py-2 text-gray-600">{r.assigned_to}</td>
                 <td className="px-3 py-2 text-sm font-medium text-gray-700">
@@ -141,7 +205,7 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSele
       <div className="md:hidden space-y-2">
         {sorted.map(r => {
           const { overdueInterview, rowColor } = rowTint(r);
-          const age = ageMap?.get(r.member.toLowerCase());
+          const meta = rowMetaById.get(r.id);
           return (
             <div key={r.id} onClick={() => onEdit(r)}
               className={`rounded-lg border border-gray-200 p-3 cursor-pointer ${overdueInterview ? 'bg-rose-50' : rowColor || 'bg-white'}`}>
@@ -152,16 +216,15 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSele
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium text-gray-900 truncate">
-                      {r.member}{age !== undefined && <span className="text-gray-500 font-normal"> (age {age})</span>}
+                      {meta?.displayName ?? r.member}{showAge && meta?.age !== undefined && <span className="text-gray-500 font-normal"> (age {meta.age})</span>}
                     </p>
                     <button onClick={e => { e.stopPropagation(); onDelete(r.id); }}
                       className="text-red-400 hover:text-red-600 text-xs shrink-0">Del</button>
                   </div>
-                  <div className="mt-1 flex items-center gap-1.5">
-                    <StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} />
-                    {dueRowIds?.has(r.id) && (
-                      <span className="inline-block text-[10px] px-1.5 py-0.5 rounded-full bg-rose-600 text-white whitespace-nowrap">Interview due</span>
-                    )}
+                  <div className="mt-1">
+                    {meta?.youthState
+                      ? <StatusBadge status={meta.youthState} colors={YOUTH_STATE_COLORS} />
+                      : <StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} />}
                   </div>
                   {r.assigned_to && <p className="text-xs text-gray-500 mt-1">Assigned: {r.assigned_to}</p>}
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs">
@@ -184,83 +247,69 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSele
   );
 }
 
-const YOUTH_TYPES = new Set(['Annual Youth', 'Semi-Annual Youth']);
-
-function computeAge(birthDate: string, asOf?: Date): number {
-  const bd = new Date(birthDate.slice(0, 10) + 'T12:00:00');
-  const ref = asOf ?? new Date();
-  let age = ref.getFullYear() - bd.getFullYear();
-  const m = ref.getMonth() - bd.getMonth();
-  if (m < 0 || (m === 0 && ref.getDate() < bd.getDate())) age--;
-  return age;
-}
-
-// Returns current age if the member is still youth-eligible, otherwise null.
-// Youth eligibility ends September 1 of the year they turn 18, so members
-// who turn 18 any time during the year remain youth through August.
-function computeYouthAge(birthDate: string): number | null {
-  const bd = new Date(birthDate.slice(0, 10) + 'T12:00:00');
-  const ageOutDate = new Date(bd.getFullYear() + 18, 8, 1); // Sep 1 of 18th year
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  if (today >= ageOutDate) return null;
-  return computeAge(birthDate);
-}
-
-// existingIds is empty when the youth has no pipeline row at all (needs "Add to
-// pipeline"); non-empty when they're already tracked but their interview has gone
-// stale (flagged directly on their existing row(s) in the table instead).
-interface DueEntry { name: string; age: number; type: string; lastInterview: string | null; existingIds: number[]; }
-
-// Handbook cadence: youth 12-15 get an annual interview with a bishopric member;
-// youth 16-17 additionally get a semiannual interview with the bishop. Flags anyone
-// with no matching interview on record, or whose last one has aged past the cadence.
-function computeDueYouth(wardMembers: WardMember[], interviews: InterviewType[]): DueEntry[] {
-  const now = new Date();
-  const out: DueEntry[] = [];
-  for (const wm of wardMembers) {
-    if (!wm.active || !wm.birth_date) continue;
-    const age = computeYouthAge(wm.birth_date);
-    if (age === null || age < 12) continue;
-    const type = age >= 16 ? 'Semi-Annual Youth' : 'Annual Youth';
-    const cadenceMonths = age >= 16 ? 6 : 12;
-    const matches = interviews.filter(i =>
-      i.member?.trim().toLowerCase() === wm.name.trim().toLowerCase() && i.type_of_interview === type);
-    const withDates = matches.filter(m => m.last_interview_datetime).sort((a, b) => a.last_interview_datetime.localeCompare(b.last_interview_datetime));
-    const lastRow = withDates[withDates.length - 1] ?? null;
-    // A pipeline row with no interview date yet means it's already being tracked
-    // (e.g. just added via "Add to pipeline") and awaiting scheduling — not due again
-    // until either it's removed or an interview date is recorded that later goes stale.
-    if (matches.length > 0 && !lastRow) continue;
-    const cutoff = new Date(now);
-    cutoff.setMonth(cutoff.getMonth() - cadenceMonths);
-    const isDue = !lastRow || new Date(lastRow.last_interview_datetime.slice(0, 10) + 'T12:00:00') < cutoff;
-    if (isDue) {
-      out.push({
-        name: wm.name, age, type,
-        lastInterview: lastRow?.last_interview_datetime ?? null,
-        existingIds: matches.map(m => m.id),
-      });
-    }
-  }
-  return out.sort((a, b) => a.name.localeCompare(b.name));
-}
-
 export default function InterviewPipeline() {
   const { rows, isLoading, create, update, remove } = useTable<InterviewType>('interview-pipeline');
-  const { rows: wardMembers } = useTable<WardMember>('ward-members');
+  const { rows: wardMembers, isLoading: wardMembersLoading, update: updateWardMember } = useTable<WardMember>('ward-members');
   const [editing, setEditing] = useState<Partial<InterviewType> | null>(null);
-  const [dismissedDue, setDismissedDue] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [assignedFilter, setAssignedFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkStatus, setBulkStatus] = useState('');
+  const [bulkAssignedTo, setBulkAssignedTo] = useState('');
+  const [showAgedOutYouth, setShowAgedOutYouth] = useState(false);
 
   const assignedOptions = useMemo(() => {
     const names = [...new Set(rows.map(r => r.assigned_to).filter(Boolean))].sort();
     return names;
   }, [rows]);
+
+  const wardMembersById = useMemo(() => {
+    const m = new Map<number, WardMember>();
+    for (const wm of wardMembers) m.set(wm.id, wm);
+    return m;
+  }, [wardMembers]);
+
+  const ageByName = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const wm of wardMembers) {
+      if (wm.birth_date) {
+        const age = computeYouthAge(wm.birth_date);
+        if (age !== null) m.set(wm.name.trim().toLowerCase(), age);
+      }
+    }
+    return m;
+  }, [wardMembers]);
+
+  const activeYouthWardMemberIds = useMemo(() => {
+    const s = new Set<number>();
+    for (const wm of wardMembers) {
+      if (wm.active && wm.birth_date && computeYouthAge(wm.birth_date) !== null) s.add(wm.id);
+    }
+    return s;
+  }, [wardMembers]);
+
+  const rowMetaById = useMemo(() => {
+    const m = new Map<number, RowMeta>();
+    for (const r of rows) {
+      let age: number | undefined;
+      let name = r.member;
+      const linked = r.ward_member_id ? wardMembersById.get(r.ward_member_id) : undefined;
+      if (linked) {
+        name = displayName(linked);
+        if (linked.active && linked.birth_date) {
+          const a = computeYouthAge(linked.birth_date);
+          if (a !== null) age = a;
+        }
+      } else if (YOUTH_TYPES.has(r.type_of_interview)) {
+        age = ageByName.get(r.member?.trim().toLowerCase() ?? '');
+      }
+      const youthState = age !== undefined && YOUTH_TYPES.has(r.type_of_interview) ? computeYouthState(r, age) : undefined;
+      m.set(r.id, { age, displayName: name, youthState });
+    }
+    return m;
+  }, [rows, wardMembersById, ageByName]);
 
   const filtered = rows.filter(r => {
     if (statusFilter && r.status !== statusFilter) return false;
@@ -268,7 +317,8 @@ export default function InterviewPipeline() {
     if (typeFilter && r.type_of_interview !== typeFilter) return false;
     if (filter) {
       const q = filter.toLowerCase();
-      return r.member?.toLowerCase().includes(q) || r.type_of_interview?.toLowerCase().includes(q);
+      const name = rowMetaById.get(r.id)?.displayName ?? r.member;
+      return name?.toLowerCase().includes(q) || r.member?.toLowerCase().includes(q) || r.type_of_interview?.toLowerCase().includes(q);
     }
     return true;
   });
@@ -281,6 +331,15 @@ export default function InterviewPipeline() {
     setBulkStatus('');
   };
 
+  const handleBulkAssign = async () => {
+    const name = bulkAssignedTo.trim();
+    if (!name || selected.size === 0) return;
+    await Promise.all([...selected].map(id => update(id, { assigned_to: name }, { silent: true })));
+    toast.success(`Assigned ${selected.size} interview${selected.size === 1 ? '' : 's'} to ${name}`);
+    setSelected(new Set());
+    setBulkAssignedTo('');
+  };
+
   const toggleSelect = (id: number) => setSelected(prev => {
     const next = new Set(prev);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -289,54 +348,57 @@ export default function InterviewPipeline() {
 
   const handleSave = async () => {
     if (!editing) return;
-    const data = { ...editing };
-    delete (data as Record<string, unknown>).id;
-    if (editing.id) await update(editing.id, data as Record<string, unknown>);
-    else await create(data as Record<string, unknown>);
+    const data = { ...editing } as Record<string, unknown>;
+    delete data.id;
+    const wardMemberId = data.ward_member_id as number | undefined | null;
+    const newName = ((data.member as string) || '').trim();
+    if (wardMemberId) {
+      const linked = wardMembersById.get(wardMemberId);
+      if (linked && newName && newName !== linked.name) {
+        await updateWardMember(wardMemberId, { name: newName });
+      }
+    }
+    if (editing.id) await update(editing.id, data);
+    else await create(data);
     setEditing(null);
   };
 
-  const ageMap = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const wm of wardMembers) {
-      if (wm.birth_date) {
-        const age = computeYouthAge(wm.birth_date);
-        if (age !== null) m.set(wm.name.toLowerCase(), age);
-      }
-    }
-    return m;
-  }, [wardMembers]);
-
-  const dueYouth = useMemo(
-    () => computeDueYouth(wardMembers, rows).filter(d => !dismissedDue.has(`${d.name.toLowerCase()}|${d.type}`)),
-    [wardMembers, rows, dismissedDue]
-  );
-
-  // Youth already tracked in the pipeline but overdue get flagged on their existing
-  // row(s) instead of offering a redundant "Add to pipeline" that would just create a duplicate.
-  const dueRowIds = useMemo(() => new Set(dueYouth.flatMap(d => d.existingIds)), [dueYouth]);
-
-  const addDueToPipeline = (d: DueEntry) => {
-    create({
-      member: d.name, type_of_interview: d.type, status: 'Unassigned', assigned_to: '',
-      date_recommend_expires: '', last_interview_datetime: '', next_interview_date: '', comments: '', notes: '',
-    });
-  };
-
-  const dismissDue = (d: DueEntry) => {
-    setDismissedDue(prev => new Set(prev).add(`${d.name.toLowerCase()}|${d.type}`));
-  };
+  const agedOutYouthCount = useMemo(() =>
+    wardMembersLoading ? 0 : rows.filter(r => YOUTH_TYPES.has(r.type_of_interview) && r.ward_member_id && !activeYouthWardMemberIds.has(r.ward_member_id)).length,
+    [rows, activeYouthWardMemberIds, wardMembersLoading]);
 
   const grouped = useMemo(() => {
-    const map = new Map<string, InterviewType[]>();
-    for (const type of INTERVIEW_TYPES) map.set(type, []);
-    for (const r of filtered) {
-      const t = r.type_of_interview || 'Other';
-      if (!map.has(t)) map.set(t, []);
-      map.get(t)!.push(r);
+    const youthRows: InterviewType[] = [];
+    const otherMap = new Map<string, InterviewType[]>();
+    for (const type of INTERVIEW_TYPES) {
+      if (!YOUTH_TYPES.has(type)) otherMap.set(type, []);
     }
-    return [...map.entries()].filter(([, rows]) => rows.length > 0);
-  }, [filtered]);
+    for (const r of filtered) {
+      if (YOUTH_TYPES.has(r.type_of_interview)) {
+        // While ward-members is still loading, don't hide anyone — activeYouthWardMemberIds
+        // would otherwise be empty and every linked row would flash as "aged-out".
+        const isCurrentYouth = wardMembersLoading || !r.ward_member_id || activeYouthWardMemberIds.has(r.ward_member_id);
+        if (isCurrentYouth || showAgedOutYouth) youthRows.push(r);
+        continue;
+      }
+      const t = r.type_of_interview || 'Other';
+      if (!otherMap.has(t)) otherMap.set(t, []);
+      otherMap.get(t)!.push(r);
+    }
+    const entries: [string, InterviewType[]][] = [];
+    if (youthRows.length > 0) entries.push(['Youth Interviews', youthRows]);
+    entries.push(...[...otherMap.entries()].filter(([, r]) => r.length > 0));
+    return entries;
+  }, [filtered, activeYouthWardMemberIds, showAgedOutYouth, wardMembersLoading]);
+
+  const editingLinkedMember = editing?.ward_member_id ? wardMembersById.get(editing.ward_member_id) : undefined;
+  const editingAge = editingLinkedMember?.birth_date
+    ? computeYouthAge(editingLinkedMember.birth_date)
+    : (editing?.member ? ageByName.get(editing.member.trim().toLowerCase()) ?? null : null);
+  const editingIsManagedYouth = !!editing && !!editing.ward_member_id && YOUTH_TYPES.has(editing.type_of_interview || '')
+    && editingAge !== null && activeYouthWardMemberIds.has(editing.ward_member_id);
+  const editingYouthState = editingIsManagedYouth && editing && editingAge !== null ? computeYouthState(editing, editingAge) : null;
+  const showLinkPicker = !!editing && !editing.ward_member_id && YOUTH_TYPES.has(editing.type_of_interview || '');
 
   return (
     <div>
@@ -346,7 +408,10 @@ export default function InterviewPipeline() {
           + New Interview
         </button>
       </div>
-      <p className="text-sm text-gray-500 mb-4">Bishop and counselor interviews — temple recommends, annual interviews, mission prep, and more.</p>
+      <p className="text-sm text-gray-500 mb-4">
+        Bishop and counselor interviews — temple recommends, annual interviews, mission prep, and more.
+        Youth interviews are kept in sync with the ward roster automatically; their status is computed from the interview dates rather than set by hand.
+      </p>
 
       <div className="flex flex-col sm:flex-row gap-2 mb-2">
         <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Search member..."
@@ -369,7 +434,7 @@ export default function InterviewPipeline() {
       </div>
 
       {selected.size > 0 && (
-        <div className="flex items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-md px-3 py-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-md px-3 py-2 text-sm">
           <span className="text-blue-700 font-medium">{selected.size} selected</span>
           <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)}
             className="rounded border border-blue-300 px-2 py-1 text-sm bg-white">
@@ -378,34 +443,12 @@ export default function InterviewPipeline() {
           </select>
           <button onClick={handleBulkStatus} disabled={!bulkStatus}
             className="px-3 py-1 bg-blue-600 text-white rounded text-sm disabled:opacity-40 hover:bg-blue-700">Apply</button>
+          <span className="text-blue-300">|</span>
+          <input value={bulkAssignedTo} onChange={e => setBulkAssignedTo(e.target.value)} placeholder="Assign to…"
+            className="rounded border border-blue-300 px-2 py-1 text-sm bg-white w-36" />
+          <button onClick={handleBulkAssign} disabled={!bulkAssignedTo.trim()}
+            className="px-3 py-1 bg-blue-600 text-white rounded text-sm disabled:opacity-40 hover:bg-blue-700">Assign</button>
           <button onClick={() => setSelected(new Set())} className="ml-auto text-blue-500 hover:text-blue-700">Clear</button>
-        </div>
-      )}
-
-      {dueYouth.length > 0 && (
-        <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 mb-4">
-          <h2 className="text-sm font-semibold text-rose-800 mb-1">Youth Interviews Due ({dueYouth.length})</h2>
-          <p className="text-xs text-rose-700 mb-2">
-            Ages 12–15 are due for an annual interview; ages 16–17 are due for a semiannual interview. Computed from birth dates on Ward Members.
-            Names already in the pipeline are flagged with an <span className="inline-block text-[10px] px-1.5 py-0.5 rounded-full bg-rose-600 text-white align-middle">Interview due</span> tag on their row below instead of a duplicate "Add" button.
-          </p>
-          <div className="space-y-1.5">
-            {dueYouth.map(d => (
-              <div key={`${d.name}|${d.type}`} className="flex items-center justify-between bg-white rounded-md px-3 py-2 border border-rose-100">
-                <span className="text-sm text-gray-800">
-                  {d.name} <span className="text-gray-400">— {d.type} (age {d.age}){d.lastInterview ? `, last: ${d.lastInterview.slice(0, 10)}` : ', no interview on record'}</span>
-                </span>
-                <div className="flex items-center gap-2">
-                  {d.existingIds.length === 0 ? (
-                    <button onClick={() => addDueToPipeline(d)} className="text-xs px-2 py-1 rounded bg-rose-600 text-white hover:bg-rose-700">Add to pipeline</button>
-                  ) : (
-                    <span className="text-xs text-rose-700 italic">Already tracked — see flagged row below</span>
-                  )}
-                  <button onClick={() => dismissDue(d)} className="text-xs px-2 py-1 rounded text-gray-500 hover:bg-gray-100">Dismiss</button>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 
@@ -414,7 +457,7 @@ export default function InterviewPipeline() {
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-yellow-50 border border-yellow-300 inline-block" />Expires within 2 months</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-orange-100 border border-orange-300 inline-block" />Expired within 1 month</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-100 border border-red-300 inline-block" />Expired over 1 month ago</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-rose-50 border border-rose-300 inline-block" />Interview overdue</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-rose-50 border border-rose-300 inline-block" />Interview overdue/due</span>
       </div>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
@@ -424,10 +467,17 @@ export default function InterviewPipeline() {
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
                 {type}
                 <span className="text-gray-400 font-normal normal-case tracking-normal">({typeRows.length})</span>
+                {type === 'Youth Interviews' && agedOutYouthCount > 0 && (
+                  <button onClick={() => setShowAgedOutYouth(s => !s)}
+                    className="ml-auto text-xs text-gray-400 hover:text-gray-600 normal-case tracking-normal font-normal">
+                    {showAgedOutYouth ? 'Hide' : 'Show'} aged-out/inactive ({agedOutYouthCount})
+                  </button>
+                )}
               </h2>
               <InterviewTable rows={typeRows} onEdit={setEditing} onDelete={remove}
-                ageMap={YOUTH_TYPES.has(type) ? ageMap : undefined}
-                selected={selected} onToggleSelect={toggleSelect} dueRowIds={dueRowIds} />
+                showAge={type === 'Youth Interviews'}
+                rowMetaById={rowMetaById}
+                selected={selected} onToggleSelect={toggleSelect} />
             </div>
           ))}
           {grouped.length === 0 && <p className="text-gray-400 text-sm text-center py-8">No interviews found</p>}
@@ -437,21 +487,67 @@ export default function InterviewPipeline() {
       <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit Interview' : 'New Interview'}>
         {editing && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
-            <Input label="Member" value={editing.member || ''} onChange={v => setEditing({ ...editing, member: v })} required />
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type of Interview</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Member</label>
               <input
-                list="interview-type-options"
-                value={editing.type_of_interview || ''}
-                onChange={e => setEditing({ ...editing, type_of_interview: e.target.value })}
-                placeholder="Select or type a new type…"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                value={editing.member || ''}
+                onChange={e => setEditing({ ...editing, member: e.target.value })}
+                required
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
-              <datalist id="interview-type-options">
-                {INTERVIEW_TYPES.map(t => <option key={t} value={t} />)}
-              </datalist>
+              {editingLinkedMember && (
+                <p className="text-xs text-gray-400 mt-1">Linked to Ward Members — saving here updates their name on the ward roster.</p>
+              )}
             </div>
-            <Select label="Status" value={editing.status || ''} onChange={v => setEditing({ ...editing, status: v })} options={INTERVIEW_STATUSES} />
+
+            {showLinkPicker && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Link to Ward Member (optional)</label>
+                <input
+                  list="ward-member-link-options"
+                  placeholder="Start typing a name…"
+                  onChange={e => {
+                    const match = wardMembers.find(wm => wm.name === e.target.value);
+                    if (match) setEditing({ ...editing, ward_member_id: match.id, member: match.name });
+                  }}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <datalist id="ward-member-link-options">
+                  {wardMembers.map(wm => <option key={wm.id} value={wm.name} />)}
+                </datalist>
+              </div>
+            )}
+
+            {editingIsManagedYouth ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type of Interview</label>
+                <p className="text-sm text-gray-600">{editing.type_of_interview} <span className="text-xs text-gray-400">(auto-managed by age)</span></p>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type of Interview</label>
+                <input
+                  list="interview-type-options"
+                  value={editing.type_of_interview || ''}
+                  onChange={e => setEditing({ ...editing, type_of_interview: e.target.value })}
+                  placeholder="Select or type a new type…"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <datalist id="interview-type-options">
+                  {(editing.id ? INTERVIEW_TYPES : INTERVIEW_TYPES.filter(t => !YOUTH_TYPES.has(t))).map(t => <option key={t} value={t} />)}
+                </datalist>
+              </div>
+            )}
+
+            {editingIsManagedYouth ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <div className="mt-1"><StatusBadge status={editingYouthState!} colors={YOUTH_STATE_COLORS} /></div>
+                <p className="text-xs text-gray-400 mt-1">Computed automatically from Next/Last Interview Date below.</p>
+              </div>
+            ) : (
+              <Select label="Status" value={editing.status || ''} onChange={v => setEditing({ ...editing, status: v })} options={INTERVIEW_STATUSES} />
+            )}
             <Input label="Assigned To" value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} />
             <Input label="Date Recommend Expires" value={(editing.date_recommend_expires || '').slice(0, 10)} onChange={v => setEditing({ ...editing, date_recommend_expires: v })} type="date" />
             <Input label="Next Interview Date" value={(editing.next_interview_date || '').slice(0, 10)} onChange={v => setEditing({ ...editing, next_interview_date: v })} type="date" />

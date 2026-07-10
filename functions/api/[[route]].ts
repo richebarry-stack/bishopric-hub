@@ -69,6 +69,10 @@ async function checkConflict(db: D1Database, tableName: string, recordId: string
   return null;
 }
 
+function isUniqueConstraintError(e: unknown): boolean {
+  return e instanceof Error && /UNIQUE constraint failed/i.test(e.message);
+}
+
 // Legacy unsalted SHA-256 — kept only to recognize old password/security-answer hashes
 // so they can be transparently upgraded to PBKDF2 the next time they're verified.
 async function hashPassword(password: string): Promise<string> {
@@ -1082,9 +1086,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const placeholders = keys.map(() => '?').join(', ');
     const values = keys.map(k => body[k]);
 
-    const result = await db.prepare(
-      `INSERT INTO ${tableConfig.name} (${keys.join(', ')}) VALUES (${placeholders})`
-    ).bind(...values).run();
+    let result;
+    try {
+      result = await db.prepare(
+        `INSERT INTO ${tableConfig.name} (${keys.join(', ')}) VALUES (${placeholders})`
+      ).bind(...values).run();
+    } catch (e) {
+      if (isUniqueConstraintError(e)) return json({ error: 'A record already exists for this person — edit the existing one instead.' }, 409);
+      throw e;
+    }
 
     const newRow = await db.prepare(
       `SELECT * FROM ${tableConfig.name} WHERE id = ?`
@@ -1110,9 +1120,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const setClause = keys.map(k => `${k} = ?`).join(', ');
     const values = keys.map(k => body[k]);
 
-    await db.prepare(
-      `UPDATE ${tableConfig.name} SET ${setClause} WHERE id = ?`
-    ).bind(...values, recordId).run();
+    try {
+      await db.prepare(
+        `UPDATE ${tableConfig.name} SET ${setClause} WHERE id = ?`
+      ).bind(...values, recordId).run();
+    } catch (e) {
+      if (isUniqueConstraintError(e)) return json({ error: 'A record already exists for this person — edit the existing one instead.' }, 409);
+      throw e;
+    }
 
     const updated = await db.prepare(
       `SELECT * FROM ${tableConfig.name} WHERE id = ?`

@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 import { SECURITY_QUESTIONS } from '../lib/constants';
 import { usePresence, type PresenceUser } from '../lib/usePresence';
+import { useMyActionItems } from '../lib/myActions';
 
 export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?: boolean }[] = [
   { path: '/', label: 'Dashboard', icon: '⌂' },
@@ -377,6 +378,15 @@ function PresenceBanner({ others, path }: { others: PresenceUser[]; path: string
   );
 }
 
+function MyActionsBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-semibold">
+      {count}
+    </span>
+  );
+}
+
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showChangePw, setShowChangePw] = useState(false);
@@ -387,6 +397,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const { user, logout, selectedHub, chooseHub, isGuest, guestType } = useAuth();
   const othersOnline = usePresence(location.pathname, !isGuest);
+  const { count: myActionsCount } = useMyActionItems();
 
   const HUB_DEFAULT: Record<string, string> = {
     yc: '/youth-activities',
@@ -539,6 +550,17 @@ export default function Layout() {
                 <i className="ti ti-home text-base w-4 text-center" aria-hidden="true" />
                 {getLabel(BH_DASHBOARD_ITEM)}
               </Link>
+              <Link
+                to="/my-actions"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors mb-1 ${
+                  location.pathname === '/my-actions' ? activeCls : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <i className="ti ti-bolt text-base w-4 text-center" aria-hidden="true" />
+                My Actions
+                <MyActionsBadge count={myActionsCount} />
+              </Link>
               {BH_NAV_CATEGORIES.map(cat => (
                 <div key={cat.label} className="mt-3">
                   <p className="px-3 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 select-none">
@@ -573,6 +595,17 @@ export default function Layout() {
               >
                 <span className="w-4 text-center">{WC_DASHBOARD_ITEM.icon}</span>
                 {getLabel(WC_DASHBOARD_ITEM)}
+              </Link>
+              <Link
+                to="/my-actions"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors mb-1 ${
+                  location.pathname === '/my-actions' ? activeCls : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <span className="w-4 text-center">⚡</span>
+                My Actions
+                <MyActionsBadge count={myActionsCount} />
               </Link>
               {WC_NAV_CATEGORIES.map(cat => (
                 <div key={cat.label} className="mt-3">

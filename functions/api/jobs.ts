@@ -107,6 +107,84 @@ export async function cleanupPresence(db: D1Database): Promise<JobResult> {
   return { ok: true, deleted: result.meta.changes ?? 0 };
 }
 
+// Duplicated from the frontend's computeAge/computeYouthAge in
+// src/pages/InterviewPipeline.tsx (pure date math, same reasoning as the
+// hub/calling constants already duplicated server-side in functions/api/[[route]].ts).
+function computeAge(birthDate: string, asOf: Date): number {
+  const bd = new Date(birthDate.slice(0, 10) + 'T12:00:00');
+  let age = asOf.getFullYear() - bd.getFullYear();
+  const m = asOf.getMonth() - bd.getMonth();
+  if (m < 0 || (m === 0 && asOf.getDate() < bd.getDate())) age--;
+  return age;
+}
+
+// Youth eligibility ends September 1 of the year they turn 18.
+function computeYouthAge(birthDate: string, now: Date): number | null {
+  const bd = new Date(birthDate.slice(0, 10) + 'T12:00:00');
+  const ageOutDate = new Date(bd.getFullYear() + 18, 8, 1);
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  if (today >= ageOutDate) return null;
+  return computeAge(birthDate, now);
+}
+
+/** Ensures every active youth (ages 12-17) has exactly one linked interview_pipeline
+ * row, bucketed into 'Annual Youth' (12-15) or 'Semi-Annual Youth' (16-17), correcting
+ * the type as they age. Adopts a matching unlinked legacy row by name if one exists,
+ * otherwise creates a new one. Never touches status/dates/assigned_to on existing rows. */
+export async function syncYouthInterviews(db: D1Database): Promise<JobResult> {
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  const membersResult = await db.prepare(
+    "SELECT id, name, birth_date FROM ward_members WHERE active = 1 AND birth_date IS NOT NULL AND birth_date != ''"
+  ).all<{ id: number; name: string; birth_date: string }>();
+
+  const existingResult = await db.prepare(
+    "SELECT id, ward_member_id, member, type_of_interview FROM interview_pipeline WHERE type_of_interview IN ('Annual Youth', 'Semi-Annual Youth')"
+  ).all<{ id: number; ward_member_id: number | null; member: string; type_of_interview: string }>();
+
+  const linkedByWardMemberId = new Map<number, { id: number; type_of_interview: string; member: string }>();
+  const unlinkedByName = new Map<string, { id: number }>();
+  for (const row of existingResult.results) {
+    if (row.ward_member_id) linkedByWardMemberId.set(row.ward_member_id, { id: row.id, type_of_interview: row.type_of_interview, member: row.member });
+    else unlinkedByName.set(row.member.trim().toLowerCase(), { id: row.id });
+  }
+
+  const stmts: D1PreparedStatement[] = [];
+  let created = 0, updated = 0, linked = 0;
+
+  for (const wm of membersResult.results) {
+    const age = computeYouthAge(wm.birth_date, now);
+    if (age === null || age < 12) continue;
+    const type = age >= 16 ? 'Semi-Annual Youth' : 'Annual Youth';
+
+    const linkedRow = linkedByWardMemberId.get(wm.id);
+    if (linkedRow) {
+      if (linkedRow.type_of_interview !== type || linkedRow.member !== wm.name) {
+        stmts.push(db.prepare('UPDATE interview_pipeline SET type_of_interview = ?, member = ?, updated_at = ? WHERE id = ?').bind(type, wm.name, nowIso, linkedRow.id));
+        updated++;
+      }
+      continue;
+    }
+
+    const unlinkedRow = unlinkedByName.get(wm.name.trim().toLowerCase());
+    if (unlinkedRow) {
+      stmts.push(db.prepare('UPDATE interview_pipeline SET ward_member_id = ?, type_of_interview = ?, updated_at = ? WHERE id = ?').bind(wm.id, type, nowIso, unlinkedRow.id));
+      linked++;
+      continue;
+    }
+
+    stmts.push(db.prepare(
+      'INSERT INTO interview_pipeline (member, type_of_interview, status, ward_member_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(wm.name, type, 'Unassigned', wm.id, nowIso, nowIso));
+    created++;
+  }
+
+  if (stmts.length > 0) await db.batch(stmts);
+  return { ok: true, created, updated, linked };
+}
+
 export async function runDailyJobs(db: D1Database): Promise<Record<string, JobResult>> {
   const todayStr = new Date().toISOString().slice(0, 10);
   const results: Record<string, JobResult> = {};
@@ -122,6 +200,9 @@ export async function runDailyJobs(db: D1Database): Promise<Record<string, JobRe
 
   try { results.cleanupPresence = await cleanupPresence(db); }
   catch (e) { results.cleanupPresence = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+
+  try { results.syncYouthInterviews = await syncYouthInterviews(db); }
+  catch (e) { results.syncYouthInterviews = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 
   return results;
 }

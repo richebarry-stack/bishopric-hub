@@ -13,6 +13,7 @@ interface WardMember {
   exclude_prayers: number;
   birth_date: string | null;
   gender: string | null;
+  preferred_name: string | null;
   updated_at: string;
 }
 
@@ -63,6 +64,28 @@ function BirthDateCell({ member, onSave }: { member: WardMember; onSave: (v: str
   );
 }
 
+function PreferredNameCell({ member, onSave }: { member: WardMember; onSave: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  if (editing) {
+    return (
+      <input
+        type="text"
+        autoFocus
+        defaultValue={member.preferred_name || ''}
+        onBlur={e => { setEditing(false); if (e.target.value !== (member.preferred_name || '')) onSave(e.target.value.trim()); }}
+        onKeyDown={e => { if (e.key === 'Escape') setEditing(false); if (e.key === 'Enter') e.currentTarget.blur(); }}
+        className="text-xs rounded border border-gray-300 px-1.5 py-0.5 w-full"
+      />
+    );
+  }
+  return (
+    <button type="button" onClick={() => setEditing(true)}
+      className="text-xs text-gray-500 hover:text-blue-600 hover:underline" aria-label={`Edit preferred name for ${member.name}`}>
+      {member.preferred_name || <span className="text-gray-300">—</span>}
+    </button>
+  );
+}
+
 function GenderCell({ member, onSave }: { member: WardMember; onSave: (v: string) => void }) {
   return (
     <select
@@ -85,7 +108,7 @@ interface GroupedRows {
   unknown: WardMember[];
 }
 
-function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender }: {
+function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSavePreferredName }: {
   title: string;
   members: WardMember[];
   onToggleActive: (m: WardMember) => void;
@@ -93,6 +116,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
   onToggleExclude: (m: WardMember, field: 'exclude_speakers' | 'exclude_prayers') => void;
   onSaveBirthDate: (m: WardMember, v: string) => void;
   onSaveGender: (m: WardMember, v: string) => void;
+  onSavePreferredName: (m: WardMember, v: string) => void;
 }) {
   if (members.length === 0) return null;
   return (
@@ -105,6 +129,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
               <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
+              <th className="text-left px-4 py-2 font-medium text-gray-600 w-28">Preferred Name</th>
               <th className="text-left px-4 py-2 font-medium text-gray-600 w-28">Birth Date</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-16">Gender</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-24">Status</th>
@@ -119,6 +144,9 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                 <td className="px-4 py-2 font-medium text-gray-900">
                   {m.name}
                   <AgeTag birthDate={m.birth_date} />
+                </td>
+                <td className="px-4 py-2">
+                  <PreferredNameCell member={m} onSave={v => onSavePreferredName(m, v)} />
                 </td>
                 <td className="px-4 py-2">
                   <BirthDateCell member={m} onSave={v => onSaveBirthDate(m, v)} />
@@ -237,12 +265,16 @@ export default function WardMembers() {
     update(m.id, { gender: v } as unknown as Record<string, unknown>);
   }, [update]);
 
+  const savePreferredName = useCallback((m: WardMember, v: string) => {
+    update(m.id, { preferred_name: v } as unknown as Record<string, unknown>);
+  }, [update]);
+
   const confirm = useConfirm();
   const handleDelete = useCallback(async (m: WardMember) => {
     if (await confirm({ message: `Permanently delete ${m.name}? This cannot be undone.` })) remove(m.id);
   }, [remove, confirm]);
 
-  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude, onSaveBirthDate: saveBirthDate, onSaveGender: saveGender };
+  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude, onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSavePreferredName: savePreferredName };
 
   return (
     <div>

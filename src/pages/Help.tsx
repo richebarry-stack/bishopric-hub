@@ -89,6 +89,15 @@ const WC_SECTIONS: Section[] = [
     ),
   },
   {
+    title: 'My Actions',
+    icon: '⚡',
+    content: (
+      <div className="space-y-2">
+        <p>A personal page gathering everything currently assigned to you — action items, an upcoming prayer or speaking assignment, and more. The sidebar link shows a red count badge whenever something needs your attention.</p>
+      </div>
+    ),
+  },
+  {
     title: 'WC Meeting Assignments',
     icon: '▦',
     content: (
@@ -193,6 +202,16 @@ const FULL_SECTIONS: Section[] = [
     ),
   },
   {
+    title: 'My Actions',
+    icon: '⚡',
+    content: (
+      <div className="space-y-2">
+        <p>A personal page gathering everything currently assigned to you — action items, a calling you need to extend, an interview you need to conduct, an upcoming prayer or speaking assignment, and more.</p>
+        <p>The <strong>My Actions</strong> link in the sidebar shows a red count badge whenever something needs your attention, so you don't have to open the page to know. Click it to see the details and jump straight to the relevant page.</p>
+      </div>
+    ),
+  },
+  {
     title: 'Current Sacrament Meeting',
     icon: '♫',
     content: (
@@ -241,9 +260,10 @@ const FULL_SECTIONS: Section[] = [
     icon: '◎',
     content: (
       <div className="space-y-2">
-        <p>Track bishop and counselor interviews — youth temple recommends, annual interviews, mission prep interviews, and others.</p>
+        <p>Track bishop and counselor interviews — youth interviews, temple recommends, mission prep interviews, calling interviews, and others.</p>
         <p>Record the interview type, current status, assigned interviewer, last interview date, and next scheduled date.</p>
-        <p>A <strong>Youth Interviews Due</strong> box appears automatically when youth (ages 12–17, from birth dates on Ward Members) are due for their annual or semiannual interview. For youth not yet in the pipeline, click <strong>Add to pipeline</strong> to start tracking one; for youth already tracked whose interview has lapsed, look for the <strong>Interview due</strong> tag on their row in the table below instead. <strong>Dismiss</strong> hides an entry from the box for now.</p>
+        <p><strong>Youth Interviews</strong> are handled automatically: every active youth (ages 12–17) is kept in a single "Youth Interviews" section, added and re-bucketed between Annual (12–15) and Semi-Annual (16–17) as they have birthdays — no manual entry needed. Their status isn't set by hand; it's computed from the dates you enter: <strong>Scheduled</strong> (a future Next Interview Date is set), <strong>Up to date</strong> (interviewed within the last 12/6 months), or <strong>Due</strong> (neither). Members who age out or become inactive drop out of the default view — use "Show aged-out/inactive" to see them.</p>
+        <p>Editing a linked youth's name here also corrects it on Ward Members (their "ward directory" name). Names shown use each person's preferred name if one is set on Ward Members.</p>
       </div>
     ),
   },
@@ -496,14 +516,15 @@ export default function Help() {
                 'Fixed: a user\'s "Last Access" on the Users page could lag a day behind if they had logged in less than 24 hours after their previous visit — it now updates as soon as they access the app on a new calendar day (in the ward\'s configured time zone).',
                 'Admins can set the ward\'s time zone on the Automation & Notifications page — used to determine calendar-day boundaries like the one above.',
                 'Added an Ordinances page tracking baptisms and Aaronic Priesthood advancement, with suggested candidates computed automatically from birth dates (and a new Gender field) on Ward Members.',
-                'Interview Pipeline now shows a "Youth Interviews Due" box for youth overdue for their annual or semiannual interview, computed from Ward Members birth dates.',
-                'Fixed: "Add to pipeline" on a Youth Interviews Due entry could appear to do nothing for youth already tracked in the pipeline — it was silently creating a duplicate row instead. "Add to pipeline" now only appears for youth with no pipeline entry yet; anyone already tracked whose interview has lapsed is flagged with an "Interview due" tag directly on their existing row in the table below.',
                 'Added an Annual Duties page (tithing declaration, ward conference, annual budget, and similar) with a Dashboard panel showing what\'s due; window months are editable per duty.',
                 'Added a Youth Council Meetings page (agenda and notes), available to both the Bishopric and Youth Council hubs.',
                 'Ward Members: added an editable Gender field, used to suggest Aaronic Priesthood advancement candidates.',
                 'Security: security question answers now use the same strong hashing as passwords (existing answers upgrade automatically the next time they\'re used to reset a password).',
                 'Removed two unused legacy pages (Prayer List, an older Member Needs variant) that were no longer reachable from any menu.',
                 'Added short descriptions under several page titles, and friendlier "nothing here yet" messages on a few pages that previously showed an empty table.',
+                'Interview Pipeline: reworked youth interview tracking — Annual and Semi-Annual Youth are now one merged, roster-linked "Youth Interviews" section instead of two separate lists; every active youth is added automatically (no more manual entry, and no more duplicate rows), and their status is now computed from the interview dates (Scheduled / Up to date / Due) instead of set by hand. Editing a linked youth\'s name updates their name on Ward Members directly. Removed the old "Youth Interviews Due" box now that the table itself always reflects who\'s current.',
+                'Added a Preferred Name field on Ward Members. When set, it\'s shown instead of the legal name on Interview Pipeline and My Actions; Ward Members itself always shows the legal name.',
+                'Added a "My Actions" page — everything currently assigned to you (action items, a calling to extend, an interview to conduct, an upcoming prayer or speaking assignment, and more) in one place, with a red count badge on its sidebar link so you know at a glance whether anything needs your attention.',
               ],
             },
             {

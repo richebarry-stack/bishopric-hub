@@ -41,6 +41,7 @@ const HubSuggestions = lazyWithReload(() => import('./pages/HubSuggestions'));
 const Ordinances = lazyWithReload(() => import('./pages/Ordinances'));
 const AnnualDuties = lazyWithReload(() => import('./pages/AnnualDuties'));
 const YcMeetings = lazyWithReload(() => import('./pages/YcMeetings'));
+const MyActions = lazyWithReload(() => import('./pages/MyActions'));
 
 const FullScreenLoading = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -55,7 +56,7 @@ const queryClient = new QueryClient({
 function WcGuard({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const wcPaths = [
-    '/', '/wc-meetings', '/wc-wins', '/wc-family-needs', '/wc-discussion-topics',
+    '/', '/my-actions', '/wc-meetings', '/wc-wins', '/wc-family-needs', '/wc-discussion-topics',
     '/current-sacrament', '/calendaring',
     '/babies', '/youth-activities', '/tasks', '/wc-members', '/hub-suggestions', '/help',
   ];
@@ -133,6 +134,7 @@ function AppRoutes() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<WcDashboard />} />
+          <Route path="/my-actions" element={<MyActions />} />
           <Route path="/wc-meetings" element={<WcMeetings />} />
           <Route path="/wc-wins" element={<WcWins />} />
           <Route path="/wc-family-needs" element={<MemberNeeds />} />
@@ -156,6 +158,7 @@ function AppRoutes() {
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/my-actions" element={<MyActions />} />
         <Route path="/calling-pipeline" element={<CallingPipeline />} />
         <Route path="/interview-pipeline" element={<InterviewPipeline />} />
         <Route path="/tasks" element={<Tasks />} />
