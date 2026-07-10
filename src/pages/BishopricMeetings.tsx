@@ -131,6 +131,7 @@ export default function BishopricMeetings() {
           + New Meeting
         </button>
       </div>
+      <p className="text-sm text-gray-500 mb-4">Agenda and minutes for weekly bishopric meetings.</p>
 
       {/* Month navigation */}
       <div className="flex items-center gap-2 mb-4">

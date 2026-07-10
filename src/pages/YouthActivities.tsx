@@ -571,6 +571,7 @@ export default function YouthActivities() {
           </button>
         )}
       </div>
+      <p className="text-sm text-gray-500">Activity dates, times, and locations for each youth organization.</p>
 
       <div className="flex gap-1 flex-wrap border-b border-gray-200 pb-px">
         {VIEW_TABS.map(t => (

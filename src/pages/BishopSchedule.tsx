@@ -363,7 +363,7 @@ export default function BishopSchedule() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-gray-900">Bishop Schedule</h1>
         <div className="flex items-center gap-2">
           <button onClick={goToday} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50">Today</button>
@@ -395,6 +395,7 @@ export default function BishopSchedule() {
           </div>
         </div>
       </div>
+      <p className="text-sm text-gray-500 mb-4">The bishop's individual appointments, separate from bishopric meetings.</p>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-auto max-h-[calc(100vh-10rem)]"

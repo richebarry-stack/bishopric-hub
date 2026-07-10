@@ -130,6 +130,7 @@ export default function Calendaring() {
         <h1 className="text-2xl font-bold text-gray-900">Calendar Events</h1>
         {!isWcReadOnly && <button onClick={() => setEditing({ ...EMPTY })} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>}
       </div>
+      <p className="text-sm text-gray-500 mb-4">Ward events — flag "Announce in sacrament" for items that need a pulpit mention.</p>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div className="space-y-8">

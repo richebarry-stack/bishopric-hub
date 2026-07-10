@@ -73,6 +73,7 @@ export const WC_NAV_CATEGORIES: { label: string; items: { path: string; label: s
 
 export const YC_NAV_ITEMS = [
   { path: '/youth-activities', label: 'Youth Calendar', icon: '⬡' },
+  { path: '/yc-meetings', label: 'Youth Council Meetings', icon: '▦' },
   { path: '/help', label: 'Help', icon: '?' },
 ];
 
@@ -106,6 +107,7 @@ export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: s
     items: [
       { path: '/calling-pipeline',     label: 'Calling Pipeline',    icon: 'ti-user-check'      },
       { path: '/interview-pipeline',   label: 'Interview Pipeline',  icon: 'ti-clipboard-list'  },
+      { path: '/ordinances',           label: 'Ordinances',          icon: 'ti-droplet'         },
       { path: '/member-needs',         label: 'Member Needs',        icon: 'ti-heart'           },
       { path: '/missionary-pipeline',  label: 'Missionary Pipeline', icon: 'ti-compass'         },
       { path: '/babies',               label: 'Babies',              icon: 'ti-baby-carriage'   },
@@ -116,12 +118,14 @@ export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: s
     items: [
       { path: '/calendaring',          label: 'Calendar Events',  icon: 'ti-calendar-event' },
       { path: '/youth-activities',     label: 'Youth Activities', icon: 'ti-run'            },
+      { path: '/yc-meetings',          label: 'Youth Council Meetings', icon: 'ti-users-group' },
     ],
   },
   {
     label: 'Administration',
     items: [
       { path: '/ward-members',         label: 'Ward Members',        icon: 'ti-address-book'              },
+      { path: '/annual-duties',        label: 'Annual Duties',       icon: 'ti-calendar-stats'            },
       { path: '/users',                label: 'Users',               icon: 'ti-user-cog'                  },
       { path: '/email-notifications',  label: 'Automation & Notifications', icon: 'ti-mail', adminOnly: true },
       { path: '/important-links',      label: 'Important Links',     icon: 'ti-link'                      },
@@ -456,7 +460,7 @@ export default function Layout() {
   const ycNavItems = isGuest
     ? (guestType === 'sac'
         ? [{ path: '/sacrament-program', label: 'Sacrament Program', icon: '♫' }]
-        : [{ path: '/youth-activities', label: 'Youth Calendar', icon: '⬡' }])
+        : [{ path: '/youth-activities', label: 'Youth Calendar', icon: '⬡' }, { path: '/yc-meetings', label: 'Youth Council Meetings', icon: '▦' }])
     : YC_NAV_ITEMS;
 
   const navItems = isCal

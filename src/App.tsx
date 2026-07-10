@@ -38,6 +38,9 @@ const WcMeetings = lazyWithReload(() => import('./pages/WcMeetings'));
 const WcWins = lazyWithReload(() => import('./pages/WcWins'));
 const WcDiscussionTopics = lazyWithReload(() => import('./pages/WcDiscussionTopics'));
 const HubSuggestions = lazyWithReload(() => import('./pages/HubSuggestions'));
+const Ordinances = lazyWithReload(() => import('./pages/Ordinances'));
+const AnnualDuties = lazyWithReload(() => import('./pages/AnnualDuties'));
+const YcMeetings = lazyWithReload(() => import('./pages/YcMeetings'));
 
 const FullScreenLoading = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -115,6 +118,7 @@ function AppRoutes() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/youth-activities" element={<YouthActivities />} />
+          <Route path="/yc-meetings" element={<YcMeetings />} />
           {!isYcGuest && <Route path="/help" element={<Help />} />}
           <Route path="*" element={<Navigate to="/youth-activities" replace />} />
         </Route>
@@ -171,6 +175,9 @@ function AppRoutes() {
         <Route path="/youth-activities" element={<YouthActivities />} />
         <Route path="/speakers-and-prayers" element={<SpeakersAndPrayers />} />
         <Route path="/ward-members" element={<WardMembers />} />
+        <Route path="/ordinances" element={<Ordinances />} />
+        <Route path="/annual-duties" element={<AnnualDuties />} />
+        <Route path="/yc-meetings" element={<YcMeetings />} />
         <Route path="/hub-suggestions" element={<HubSuggestions />} />
         <Route path="/help" element={<Help />} />
         <Route path="*" element={<Navigate to="/" replace />} />

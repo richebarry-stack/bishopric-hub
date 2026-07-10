@@ -12,6 +12,7 @@ interface WardMember {
   exclude_speakers: number;
   exclude_prayers: number;
   birth_date: string | null;
+  gender: string | null;
   updated_at: string;
 }
 
@@ -62,6 +63,21 @@ function BirthDateCell({ member, onSave }: { member: WardMember; onSave: (v: str
   );
 }
 
+function GenderCell({ member, onSave }: { member: WardMember; onSave: (v: string) => void }) {
+  return (
+    <select
+      value={member.gender || ''}
+      onChange={e => onSave(e.target.value)}
+      aria-label={`Gender for ${member.name}`}
+      className="text-xs rounded border border-gray-200 px-1.5 py-0.5 bg-transparent hover:border-gray-300"
+    >
+      <option value="">—</option>
+      <option value="M">M</option>
+      <option value="F">F</option>
+    </select>
+  );
+}
+
 interface GroupedRows {
   adults: WardMember[];
   youth: WardMember[];
@@ -69,13 +85,14 @@ interface GroupedRows {
   unknown: WardMember[];
 }
 
-function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate }: {
+function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender }: {
   title: string;
   members: WardMember[];
   onToggleActive: (m: WardMember) => void;
   onDelete: (m: WardMember) => void;
   onToggleExclude: (m: WardMember, field: 'exclude_speakers' | 'exclude_prayers') => void;
   onSaveBirthDate: (m: WardMember, v: string) => void;
+  onSaveGender: (m: WardMember, v: string) => void;
 }) {
   if (members.length === 0) return null;
   return (
@@ -89,6 +106,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
             <tr className="border-b border-gray-100 bg-gray-50">
               <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
               <th className="text-left px-4 py-2 font-medium text-gray-600 w-28">Birth Date</th>
+              <th className="text-center px-4 py-2 font-medium text-gray-600 w-16">Gender</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-24">Status</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Speakers</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Prayers</th>
@@ -104,6 +122,9 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                 </td>
                 <td className="px-4 py-2">
                   <BirthDateCell member={m} onSave={v => onSaveBirthDate(m, v)} />
+                </td>
+                <td className="px-4 py-2 text-center">
+                  <GenderCell member={m} onSave={v => onSaveGender(m, v)} />
                 </td>
                 <td className="px-4 py-2 text-center">
                   {m.active ? (
@@ -212,12 +233,16 @@ export default function WardMembers() {
     update(m.id, { birth_date: v } as unknown as Record<string, unknown>);
   }, [update]);
 
+  const saveGender = useCallback((m: WardMember, v: string) => {
+    update(m.id, { gender: v } as unknown as Record<string, unknown>);
+  }, [update]);
+
   const confirm = useConfirm();
   const handleDelete = useCallback(async (m: WardMember) => {
     if (await confirm({ message: `Permanently delete ${m.name}? This cannot be undone.` })) remove(m.id);
   }, [remove, confirm]);
 
-  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude, onSaveBirthDate: saveBirthDate };
+  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude, onSaveBirthDate: saveBirthDate, onSaveGender: saveGender };
 
   return (
     <div>

@@ -98,6 +98,7 @@ export default function MissionaryPipeline() {
         <h1 className="text-2xl font-bold text-gray-900">Missionary Pipeline</h1>
         <button onClick={openNew} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>
       </div>
+      <p className="text-sm text-gray-500 mb-4">Prospective, currently serving, and recently returned missionaries.</p>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div className="space-y-6">

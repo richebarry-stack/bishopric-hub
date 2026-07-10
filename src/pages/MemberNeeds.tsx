@@ -128,6 +128,7 @@ export default function MemberNeeds() {
           + Add Need
         </button>
       </div>
+      <p className="text-sm text-gray-500 mb-4">Members with health or support needs — flag for prayer and mark resolved when addressed.</p>
       {isWcContext && (
         <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 mb-4">
           Showing needs shared with Ward Council.

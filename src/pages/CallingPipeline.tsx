@@ -216,6 +216,7 @@ export default function CallingPipeline() {
           + New Calling / Release
         </button>
       </div>
+      <p className="text-sm text-gray-500 mb-4">Track callings from initial discussion through sustaining, setting apart, and release.</p>
 
       <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Search member or calling..."

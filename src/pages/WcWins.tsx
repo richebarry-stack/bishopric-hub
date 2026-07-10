@@ -89,6 +89,7 @@ export default function WcWins() {
           + Add Win
         </button>
       </div>
+      <p className="text-sm text-gray-500">A running log of good things happening in the ward.</p>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading…</p> : (
         <>

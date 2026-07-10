@@ -162,6 +162,15 @@ const YC_SECTIONS: Section[] = [
     ),
   },
   {
+    title: 'Youth Council Meetings',
+    icon: '▦',
+    content: (
+      <div className="space-y-2">
+        <p>Agenda and notes for the ward youth council — usually meets monthly.</p>
+      </div>
+    ),
+  },
+  {
     title: 'Changing Your Password',
     icon: '⚿',
     content: <p>Use the "Change Password" link in the sidebar footer at any time.</p>,
@@ -234,6 +243,17 @@ const FULL_SECTIONS: Section[] = [
       <div className="space-y-2">
         <p>Track bishop and counselor interviews — youth temple recommends, annual interviews, mission prep interviews, and others.</p>
         <p>Record the interview type, current status, assigned interviewer, last interview date, and next scheduled date.</p>
+        <p>A <strong>Youth Interviews Due</strong> box appears automatically when youth (ages 12–17, from birth dates on Ward Members) are due for their annual or semiannual interview — click <strong>Add to pipeline</strong> to start tracking one, or <strong>Dismiss</strong> to hide it for now.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Ordinances',
+    icon: '💧',
+    content: (
+      <div className="space-y-2">
+        <p>Track baptisms and Aaronic Priesthood advancement (Deacon, Teacher, Priest) from discussion through recording.</p>
+        <p>A <strong>Suggested this year</strong> box lists children turning 8 and young men turning 12, 14, or 16 this year, computed from birth dates and gender on Ward Members — click <strong>Track</strong> to add one, or <strong>Dismiss</strong> to hide it.</p>
       </div>
     ),
   },
@@ -332,6 +352,26 @@ const FULL_SECTIONS: Section[] = [
     content: (
       <div className="space-y-2">
         <p>A list of frequently-used URLs — handbooks, tools, forms, or any resources the bishopric references often. Add a title, URL, and optional description for each link.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Annual Duties',
+    icon: '🗓',
+    content: (
+      <div className="space-y-2">
+        <p>Recurring seasonal duties — tithing declaration, ward conference, annual budget, youth camp planning, and ward history. Each has a month window (edit it to match your ward's actual schedule).</p>
+        <p>Duties are grouped into <strong>In Window Now</strong>, <strong>Upcoming</strong>, and <strong>Done This Year</strong>. Click <strong>Mark done</strong> once completed; it resets automatically the following year.</p>
+        <p>An <strong>Annual Duties Due</strong> panel on the Dashboard shows what's currently in-window and not yet done.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Youth Council Meetings',
+    icon: '▦',
+    content: (
+      <div className="space-y-2">
+        <p>Agenda and notes for the ward youth council — bishopric, quorum/class presidencies, and advisers usually meet monthly. Available to both the Bishopric and Youth Council hubs.</p>
       </div>
     ),
   },
@@ -455,6 +495,14 @@ export default function Help() {
                 'Action Items, Member Needs, Calendar Events, and Calling Pipeline now show "Last edited by [name]" in the edit form once a record has been saved by someone.',
                 'Fixed: a user\'s "Last Access" on the Users page could lag a day behind if they had logged in less than 24 hours after their previous visit — it now updates as soon as they access the app on a new calendar day (in the ward\'s configured time zone).',
                 'Admins can set the ward\'s time zone on the Automation & Notifications page — used to determine calendar-day boundaries like the one above.',
+                'Added an Ordinances page tracking baptisms and Aaronic Priesthood advancement, with suggested candidates computed automatically from birth dates (and a new Gender field) on Ward Members.',
+                'Interview Pipeline now shows a "Youth Interviews Due" box for youth overdue for their annual or semiannual interview, computed from Ward Members birth dates.',
+                'Added an Annual Duties page (tithing declaration, ward conference, annual budget, and similar) with a Dashboard panel showing what\'s due; window months are editable per duty.',
+                'Added a Youth Council Meetings page (agenda and notes), available to both the Bishopric and Youth Council hubs.',
+                'Ward Members: added an editable Gender field, used to suggest Aaronic Priesthood advancement candidates.',
+                'Security: security question answers now use the same strong hashing as passwords (existing answers upgrade automatically the next time they\'re used to reset a password).',
+                'Removed two unused legacy pages (Prayer List, an older Member Needs variant) that were no longer reachable from any menu.',
+                'Added short descriptions under several page titles, and friendlier "nothing here yet" messages on a few pages that previously showed an empty table.',
               ],
             },
             {

@@ -122,7 +122,7 @@ export default function WardCouncilMembers() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-bold text-gray-900">Ward Council Members</h1>
         {isAdmin && (
           <button onClick={() => setAdding(true)}
@@ -131,6 +131,7 @@ export default function WardCouncilMembers() {
           </button>
         )}
       </div>
+      <p className="text-sm text-gray-500 mb-6">The people with Ward Council Hub access.</p>
 
       {adding && (
         <AddMemberModal

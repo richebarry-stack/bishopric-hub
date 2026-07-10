@@ -355,6 +355,7 @@ export default function WcDiscussionTopics() {
           ⚙ Manage Categories
         </button>
       </div>
+      <p className="text-sm text-gray-500">Status, next steps, and help needed for each organization ahead of ward council.</p>
 
       {manageOpen && (
         <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">

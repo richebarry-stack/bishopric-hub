@@ -47,6 +47,7 @@ export interface DashboardConfig {
   tasks: TasksConfig;
   callings: CallingsConfig;
   events: EventsConfig;
+  annualDuties: SectionConfig;
 }
 
 export const DEFAULT_CONFIG: DashboardConfig = {
@@ -54,12 +55,13 @@ export const DEFAULT_CONFIG: DashboardConfig = {
     visible: true, fontSize: '3xl',
     showDate: true, showSpiritualThought: false, showOpeningPrayer: true, showHandbookTopic: true, showClosingPrayer: true,
   },
-  healthNeeds:  { visible: true, fontSize: '2xl' },
-  supportNeeds: { visible: true, fontSize: '2xl' },
-  missionaries: { visible: true, fontSize: '2xl', showStatus: true },
-  tasks:        { visible: true, fontSize: 'sm',  showAssignedTo: true },
-  callings:     { visible: true, fontSize: 'sm',  showStatusBadge: true },
-  events:       { visible: true, fontSize: 'sm',  showDate: true },
+  healthNeeds:   { visible: true, fontSize: '2xl' },
+  supportNeeds:  { visible: true, fontSize: '2xl' },
+  missionaries:  { visible: true, fontSize: '2xl', showStatus: true },
+  tasks:         { visible: true, fontSize: 'sm',  showAssignedTo: true },
+  callings:      { visible: true, fontSize: 'sm',  showStatusBadge: true },
+  events:        { visible: true, fontSize: 'sm',  showDate: true },
+  annualDuties:  { visible: true, fontSize: 'sm' },
 };
 
 const CONFIG_KEY = 'dashboard_config_v1';
@@ -77,6 +79,7 @@ export function loadDashboardConfig(): DashboardConfig {
       tasks:            { ...DEFAULT_CONFIG.tasks,            ...saved.tasks            },
       callings:         { ...DEFAULT_CONFIG.callings,         ...saved.callings         },
       events:           { ...DEFAULT_CONFIG.events,           ...saved.events           },
+      annualDuties:     { ...DEFAULT_CONFIG.annualDuties,     ...saved.annualDuties     },
     };
   } catch {
     return DEFAULT_CONFIG;

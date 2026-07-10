@@ -31,6 +31,7 @@ export default function OutOfTown() {
         <h1 className="text-2xl font-bold text-gray-900">Out of Town</h1>
         <button onClick={() => setEditing({ ...EMPTY })} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>
       </div>
+      <p className="text-sm text-gray-500 mb-4">When bishopric members or key leaders will be away.</p>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
@@ -45,6 +46,9 @@ export default function OutOfTown() {
               </tr>
             </thead>
             <tbody>
+              {rows.length === 0 && (
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-sm text-gray-400">No entries yet — use "+ Add" above to create the first one.</td></tr>
+              )}
               {[...current, ...past].map(r => (
                 <tr key={r.id} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${r.end_date && r.end_date < today ? 'opacity-50' : ''}`} onClick={() => setEditing(r)}>
                   <td className="px-3 py-2 font-medium text-gray-900">{r.who}</td>

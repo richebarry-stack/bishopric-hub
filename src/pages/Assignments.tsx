@@ -34,6 +34,7 @@ export default function Assignments() {
         <h1 className="text-2xl font-bold text-gray-900">Bishopric Assignments</h1>
         <button onClick={() => setEditing({ ...EMPTY })} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>
       </div>
+      <p className="text-sm text-gray-500 mb-4">Rotating monthly assignments for who plans/conducts sacrament meeting and gives the primary message — auto-fills Conducting on the sacrament agenda.</p>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
@@ -47,6 +48,9 @@ export default function Assignments() {
               </tr>
             </thead>
             <tbody>
+              {rows.length === 0 && (
+                <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-gray-400">No assignments yet — use "+ Add" above to create the first one.</td></tr>
+              )}
               {rows.map(r => (
                 <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => setEditing(r)}>
                   <td className="px-3 py-2 font-medium text-gray-900">{r.month}</td>

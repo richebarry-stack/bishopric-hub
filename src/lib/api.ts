@@ -451,5 +451,39 @@ export interface WardMember {
   exclude_speakers: number;
   exclude_prayers: number;
   birth_date: string | null;
+  gender: string | null;
   updated_at: string;
+}
+
+export interface Ordinance {
+  id: number;
+  member_name: string;
+  ordinance_type: string;
+  status: string;
+  target_date: string;
+  completed_date: string;
+  notes: string;
+  updated_at: string;
+  updated_by?: string;
+}
+
+export interface AnnualDuty {
+  id: number;
+  title: string;
+  month_start: number;
+  month_end: number;
+  notes: string;
+  last_completed_year: number | null;
+  sort_order: number;
+  updated_at: string;
+  updated_by?: string;
+}
+
+export interface YcMeeting {
+  id: number;
+  date: string;
+  agenda: string;
+  notes: string;
+  updated_at: string;
+  updated_by?: string;
 }

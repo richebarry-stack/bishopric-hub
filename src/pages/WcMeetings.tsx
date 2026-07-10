@@ -111,6 +111,7 @@ export default function WcMeetings() {
           </button>
         )}
       </div>
+      <p className="text-sm text-gray-500">Opening prayer, spiritual thought, and closing prayer assignments for upcoming ward council meetings.</p>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading…</p> : (
         <>

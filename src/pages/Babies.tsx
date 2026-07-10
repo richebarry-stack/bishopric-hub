@@ -44,6 +44,7 @@ export default function Babies() {
         <h1 className="text-2xl font-bold text-gray-900">Babies</h1>
         {!isGuest && <button onClick={() => setEditing({ ...EMPTY })} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>}
       </div>
+      <p className="text-sm text-gray-500 mb-4">New babies, from expecting through blessed and recorded.</p>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

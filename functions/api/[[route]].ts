@@ -46,6 +46,9 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'wc-family-needs': { name: 'wc_family_needs', orderBy: 'id ASC' },
   'wc-discussion-topics': { name: 'wc_discussion_topics', orderBy: 'meeting_date DESC, organization ASC' },
   'hub-suggestions': { name: 'hub_suggestions', orderBy: 'id DESC' },
+  'ordinances': { name: 'ordinances', orderBy: 'status ASC, target_date ASC' },
+  'annual-duties': { name: 'annual_duties', orderBy: 'sort_order ASC, id ASC' },
+  'yc-meetings': { name: 'yc_meetings', orderBy: 'date ASC' },
 };
 
 function json(data: unknown, status = 200) {
@@ -66,8 +69,8 @@ async function checkConflict(db: D1Database, tableName: string, recordId: string
   return null;
 }
 
-// Legacy unsalted SHA-256 — kept only for security-question answers (low entropy anyway;
-// upgrading them is a separate follow-up) and to recognize old password hashes for migration.
+// Legacy unsalted SHA-256 — kept only to recognize old password/security-answer hashes
+// so they can be transparently upgraded to PBKDF2 the next time they're verified.
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
@@ -104,6 +107,16 @@ async function verifyPassword(password: string, stored: string): Promise<{ valid
     return { valid: await verifyPasswordSecure(password, stored), legacy: false };
   }
   const legacyHash = await hashPassword(password);
+  return { valid: legacyHash === stored, legacy: true };
+}
+
+// Same legacy/secure dual-check as verifyPassword, for security-question answers.
+async function verifyAnswer(answer: string, stored: string): Promise<{ valid: boolean; legacy: boolean }> {
+  const normalized = answer.trim().toLowerCase();
+  if (stored.startsWith('pbkdf2$')) {
+    return { valid: await verifyPasswordSecure(normalized, stored), legacy: false };
+  }
+  const legacyHash = await hashPassword(normalized);
   return { valid: legacyHash === stored, legacy: true };
 }
 
@@ -340,8 +353,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const { question1, answer1, question2, answer2 } = await request.json() as { question1: string; answer1: string; question2: string; answer2: string };
       if (!question1 || !answer1 || !question2 || !answer2) return json({ error: 'All fields required' }, 400);
       if (question1 === question2) return json({ error: 'Questions must be different' }, 400);
-      const a1hash = await hashPassword(answer1.trim().toLowerCase());
-      const a2hash = await hashPassword(answer2.trim().toLowerCase());
+      const a1hash = await hashPasswordSecure(answer1.trim().toLowerCase());
+      const a2hash = await hashPasswordSecure(answer2.trim().toLowerCase());
       const now = new Date().toISOString();
       await db.prepare(`
         INSERT INTO security_questions (user_id, question1, answer1_hash, question2, answer2_hash, updated_at)
@@ -367,14 +380,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (!new_password || new_password.length < 6) return json({ error: 'Password must be at least 6 characters' }, 400);
       const user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: number }>();
       const sq = user ? await db.prepare('SELECT answer1_hash, answer2_hash FROM security_questions WHERE user_id = ?').bind(user.id).first<{ answer1_hash: string; answer2_hash: string }>() : null;
-      const a1hash = await hashPassword(answer1.trim().toLowerCase());
-      const a2hash = await hashPassword(answer2.trim().toLowerCase());
-      if (!user || !sq || a1hash !== sq.answer1_hash || a2hash !== sq.answer2_hash) {
+      const check1 = sq ? await verifyAnswer(answer1, sq.answer1_hash) : { valid: false, legacy: false };
+      const check2 = sq ? await verifyAnswer(answer2, sq.answer2_hash) : { valid: false, legacy: false };
+      if (!user || !sq || !check1.valid || !check2.valid) {
         await db.prepare('INSERT INTO login_attempts (identifier) VALUES (?)').bind('rbq:' + emailLower).run();
         await db.prepare('INSERT INTO login_attempts (identifier) VALUES (?)').bind(ip).run();
         return json({ error: !user ? 'No account found for that email' : !sq ? 'This account has no security questions set up' : 'One or more answers are incorrect' }, user && sq ? 400 : 404);
       }
       await db.prepare('DELETE FROM login_attempts WHERE identifier IN (?, ?)').bind('rbq:' + emailLower, ip).run();
+      if (check1.legacy || check2.legacy) {
+        const upgradedA1 = check1.legacy ? await hashPasswordSecure(answer1.trim().toLowerCase()) : sq.answer1_hash;
+        const upgradedA2 = check2.legacy ? await hashPasswordSecure(answer2.trim().toLowerCase()) : sq.answer2_hash;
+        await db.prepare('UPDATE security_questions SET answer1_hash = ?, answer2_hash = ? WHERE user_id = ?').bind(upgradedA1, upgradedA2, user.id).run();
+      }
       const newHash = await hashPasswordSecure(new_password);
       await db.prepare('UPDATE users SET password_hash = ?, must_reset_password = 0 WHERE id = ?').bind(newHash, user.id).run();
       await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id).run();
@@ -716,14 +734,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ error: 'Method not allowed' }, 405);
   }
 
-  // App time zone (used for "same day" calculations like Last Access) — admin only
+  // App time zone (used for "same day" calculations like Last Access, and for
+  // deciding Annual Duties windows). Readable by any authenticated user; admin-only to change.
   if (routeParts[0] === 'app-timezone') {
-    if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
     if (method === 'GET') {
       const row = await db.prepare("SELECT value FROM ui_settings WHERE key = 'app_timezone'").first<{ value: string }>();
       return json({ timeZone: row?.value || DEFAULT_TIME_ZONE });
     }
     if (method === 'PUT') {
+      if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
       const body = await request.json() as { timeZone?: string };
       const timeZone = (body.timeZone || '').trim();
       if (!timeZone) return json({ error: 'timeZone is required' }, 400);
@@ -953,7 +972,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const guestKind = session.church_role; // 'yc' = youth calendar, 'sac' = sacrament program
       const SAC_TABLES = new Set(['sacrament-speakers', 'prayers', 'sacrament-music', 'sacrament-themes', 'sacrament-announcements']);
       if (guestKind === 'yc') {
-        if (tbl !== 'youth-activities') return json({ error: 'Forbidden' }, 403);
+        if (tbl !== 'youth-activities' && tbl !== 'yc-meetings') return json({ error: 'Forbidden' }, 403);
       } else if (guestKind === 'sac') {
         if (!SAC_TABLES.has(tbl)) return json({ error: 'Forbidden' }, 403);
         // Strip ward/stake business columns from sacrament-themes
@@ -975,7 +994,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
       // fall through to generic TABLES handler
     } else {
-      if (tbl !== 'youth-activities') return json({ error: 'Forbidden' }, 403);
+      if (tbl !== 'youth-activities' && tbl !== 'yc-meetings') return json({ error: 'Forbidden' }, 403);
     }
     // fall through to generic TABLES handler
   }

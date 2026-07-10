@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../lib/useTable';
 import { useAuth } from '../lib/auth';
-import type { CallingPipeline, CalendarEvent, Task, MemberNeed, MissionaryPipeline, BishopricMeeting } from '../lib/api';
+import { api } from '../lib/api';
+import type { CallingPipeline, CalendarEvent, Task, MemberNeed, MissionaryPipeline, BishopricMeeting, AnnualDuty } from '../lib/api';
 import StatusBadge from '../components/StatusBadge';
 import { CALLING_STATUS_COLORS } from '../lib/constants';
 import { renderRichText } from '../lib/richText';
@@ -11,6 +13,7 @@ import {
   DEFAULT_CONFIG, FONT_SIZE_LABELS, FONT_SIZE_CLASS,
   loadDashboardConfig, saveDashboardConfig,
 } from '../lib/dashboardConfig';
+import { inDutyWindow, useTimeZoneNow } from '../lib/annualDuties';
 import { NAV_ITEMS, LAST_VISITED_KEY } from '../components/Layout';
 import { responsiveGridCols } from '../lib/gridCols';
 
@@ -217,6 +220,10 @@ function DashboardSettingsModal({ config, onSave, onClose }: {
             <SubToggle label="Show date" checked={draft.events.showDate}
               onChange={v => upd('events', { showDate: v })} />
           </SettingsSection>
+
+          <SettingsSection title="Annual Duties Due"
+            visible={draft.annualDuties.visible} onVisibleChange={v => upd('annualDuties', { visible: v })}
+            fontSize={draft.annualDuties.fontSize} onFontSizeChange={v => upd('annualDuties', { fontSize: v })} />
         </div>
 
         <div className="flex items-center justify-between px-4 py-3 border-t">
@@ -247,6 +254,9 @@ export default function Dashboard() {
   const { rows: needs, create: createNeed, update: updateNeed } = useTable<MemberNeed>('member-needs');
   const { rows: missionaries } = useTable<MissionaryPipeline>('missionary-pipeline');
   const { rows: meetings } = useTable<BishopricMeeting>('bishopric-meetings');
+  const { rows: annualDuties } = useTable<AnnualDuty>('annual-duties');
+  const { data: tzData } = useQuery({ queryKey: ['app-timezone'], queryFn: () => api.appTimezone.get() });
+  const { month: currentMonth, year: currentYear } = useTimeZoneNow(tzData?.timeZone || 'America/Denver');
 
   const [newHealth, setNewHealth] = useState('');
   const [newSupport, setNewSupport] = useState('');
@@ -271,6 +281,9 @@ export default function Dashboard() {
     events.filter(e => e.dates && e.dates.slice(0, 10) >= TODAY)
       .sort((a, b) => a.dates.localeCompare(b.dates)).slice(0, 10),
     [events]);
+  const dutiesDue = useMemo(() =>
+    annualDuties.filter(d => d.last_completed_year !== currentYear && inDutyWindow(currentMonth, d.month_start, d.month_end)),
+    [annualDuties, currentMonth, currentYear]);
 
   const removePrayer = (id: number) => updateNeed(id, { pray_for: 0 });
 
@@ -289,7 +302,7 @@ export default function Dashboard() {
 
   const cfg = config;
   const topCount = [cfg.bishopricMeeting.visible, cfg.healthNeeds.visible, cfg.supportNeeds.visible, cfg.missionaries.visible].filter(Boolean).length;
-  const bottomCount = [cfg.tasks.visible, cfg.callings.visible, cfg.events.visible].filter(Boolean).length;
+  const bottomCount = [cfg.tasks.visible, cfg.callings.visible, cfg.events.visible, cfg.annualDuties.visible].filter(Boolean).length;
 
   const lastVisited = useMemo(() => {
     const path = localStorage.getItem(LAST_VISITED_KEY);
@@ -501,6 +514,25 @@ export default function Dashboard() {
                       {cfg.events.showDate && (
                         <span className="text-xs text-gray-400 whitespace-nowrap">{formatEventDate(e.dates)}</span>
                       )}
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+          )}
+
+          {cfg.annualDuties.visible && (
+            <div className="bg-white rounded-xl border border-gray-200 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 flex-shrink-0">
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Annual Duties Due ({dutiesDue.length})</span>
+                <Link to="/annual-duties" className="text-xs text-blue-400 hover:text-blue-600">↗</Link>
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 py-2 min-h-0">
+                {dutiesDue.length === 0
+                  ? <p className="text-xs text-gray-400 py-2">None</p>
+                  : dutiesDue.map(d => (
+                    <div key={d.id} className="py-1">
+                      <span className={`${FONT_SIZE_CLASS[cfg.annualDuties.fontSize]} text-gray-800 truncate block`}>{d.title}</span>
                     </div>
                   ))
                 }

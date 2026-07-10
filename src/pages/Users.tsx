@@ -265,6 +265,7 @@ export default function Users() {
           )}
         </div>
       </div>
+      <p className="text-sm text-gray-500 mb-4">Manage who has access to the hub and what they can do.</p>
 
       {isAdmin && regRequests.length > 0 && (
         <div className="mb-6 bg-white rounded-lg border border-amber-300 overflow-x-auto">

@@ -195,10 +195,37 @@ function computeYouthAge(birthDate: string): number | null {
   return computeAge(birthDate);
 }
 
+interface DueEntry { name: string; age: number; type: string; lastInterview: string | null; }
+
+// Handbook cadence: youth 12-15 get an annual interview with a bishopric member;
+// youth 16-17 additionally get a semiannual interview with the bishop. Flags anyone
+// with no matching interview on record, or whose last one has aged past the cadence.
+function computeDueYouth(wardMembers: WardMember[], interviews: InterviewType[]): DueEntry[] {
+  const now = new Date();
+  const out: DueEntry[] = [];
+  for (const wm of wardMembers) {
+    if (!wm.active || !wm.birth_date) continue;
+    const age = computeYouthAge(wm.birth_date);
+    if (age === null || age < 12) continue;
+    const type = age >= 16 ? 'Semi-Annual Youth' : 'Annual Youth';
+    const cadenceMonths = age >= 16 ? 6 : 12;
+    const matches = interviews.filter(i =>
+      i.member?.trim().toLowerCase() === wm.name.trim().toLowerCase() && i.type_of_interview === type);
+    const lastDates = matches.map(m => m.last_interview_datetime).filter(Boolean).sort();
+    const last = lastDates[lastDates.length - 1] || null;
+    const cutoff = new Date(now);
+    cutoff.setMonth(cutoff.getMonth() - cadenceMonths);
+    const isDue = !last || new Date(last.slice(0, 10) + 'T12:00:00') < cutoff;
+    if (isDue) out.push({ name: wm.name, age, type, lastInterview: last });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export default function InterviewPipeline() {
   const { rows, isLoading, create, update, remove } = useTable<InterviewType>('interview-pipeline');
   const { rows: wardMembers } = useTable<WardMember>('ward-members');
   const [editing, setEditing] = useState<Partial<InterviewType> | null>(null);
+  const [dismissedDue, setDismissedDue] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [assignedFilter, setAssignedFilter] = useState('');
@@ -256,6 +283,22 @@ export default function InterviewPipeline() {
     return m;
   }, [wardMembers]);
 
+  const dueYouth = useMemo(
+    () => computeDueYouth(wardMembers, rows).filter(d => !dismissedDue.has(`${d.name.toLowerCase()}|${d.type}`)),
+    [wardMembers, rows, dismissedDue]
+  );
+
+  const addDueToPipeline = (d: DueEntry) => {
+    create({
+      member: d.name, type_of_interview: d.type, status: 'Unassigned', assigned_to: '',
+      date_recommend_expires: '', last_interview_datetime: '', next_interview_date: '', comments: '', notes: '',
+    });
+  };
+
+  const dismissDue = (d: DueEntry) => {
+    setDismissedDue(prev => new Set(prev).add(`${d.name.toLowerCase()}|${d.type}`));
+  };
+
   const grouped = useMemo(() => {
     const map = new Map<string, InterviewType[]>();
     for (const type of INTERVIEW_TYPES) map.set(type, []);
@@ -275,6 +318,7 @@ export default function InterviewPipeline() {
           + New Interview
         </button>
       </div>
+      <p className="text-sm text-gray-500 mb-4">Bishop and counselor interviews — temple recommends, annual interviews, mission prep, and more.</p>
 
       <div className="flex flex-col sm:flex-row gap-2 mb-2">
         <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Search member..."
@@ -307,6 +351,28 @@ export default function InterviewPipeline() {
           <button onClick={handleBulkStatus} disabled={!bulkStatus}
             className="px-3 py-1 bg-blue-600 text-white rounded text-sm disabled:opacity-40 hover:bg-blue-700">Apply</button>
           <button onClick={() => setSelected(new Set())} className="ml-auto text-blue-500 hover:text-blue-700">Clear</button>
+        </div>
+      )}
+
+      {dueYouth.length > 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 mb-4">
+          <h2 className="text-sm font-semibold text-rose-800 mb-1">Youth Interviews Due ({dueYouth.length})</h2>
+          <p className="text-xs text-rose-700 mb-2">
+            Ages 12–15 are due for an annual interview; ages 16–17 are due for a semiannual interview. Computed from birth dates on Ward Members.
+          </p>
+          <div className="space-y-1.5">
+            {dueYouth.map(d => (
+              <div key={`${d.name}|${d.type}`} className="flex items-center justify-between bg-white rounded-md px-3 py-2 border border-rose-100">
+                <span className="text-sm text-gray-800">
+                  {d.name} <span className="text-gray-400">— {d.type} (age {d.age}){d.lastInterview ? `, last: ${d.lastInterview.slice(0, 10)}` : ', no interview on record'}</span>
+                </span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => addDueToPipeline(d)} className="text-xs px-2 py-1 rounded bg-rose-600 text-white hover:bg-rose-700">Add to pipeline</button>
+                  <button onClick={() => dismissDue(d)} className="text-xs px-2 py-1 rounded text-gray-500 hover:bg-gray-100">Dismiss</button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
