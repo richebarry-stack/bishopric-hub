@@ -450,6 +450,7 @@ export default function Help() {
               date: 'Jul 10, 2026',
               items: [
                 'Added a live "who\'s online" indicator: the sidebar now shows which other users are currently in the app and what page they\'re on, and a banner appears at the top of a page when someone else is viewing it (or actively editing it, shown in amber) — helps avoid two people working on the same thing at once.',
+                'Speakers & Prayers and Interview Pipeline now show a card layout on phones instead of a hard-to-read sideways-scrolling table, with all the same actions (notes, include/exclude, select, delete) available.',
               ],
             },
             {

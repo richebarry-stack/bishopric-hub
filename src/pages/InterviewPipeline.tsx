@@ -78,53 +78,98 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSele
     </th>
   );
 
+  const rowTint = (r: InterviewType): { overdueInterview: boolean; rowColor: string } => {
+    const rowColor = recommendRowClass(r.date_recommend_expires);
+    const overdueInterview = !rowColor && isPast(r.next_interview_date);
+    return { overdueInterview, rowColor };
+  };
+
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 bg-gray-50">
-            <th className="px-3 py-2 w-8"></th>
-            <Th col="member" label="Member" />
-            {ageMap && <Th col="age" label="Age" />}
-            <Th col="status" label="Status" />
-            <Th col="assigned_to" label="Assigned To" />
-            <Th col="date_recommend_expires" label="Rec. Expires" />
-            <Th col="next_interview_date" label="Next Interview" />
-            <Th col="last_interview_datetime" label="Last Interview" />
-            <Th col="comments" label="Comments" />
-            <th className="px-3 py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map(r => {
-            const rowColor = recommendRowClass(r.date_recommend_expires);
-            const overdueInterview = !rowColor && isPast(r.next_interview_date);
-            return (
-            <tr key={r.id} className={`border-b border-gray-50 cursor-pointer hover:brightness-95 ${overdueInterview ? 'bg-rose-50' : rowColor || 'hover:bg-gray-50'}`} onClick={() => onEdit(r)}>
-              <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
-                <input type="checkbox" checked={selected.has(r.id)} onChange={() => onToggleSelect(r.id)}
-                  className="rounded border-gray-300 text-blue-600" />
-              </td>
-              <td className="px-3 py-2 font-medium text-gray-900">{r.member}</td>
-              {ageMap && <td className="px-3 py-2 text-gray-600 text-center">{ageMap.get(r.member.toLowerCase()) ?? '—'}</td>}
-              <td className="px-3 py-2"><StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} /></td>
-              <td className="px-3 py-2 text-gray-600">{r.assigned_to}</td>
-              <td className="px-3 py-2 text-sm font-medium text-gray-700">
-                {formatRecommendDate(r.date_recommend_expires)}
-              </td>
-              <td className={`px-3 py-2 font-mono text-sm ${isPast(r.next_interview_date) ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
-                {(r.next_interview_date || '').slice(0, 10)}
-              </td>
-              <td className="px-3 py-2 text-gray-600 font-mono text-sm">{(r.last_interview_datetime || '').slice(0, 10)}</td>
-              <td className="px-3 py-2 text-gray-700">{r.comments}</td>
-              <td className="px-3 py-2">
-                <button onClick={e => { e.stopPropagation(); onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
-              </td>
+    <>
+      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50">
+              <th className="px-3 py-2 w-8"></th>
+              <Th col="member" label="Member" />
+              {ageMap && <Th col="age" label="Age" />}
+              <Th col="status" label="Status" />
+              <Th col="assigned_to" label="Assigned To" />
+              <Th col="date_recommend_expires" label="Rec. Expires" />
+              <Th col="next_interview_date" label="Next Interview" />
+              <Th col="last_interview_datetime" label="Last Interview" />
+              <Th col="comments" label="Comments" />
+              <th className="px-3 py-2"></th>
             </tr>
-          );})}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {sorted.map(r => {
+              const { overdueInterview, rowColor } = rowTint(r);
+              return (
+              <tr key={r.id} className={`border-b border-gray-50 cursor-pointer hover:brightness-95 ${overdueInterview ? 'bg-rose-50' : rowColor || 'hover:bg-gray-50'}`} onClick={() => onEdit(r)}>
+                <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                  <input type="checkbox" checked={selected.has(r.id)} onChange={() => onToggleSelect(r.id)}
+                    className="rounded border-gray-300 text-blue-600" />
+                </td>
+                <td className="px-3 py-2 font-medium text-gray-900">{r.member}</td>
+                {ageMap && <td className="px-3 py-2 text-gray-600 text-center">{ageMap.get(r.member.toLowerCase()) ?? '—'}</td>}
+                <td className="px-3 py-2"><StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} /></td>
+                <td className="px-3 py-2 text-gray-600">{r.assigned_to}</td>
+                <td className="px-3 py-2 text-sm font-medium text-gray-700">
+                  {formatRecommendDate(r.date_recommend_expires)}
+                </td>
+                <td className={`px-3 py-2 font-mono text-sm ${isPast(r.next_interview_date) ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
+                  {(r.next_interview_date || '').slice(0, 10)}
+                </td>
+                <td className="px-3 py-2 text-gray-600 font-mono text-sm">{(r.last_interview_datetime || '').slice(0, 10)}</td>
+                <td className="px-3 py-2 text-gray-700">{r.comments}</td>
+                <td className="px-3 py-2">
+                  <button onClick={e => { e.stopPropagation(); onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
+                </td>
+              </tr>
+            );})}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="md:hidden space-y-2">
+        {sorted.map(r => {
+          const { overdueInterview, rowColor } = rowTint(r);
+          const age = ageMap?.get(r.member.toLowerCase());
+          return (
+            <div key={r.id} onClick={() => onEdit(r)}
+              className={`rounded-lg border border-gray-200 p-3 cursor-pointer ${overdueInterview ? 'bg-rose-50' : rowColor || 'bg-white'}`}>
+              <div className="flex items-start gap-2">
+                <input type="checkbox" checked={selected.has(r.id)} onChange={() => onToggleSelect(r.id)}
+                  onClick={e => e.stopPropagation()}
+                  className="mt-1 rounded border-gray-300 text-blue-600 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium text-gray-900 truncate">
+                      {r.member}{age !== undefined && <span className="text-gray-500 font-normal"> (age {age})</span>}
+                    </p>
+                    <button onClick={e => { e.stopPropagation(); onDelete(r.id); }}
+                      className="text-red-400 hover:text-red-600 text-xs shrink-0">Del</button>
+                  </div>
+                  <div className="mt-1"><StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} /></div>
+                  {r.assigned_to && <p className="text-xs text-gray-500 mt-1">Assigned: {r.assigned_to}</p>}
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs">
+                    {r.date_recommend_expires && <span className="text-gray-600">Rec. expires: {formatRecommendDate(r.date_recommend_expires)}</span>}
+                    {r.next_interview_date && (
+                      <span className={isPast(r.next_interview_date) ? 'text-red-600 font-semibold' : 'text-gray-600'}>
+                        Next: {r.next_interview_date.slice(0, 10)}
+                      </span>
+                    )}
+                    {r.last_interview_datetime && <span className="text-gray-600">Last: {r.last_interview_datetime.slice(0, 10)}</span>}
+                  </div>
+                  {r.comments && <p className="text-xs text-gray-700 mt-1 truncate">{r.comments}</p>}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 

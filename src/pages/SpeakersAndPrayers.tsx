@@ -154,6 +154,16 @@ interface SpeakerRow {
 
 interface SpeakerRowEx extends SpeakerRow { age: number | null; }
 
+function SpeakerDatesChips({ r, onDateClick }: { r: SpeakerRowEx; onDateClick: (date: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {r.dates.map(d => (
+        <AgendaLink key={d} date={d} onOpen={onDateClick} className="text-xs bg-blue-50 text-blue-700 rounded px-2 py-0.5 hover:bg-blue-100 transition-colors">{formatDate(d)}</AgendaLink>
+      ))}
+    </div>
+  );
+}
+
 function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember, onDateClick }: {
   rows: SpeakerRowEx[];
   notes: Map<string, string>;
@@ -168,63 +178,94 @@ function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey,
   onDateClick: (date: string) => void;
 }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 bg-gray-50">
-            <SortHeader label="Name" active={sortKey === 'name'} dir={sortDir} onClick={() => toggle('name')} />
-            <SortHeader label="Times" active={sortKey === 'count'} dir={sortDir} onClick={() => toggle('count')} className="w-20 text-center" />
-            <SortHeader label="Most Recent" active={sortKey === 'lastDate'} dir={sortDir} onClick={() => toggle('lastDate')} />
-            <th className="px-3 py-2 text-left font-medium text-gray-600 w-56">Notes</th>
-            <th className="px-3 py-2 text-center font-medium text-gray-600 w-28">Include</th>
-            <th className="px-3 py-2 w-8" />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 && (
-            <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-gray-400">No results</td></tr>
-          )}
-          {rows.map(r => {
-            const wm = memberMap.get(r.name);
-            const excluded = wm?.exclude_speakers ?? false;
-            return (
-              <>
-                <tr key={r.name} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${excluded ? 'opacity-50' : ''}`}
-                  onClick={() => setExpanded(expanded === r.name ? null : r.name)}>
-                  <td className="px-3 py-2 font-medium text-gray-900">
+    <>
+      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50">
+              <SortHeader label="Name" active={sortKey === 'name'} dir={sortDir} onClick={() => toggle('name')} />
+              <SortHeader label="Times" active={sortKey === 'count'} dir={sortDir} onClick={() => toggle('count')} className="w-20 text-center" />
+              <SortHeader label="Most Recent" active={sortKey === 'lastDate'} dir={sortDir} onClick={() => toggle('lastDate')} />
+              <th className="px-3 py-2 text-left font-medium text-gray-600 w-56">Notes</th>
+              <th className="px-3 py-2 text-center font-medium text-gray-600 w-28">Include</th>
+              <th className="px-3 py-2 w-8" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-gray-400">No results</td></tr>
+            )}
+            {rows.map(r => {
+              const wm = memberMap.get(r.name);
+              const excluded = wm?.exclude_speakers ?? false;
+              return (
+                <>
+                  <tr key={r.name} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${excluded ? 'opacity-50' : ''}`}
+                    onClick={() => setExpanded(expanded === r.name ? null : r.name)}>
+                    <td className="px-3 py-2 font-medium text-gray-900">
+                      {r.name}
+                      {r.age !== null && <span className="text-xs text-gray-400 font-normal ml-1.5">age {r.age}</span>}
+                    </td>
+                    <td className="px-3 py-2 text-center text-gray-600">{r.count}</td>
+                    <td className="px-3 py-2 text-gray-600">{formatDate(r.lastDate)}</td>
+                    <td className="px-3 py-1.5"><NoteField name={r.name} category="speaker" notes={notes} onSave={onSaveNote} /></td>
+                    <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
+                      {wm && (
+                        <button onClick={() => onUpdateMember(wm.id, { exclude_speakers: excluded ? 0 : 1 })}
+                          className={`text-xs px-2 py-0.5 rounded-full ${excluded ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                          {excluded ? 'Excluded' : 'Included'}
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-gray-400 text-xs">{expanded === r.name ? '▲' : '▼'}</td>
+                  </tr>
+                  {expanded === r.name && (
+                    <tr key={`${r.name}-exp`} className="bg-gray-50 border-b border-gray-100">
+                      <td colSpan={6} className="px-6 py-2">
+                        <SpeakerDatesChips r={r} onDateClick={onDateClick} />
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="md:hidden space-y-2">
+        {rows.length === 0 && <p className="text-center text-sm text-gray-400 py-4">No results</p>}
+        {rows.map(r => {
+          const wm = memberMap.get(r.name);
+          const excluded = wm?.exclude_speakers ?? false;
+          const isOpen = expanded === r.name;
+          return (
+            <div key={r.name} className={`rounded-lg border border-gray-200 p-3 ${excluded ? 'opacity-50' : 'bg-white'}`}>
+              <div className="flex items-start justify-between gap-2 cursor-pointer" onClick={() => setExpanded(isOpen ? null : r.name)}>
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-900 truncate">
                     {r.name}
                     {r.age !== null && <span className="text-xs text-gray-400 font-normal ml-1.5">age {r.age}</span>}
-                  </td>
-                  <td className="px-3 py-2 text-center text-gray-600">{r.count}</td>
-                  <td className="px-3 py-2 text-gray-600">{formatDate(r.lastDate)}</td>
-                  <td className="px-3 py-1.5"><NoteField name={r.name} category="speaker" notes={notes} onSave={onSaveNote} /></td>
-                  <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
-                    {wm && (
-                      <button onClick={() => onUpdateMember(wm.id, { exclude_speakers: excluded ? 0 : 1 })}
-                        className={`text-xs px-2 py-0.5 rounded-full ${excluded ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
-                        {excluded ? 'Excluded' : 'Included'}
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-gray-400 text-xs">{expanded === r.name ? '▲' : '▼'}</td>
-                </tr>
-                {expanded === r.name && (
-                  <tr key={`${r.name}-exp`} className="bg-gray-50 border-b border-gray-100">
-                    <td colSpan={6} className="px-6 py-2">
-                      <div className="flex flex-wrap gap-2">
-                        {r.dates.map(d => (
-                          <AgendaLink key={d} date={d} onOpen={onDateClick} className="text-xs bg-blue-50 text-blue-700 rounded px-2 py-0.5 hover:bg-blue-100 transition-colors">{formatDate(d)}</AgendaLink>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">{r.count} time{r.count === 1 ? '' : 's'} · Most recent {formatDate(r.lastDate) || '—'}</p>
+                </div>
+                <span className="text-gray-400 text-xs shrink-0">{isOpen ? '▲' : '▼'}</span>
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="flex-1"><NoteField name={r.name} category="speaker" notes={notes} onSave={onSaveNote} /></div>
+                {wm && (
+                  <button onClick={() => onUpdateMember(wm.id, { exclude_speakers: excluded ? 0 : 1 })}
+                    className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${excluded ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                    {excluded ? 'Excluded' : 'Included'}
+                  </button>
                 )}
-              </>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+              </div>
+              {isOpen && <div className="mt-2 pt-2 border-t border-gray-100"><SpeakerDatesChips r={r} onDateClick={onDateClick} /></div>}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -351,6 +392,33 @@ interface PrayerRow {
 
 interface PrayerRowEx extends PrayerRow { age: number | null; }
 
+function PrayerDatesChips({ r, onDateClick }: { r: PrayerRowEx; onDateClick: (date: string) => void }) {
+  return (
+    <div className="space-y-2">
+      {r.openingDates.length > 0 && (
+        <div>
+          <span className="text-xs font-semibold text-gray-500 mr-2">Opening:</span>
+          <span className="flex flex-wrap gap-1.5 mt-1">
+            {r.openingDates.map(d => (
+              <AgendaLink key={d} date={d} onOpen={onDateClick} className="text-xs bg-green-50 text-green-700 rounded px-2 py-0.5 hover:bg-green-100 transition-colors">{formatDate(d)}</AgendaLink>
+            ))}
+          </span>
+        </div>
+      )}
+      {r.closingDates.length > 0 && (
+        <div>
+          <span className="text-xs font-semibold text-gray-500 mr-2">Closing:</span>
+          <span className="flex flex-wrap gap-1.5 mt-1">
+            {r.closingDates.map(d => (
+              <AgendaLink key={d} date={d} onOpen={onDateClick} className="text-xs bg-purple-50 text-purple-700 rounded px-2 py-0.5 hover:bg-purple-100 transition-colors">{formatDate(d)}</AgendaLink>
+            ))}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember, onDateClick }: {
   rows: PrayerRowEx[];
   notes: Map<string, string>;
@@ -365,78 +433,94 @@ function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, 
   onDateClick: (date: string) => void;
 }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 bg-gray-50">
-            <SortHeader label="Name" active={sortKey === 'name'} dir={sortDir} onClick={() => toggle('name')} />
-            <SortHeader label="Total" active={sortKey === 'count'} dir={sortDir} onClick={() => toggle('count')} className="w-20 text-center" />
-            <SortHeader label="Most Recent" active={sortKey === 'lastDate'} dir={sortDir} onClick={() => toggle('lastDate')} />
-            <th className="px-3 py-2 text-left font-medium text-gray-600 w-56">Notes</th>
-            <th className="px-3 py-2 text-center font-medium text-gray-600 w-28">Include</th>
-            <th className="px-3 py-2 w-8" />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 && (
-            <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-gray-400">No results</td></tr>
-          )}
-          {rows.map(r => {
-            const wm = memberMap.get(r.name);
-            const excluded = wm?.exclude_prayers ?? false;
-            return (
-              <>
-                <tr key={r.name} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${excluded ? 'opacity-50' : ''}`}
-                  onClick={() => setExpanded(expanded === r.name ? null : r.name)}>
-                  <td className="px-3 py-2 font-medium text-gray-900">
-                    {r.name}
-                    {r.age !== null && <span className="text-xs text-gray-400 font-normal ml-1.5">age {r.age}</span>}
-                  </td>
-                  <td className="px-3 py-2 text-center text-gray-600">{r.count}</td>
-                  <td className="px-3 py-2 text-gray-600">{formatDate(r.lastDate)}</td>
-                  <td className="px-3 py-1.5"><NoteField name={r.name} category="prayer" notes={notes} onSave={onSaveNote} /></td>
-                  <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
-                    {wm && (
-                      <button onClick={() => onUpdateMember(wm.id, { exclude_prayers: excluded ? 0 : 1 })}
-                        className={`text-xs px-2 py-0.5 rounded-full ${excluded ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
-                        {excluded ? 'Excluded' : 'Included'}
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-gray-400 text-xs">{expanded === r.name ? '▲' : '▼'}</td>
-                </tr>
-                {expanded === r.name && (
-                  <tr key={`${r.name}-exp`} className="bg-gray-50 border-b border-gray-100">
-                    <td colSpan={6} className="px-6 py-2 space-y-2">
-                      {r.openingDates.length > 0 && (
-                        <div>
-                          <span className="text-xs font-semibold text-gray-500 mr-2">Opening:</span>
-                          <span className="flex flex-wrap gap-1.5 mt-1">
-                            {r.openingDates.map(d => (
-                              <AgendaLink key={d} date={d} onOpen={onDateClick} className="text-xs bg-green-50 text-green-700 rounded px-2 py-0.5 hover:bg-green-100 transition-colors">{formatDate(d)}</AgendaLink>
-                            ))}
-                          </span>
-                        </div>
-                      )}
-                      {r.closingDates.length > 0 && (
-                        <div>
-                          <span className="text-xs font-semibold text-gray-500 mr-2">Closing:</span>
-                          <span className="flex flex-wrap gap-1.5 mt-1">
-                            {r.closingDates.map(d => (
-                              <AgendaLink key={d} date={d} onOpen={onDateClick} className="text-xs bg-purple-50 text-purple-700 rounded px-2 py-0.5 hover:bg-purple-100 transition-colors">{formatDate(d)}</AgendaLink>
-                            ))}
-                          </span>
-                        </div>
+    <>
+      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50">
+              <SortHeader label="Name" active={sortKey === 'name'} dir={sortDir} onClick={() => toggle('name')} />
+              <SortHeader label="Total" active={sortKey === 'count'} dir={sortDir} onClick={() => toggle('count')} className="w-20 text-center" />
+              <SortHeader label="Most Recent" active={sortKey === 'lastDate'} dir={sortDir} onClick={() => toggle('lastDate')} />
+              <th className="px-3 py-2 text-left font-medium text-gray-600 w-56">Notes</th>
+              <th className="px-3 py-2 text-center font-medium text-gray-600 w-28">Include</th>
+              <th className="px-3 py-2 w-8" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-gray-400">No results</td></tr>
+            )}
+            {rows.map(r => {
+              const wm = memberMap.get(r.name);
+              const excluded = wm?.exclude_prayers ?? false;
+              return (
+                <>
+                  <tr key={r.name} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${excluded ? 'opacity-50' : ''}`}
+                    onClick={() => setExpanded(expanded === r.name ? null : r.name)}>
+                    <td className="px-3 py-2 font-medium text-gray-900">
+                      {r.name}
+                      {r.age !== null && <span className="text-xs text-gray-400 font-normal ml-1.5">age {r.age}</span>}
+                    </td>
+                    <td className="px-3 py-2 text-center text-gray-600">{r.count}</td>
+                    <td className="px-3 py-2 text-gray-600">{formatDate(r.lastDate)}</td>
+                    <td className="px-3 py-1.5"><NoteField name={r.name} category="prayer" notes={notes} onSave={onSaveNote} /></td>
+                    <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
+                      {wm && (
+                        <button onClick={() => onUpdateMember(wm.id, { exclude_prayers: excluded ? 0 : 1 })}
+                          className={`text-xs px-2 py-0.5 rounded-full ${excluded ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                          {excluded ? 'Excluded' : 'Included'}
+                        </button>
                       )}
                     </td>
+                    <td className="px-3 py-2 text-gray-400 text-xs">{expanded === r.name ? '▲' : '▼'}</td>
                   </tr>
+                  {expanded === r.name && (
+                    <tr key={`${r.name}-exp`} className="bg-gray-50 border-b border-gray-100">
+                      <td colSpan={6} className="px-6 py-2">
+                        <PrayerDatesChips r={r} onDateClick={onDateClick} />
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="md:hidden space-y-2">
+        {rows.length === 0 && <p className="text-center text-sm text-gray-400 py-4">No results</p>}
+        {rows.map(r => {
+          const wm = memberMap.get(r.name);
+          const excluded = wm?.exclude_prayers ?? false;
+          const isOpen = expanded === r.name;
+          return (
+            <div key={r.name} className={`rounded-lg border border-gray-200 p-3 ${excluded ? 'opacity-50' : 'bg-white'}`}>
+              <div className="flex items-start justify-between gap-2 cursor-pointer" onClick={() => setExpanded(isOpen ? null : r.name)}>
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-900 truncate">
+                    {r.name}
+                    {r.age !== null && <span className="text-xs text-gray-400 font-normal ml-1.5">age {r.age}</span>}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">{r.count} total · Most recent {formatDate(r.lastDate) || '—'}</p>
+                </div>
+                <span className="text-gray-400 text-xs shrink-0">{isOpen ? '▲' : '▼'}</span>
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="flex-1"><NoteField name={r.name} category="prayer" notes={notes} onSave={onSaveNote} /></div>
+                {wm && (
+                  <button onClick={() => onUpdateMember(wm.id, { exclude_prayers: excluded ? 0 : 1 })}
+                    className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${excluded ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                    {excluded ? 'Excluded' : 'Included'}
+                  </button>
                 )}
-              </>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+              </div>
+              {isOpen && <div className="mt-2 pt-2 border-t border-gray-100"><PrayerDatesChips r={r} onDateClick={onDateClick} /></div>}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
