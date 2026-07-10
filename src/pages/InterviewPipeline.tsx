@@ -42,13 +42,14 @@ function formatRecommendDate(dateStr: string): string {
 
 type SortKey = 'member' | 'age' | 'status' | 'assigned_to' | 'date_recommend_expires' | 'next_interview_date' | 'last_interview_datetime' | 'comments';
 
-function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSelect }: {
+function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSelect, dueRowIds }: {
   rows: InterviewType[];
   onEdit: (r: InterviewType) => void;
   onDelete: (id: number) => void;
   ageMap?: Map<string, number>;
   selected: Set<number>;
   onToggleSelect: (id: number) => void;
+  dueRowIds?: Set<number>;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('member');
   const [sortAsc, setSortAsc] = useState(true);
@@ -80,7 +81,7 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSele
 
   const rowTint = (r: InterviewType): { overdueInterview: boolean; rowColor: string } => {
     const rowColor = recommendRowClass(r.date_recommend_expires);
-    const overdueInterview = !rowColor && isPast(r.next_interview_date);
+    const overdueInterview = !rowColor && (isPast(r.next_interview_date) || !!dueRowIds?.has(r.id));
     return { overdueInterview, rowColor };
   };
 
@@ -113,7 +114,12 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSele
                 </td>
                 <td className="px-3 py-2 font-medium text-gray-900">{r.member}</td>
                 {ageMap && <td className="px-3 py-2 text-gray-600 text-center">{ageMap.get(r.member.toLowerCase()) ?? '—'}</td>}
-                <td className="px-3 py-2"><StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} /></td>
+                <td className="px-3 py-2">
+                  <StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} />
+                  {dueRowIds?.has(r.id) && (
+                    <span className="ml-1.5 inline-block text-[10px] px-1.5 py-0.5 rounded-full bg-rose-600 text-white align-middle whitespace-nowrap">Interview due</span>
+                  )}
+                </td>
                 <td className="px-3 py-2 text-gray-600">{r.assigned_to}</td>
                 <td className="px-3 py-2 text-sm font-medium text-gray-700">
                   {formatRecommendDate(r.date_recommend_expires)}
@@ -151,7 +157,12 @@ function InterviewTable({ rows, onEdit, onDelete, ageMap, selected, onToggleSele
                     <button onClick={e => { e.stopPropagation(); onDelete(r.id); }}
                       className="text-red-400 hover:text-red-600 text-xs shrink-0">Del</button>
                   </div>
-                  <div className="mt-1"><StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} /></div>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} />
+                    {dueRowIds?.has(r.id) && (
+                      <span className="inline-block text-[10px] px-1.5 py-0.5 rounded-full bg-rose-600 text-white whitespace-nowrap">Interview due</span>
+                    )}
+                  </div>
                   {r.assigned_to && <p className="text-xs text-gray-500 mt-1">Assigned: {r.assigned_to}</p>}
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs">
                     {r.date_recommend_expires && <span className="text-gray-600">Rec. expires: {formatRecommendDate(r.date_recommend_expires)}</span>}
@@ -195,7 +206,10 @@ function computeYouthAge(birthDate: string): number | null {
   return computeAge(birthDate);
 }
 
-interface DueEntry { name: string; age: number; type: string; lastInterview: string | null; }
+// existingIds is empty when the youth has no pipeline row at all (needs "Add to
+// pipeline"); non-empty when they're already tracked but their interview has gone
+// stale (flagged directly on their existing row(s) in the table instead).
+interface DueEntry { name: string; age: number; type: string; lastInterview: string | null; existingIds: number[]; }
 
 // Handbook cadence: youth 12-15 get an annual interview with a bishopric member;
 // youth 16-17 additionally get a semiannual interview with the bishop. Flags anyone
@@ -211,16 +225,22 @@ function computeDueYouth(wardMembers: WardMember[], interviews: InterviewType[])
     const cadenceMonths = age >= 16 ? 6 : 12;
     const matches = interviews.filter(i =>
       i.member?.trim().toLowerCase() === wm.name.trim().toLowerCase() && i.type_of_interview === type);
-    const lastDates = matches.map(m => m.last_interview_datetime).filter(Boolean).sort();
-    const last = lastDates[lastDates.length - 1] || null;
+    const withDates = matches.filter(m => m.last_interview_datetime).sort((a, b) => a.last_interview_datetime.localeCompare(b.last_interview_datetime));
+    const lastRow = withDates[withDates.length - 1] ?? null;
     // A pipeline row with no interview date yet means it's already being tracked
-    // (e.g. just added via "Add to pipeline") — don't nag again until it's either
-    // removed or an interview date is recorded that later goes stale.
-    if (matches.length > 0 && !last) continue;
+    // (e.g. just added via "Add to pipeline") and awaiting scheduling — not due again
+    // until either it's removed or an interview date is recorded that later goes stale.
+    if (matches.length > 0 && !lastRow) continue;
     const cutoff = new Date(now);
     cutoff.setMonth(cutoff.getMonth() - cadenceMonths);
-    const isDue = !last || new Date(last.slice(0, 10) + 'T12:00:00') < cutoff;
-    if (isDue) out.push({ name: wm.name, age, type, lastInterview: last });
+    const isDue = !lastRow || new Date(lastRow.last_interview_datetime.slice(0, 10) + 'T12:00:00') < cutoff;
+    if (isDue) {
+      out.push({
+        name: wm.name, age, type,
+        lastInterview: lastRow?.last_interview_datetime ?? null,
+        existingIds: matches.map(m => m.id),
+      });
+    }
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -291,6 +311,10 @@ export default function InterviewPipeline() {
     () => computeDueYouth(wardMembers, rows).filter(d => !dismissedDue.has(`${d.name.toLowerCase()}|${d.type}`)),
     [wardMembers, rows, dismissedDue]
   );
+
+  // Youth already tracked in the pipeline but overdue get flagged on their existing
+  // row(s) instead of offering a redundant "Add to pipeline" that would just create a duplicate.
+  const dueRowIds = useMemo(() => new Set(dueYouth.flatMap(d => d.existingIds)), [dueYouth]);
 
   const addDueToPipeline = (d: DueEntry) => {
     create({
@@ -363,6 +387,7 @@ export default function InterviewPipeline() {
           <h2 className="text-sm font-semibold text-rose-800 mb-1">Youth Interviews Due ({dueYouth.length})</h2>
           <p className="text-xs text-rose-700 mb-2">
             Ages 12–15 are due for an annual interview; ages 16–17 are due for a semiannual interview. Computed from birth dates on Ward Members.
+            Names already in the pipeline are flagged with an <span className="inline-block text-[10px] px-1.5 py-0.5 rounded-full bg-rose-600 text-white align-middle">Interview due</span> tag on their row below instead of a duplicate "Add" button.
           </p>
           <div className="space-y-1.5">
             {dueYouth.map(d => (
@@ -371,7 +396,11 @@ export default function InterviewPipeline() {
                   {d.name} <span className="text-gray-400">— {d.type} (age {d.age}){d.lastInterview ? `, last: ${d.lastInterview.slice(0, 10)}` : ', no interview on record'}</span>
                 </span>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => addDueToPipeline(d)} className="text-xs px-2 py-1 rounded bg-rose-600 text-white hover:bg-rose-700">Add to pipeline</button>
+                  {d.existingIds.length === 0 ? (
+                    <button onClick={() => addDueToPipeline(d)} className="text-xs px-2 py-1 rounded bg-rose-600 text-white hover:bg-rose-700">Add to pipeline</button>
+                  ) : (
+                    <span className="text-xs text-rose-700 italic">Already tracked — see flagged row below</span>
+                  )}
                   <button onClick={() => dismissDue(d)} className="text-xs px-2 py-1 rounded text-gray-500 hover:bg-gray-100">Dismiss</button>
                 </div>
               </div>
@@ -398,7 +427,7 @@ export default function InterviewPipeline() {
               </h2>
               <InterviewTable rows={typeRows} onEdit={setEditing} onDelete={remove}
                 ageMap={YOUTH_TYPES.has(type) ? ageMap : undefined}
-                selected={selected} onToggleSelect={toggleSelect} />
+                selected={selected} onToggleSelect={toggleSelect} dueRowIds={dueRowIds} />
             </div>
           ))}
           {grouped.length === 0 && <p className="text-gray-400 text-sm text-center py-8">No interviews found</p>}

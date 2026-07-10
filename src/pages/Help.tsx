@@ -243,7 +243,7 @@ const FULL_SECTIONS: Section[] = [
       <div className="space-y-2">
         <p>Track bishop and counselor interviews — youth temple recommends, annual interviews, mission prep interviews, and others.</p>
         <p>Record the interview type, current status, assigned interviewer, last interview date, and next scheduled date.</p>
-        <p>A <strong>Youth Interviews Due</strong> box appears automatically when youth (ages 12–17, from birth dates on Ward Members) are due for their annual or semiannual interview — click <strong>Add to pipeline</strong> to start tracking one, or <strong>Dismiss</strong> to hide it for now.</p>
+        <p>A <strong>Youth Interviews Due</strong> box appears automatically when youth (ages 12–17, from birth dates on Ward Members) are due for their annual or semiannual interview. For youth not yet in the pipeline, click <strong>Add to pipeline</strong> to start tracking one; for youth already tracked whose interview has lapsed, look for the <strong>Interview due</strong> tag on their row in the table below instead. <strong>Dismiss</strong> hides an entry from the box for now.</p>
       </div>
     ),
   },
@@ -497,7 +497,7 @@ export default function Help() {
                 'Admins can set the ward\'s time zone on the Automation & Notifications page — used to determine calendar-day boundaries like the one above.',
                 'Added an Ordinances page tracking baptisms and Aaronic Priesthood advancement, with suggested candidates computed automatically from birth dates (and a new Gender field) on Ward Members.',
                 'Interview Pipeline now shows a "Youth Interviews Due" box for youth overdue for their annual or semiannual interview, computed from Ward Members birth dates.',
-                'Fixed: "Add to pipeline" on a Youth Interviews Due entry appeared to do nothing — it was creating the interview correctly, but the entry stayed listed as due until an interview date was recorded; it now drops off the Due list as soon as it\'s added to the pipeline.',
+                'Fixed: "Add to pipeline" on a Youth Interviews Due entry could appear to do nothing for youth already tracked in the pipeline — it was silently creating a duplicate row instead. "Add to pipeline" now only appears for youth with no pipeline entry yet; anyone already tracked whose interview has lapsed is flagged with an "Interview due" tag directly on their existing row in the table below.',
                 'Added an Annual Duties page (tithing declaration, ward conference, annual budget, and similar) with a Dashboard panel showing what\'s due; window months are editable per duty.',
                 'Added a Youth Council Meetings page (agenda and notes), available to both the Bishopric and Youth Council hubs.',
                 'Ward Members: added an editable Gender field, used to suggest Aaronic Priesthood advancement candidates.',
