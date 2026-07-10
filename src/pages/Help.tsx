@@ -497,6 +497,7 @@ export default function Help() {
                 'Admins can set the ward\'s time zone on the Automation & Notifications page — used to determine calendar-day boundaries like the one above.',
                 'Added an Ordinances page tracking baptisms and Aaronic Priesthood advancement, with suggested candidates computed automatically from birth dates (and a new Gender field) on Ward Members.',
                 'Interview Pipeline now shows a "Youth Interviews Due" box for youth overdue for their annual or semiannual interview, computed from Ward Members birth dates.',
+                'Fixed: "Add to pipeline" on a Youth Interviews Due entry appeared to do nothing — it was creating the interview correctly, but the entry stayed listed as due until an interview date was recorded; it now drops off the Due list as soon as it\'s added to the pipeline.',
                 'Added an Annual Duties page (tithing declaration, ward conference, annual budget, and similar) with a Dashboard panel showing what\'s due; window months are editable per duty.',
                 'Added a Youth Council Meetings page (agenda and notes), available to both the Bishopric and Youth Council hubs.',
                 'Ward Members: added an editable Gender field, used to suggest Aaronic Priesthood advancement candidates.',

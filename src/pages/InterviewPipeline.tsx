@@ -213,6 +213,10 @@ function computeDueYouth(wardMembers: WardMember[], interviews: InterviewType[])
       i.member?.trim().toLowerCase() === wm.name.trim().toLowerCase() && i.type_of_interview === type);
     const lastDates = matches.map(m => m.last_interview_datetime).filter(Boolean).sort();
     const last = lastDates[lastDates.length - 1] || null;
+    // A pipeline row with no interview date yet means it's already being tracked
+    // (e.g. just added via "Add to pipeline") — don't nag again until it's either
+    // removed or an interview date is recorded that later goes stale.
+    if (matches.length > 0 && !last) continue;
     const cutoff = new Date(now);
     cutoff.setMonth(cutoff.getMonth() - cadenceMonths);
     const isDue = !last || new Date(last.slice(0, 10) + 'T12:00:00') < cutoff;
