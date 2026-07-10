@@ -808,6 +808,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (method === 'POST') {
         const body = await request.json() as Record<string, unknown>;
         body.shared_with_wc = 1;
+        body.updated_by = session.name;
         delete body.id;
         const keys = Object.keys(body);
         const result = await db.prepare(
@@ -830,6 +831,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           }
           body.shared_with_wc = 1;
           body.updated_at = new Date().toISOString();
+          body.updated_by = session.name;
           const keys = Object.keys(body);
           await db.prepare(`UPDATE member_needs SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`)
             .bind(...keys.map(k => body[k]), needId).run();
@@ -856,6 +858,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           if (!String(body.share_with || '').includes('Ward Council')) {
             body.share_with = body.share_with ? body.share_with + ',Ward Council' : 'Ward Council';
           }
+          body.updated_by = session.name;
           delete body.id;
           const keys = Object.keys(body);
           const result = await db.prepare(
@@ -1000,6 +1003,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   if (method === 'POST') {
     const body = await request.json() as Record<string, unknown>;
+    delete body.updated_by;
+    body.updated_by = session.name;
     const keys = Object.keys(body);
     const placeholders = keys.map(() => '?').join(', ');
     const values = keys.map(k => body[k]);
@@ -1019,6 +1024,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const baseUpdatedAt = body._base_updated_at as string | null | undefined;
     delete body._base_updated_at;
     delete body.updated_at;
+    delete body.updated_by;
 
     if (baseUpdatedAt) {
       const conflictCheck = await checkConflict(db, tableConfig.name, recordId, baseUpdatedAt);
@@ -1026,6 +1032,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     body.updated_at = new Date().toISOString();
+    body.updated_by = session.name;
     const keys = Object.keys(body);
     const setClause = keys.map(k => `${k} = ?`).join(', ');
     const values = keys.map(k => body[k]);

@@ -6,6 +6,7 @@ import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
 import { SHARE_WITH_OPTIONS } from '../lib/constants';
 import { useConfirm } from '../components/ConfirmDialog';
+import LastEdited from '../components/LastEdited';
 
 const EMPTY: Partial<Task> = { task: '', assigned_to: '', done: 0, share_with: '', due_date: '' };
 
@@ -154,6 +155,7 @@ export default function Tasks() {
               onChange={v => setEditing({ ...editing, share_with: v })}
               options={shareWithOptions}
             />
+            <LastEdited updatedBy={editing.updated_by} updatedAt={editing.updated_at} />
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
               <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">Save</button>

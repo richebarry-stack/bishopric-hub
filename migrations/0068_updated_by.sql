@@ -1,0 +1,31 @@
+-- Audit trail groundwork: records who last saved each row (stores the user's
+-- name as text for zero-join display), stamped server-side on every write.
+ALTER TABLE calling_pipeline ADD COLUMN updated_by TEXT;
+ALTER TABLE interview_pipeline ADD COLUMN updated_by TEXT;
+ALTER TABLE tasks ADD COLUMN updated_by TEXT;
+ALTER TABLE rotating_assignments ADD COLUMN updated_by TEXT;
+ALTER TABLE bishopric_meetings ADD COLUMN updated_by TEXT;
+ALTER TABLE out_of_town ADD COLUMN updated_by TEXT;
+ALTER TABLE sacrament_speakers ADD COLUMN updated_by TEXT;
+ALTER TABLE prayers ADD COLUMN updated_by TEXT;
+ALTER TABLE sacrament_music ADD COLUMN updated_by TEXT;
+ALTER TABLE sacrament_themes ADD COLUMN updated_by TEXT;
+ALTER TABLE member_needs ADD COLUMN updated_by TEXT;
+ALTER TABLE calendaring ADD COLUMN updated_by TEXT;
+ALTER TABLE missionary_pipeline ADD COLUMN updated_by TEXT;
+ALTER TABLE babies ADD COLUMN updated_by TEXT;
+ALTER TABLE "bishop-schedule" ADD COLUMN updated_by TEXT;
+ALTER TABLE members_without_callings ADD COLUMN updated_by TEXT;
+ALTER TABLE sacrament_announcements ADD COLUMN updated_by TEXT;
+ALTER TABLE prayer_others ADD COLUMN updated_by TEXT;
+ALTER TABLE sacrament_agenda_notes ADD COLUMN updated_by TEXT;
+ALTER TABLE sacrament_ward_business ADD COLUMN updated_by TEXT;
+ALTER TABLE sacrament_agenda_exclusions ADD COLUMN updated_by TEXT;
+ALTER TABLE important_links ADD COLUMN updated_by TEXT;
+ALTER TABLE ward_members ADD COLUMN updated_by TEXT;
+ALTER TABLE youth_activities ADD COLUMN updated_by TEXT;
+ALTER TABLE wc_meetings ADD COLUMN updated_by TEXT;
+ALTER TABLE wc_wins ADD COLUMN updated_by TEXT;
+ALTER TABLE wc_family_needs ADD COLUMN updated_by TEXT;
+ALTER TABLE wc_discussion_topics ADD COLUMN updated_by TEXT;
+ALTER TABLE hub_suggestions ADD COLUMN updated_by TEXT;

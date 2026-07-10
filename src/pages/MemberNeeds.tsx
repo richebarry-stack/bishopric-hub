@@ -5,6 +5,7 @@ import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
 import { MEMBER_NEED_TYPES } from '../lib/constants';
 import { useAuth } from '../lib/auth';
+import LastEdited from '../components/LastEdited';
 
 const CUSTOM_TYPES_KEY = 'bishopric_member_need_types';
 
@@ -178,6 +179,7 @@ export default function MemberNeeds() {
                 Share with ward council
               </label>
             )}
+            <LastEdited updatedBy={editing.updated_by} updatedAt={editing.updated_at} />
             <div className="flex justify-between pt-2">
               <div>
                 {editing.id && (

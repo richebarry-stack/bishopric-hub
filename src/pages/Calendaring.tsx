@@ -5,6 +5,7 @@ import Modal from '../components/Modal';
 import { Input, Select, Textarea, Checkbox } from '../components/FormFields';
 import { SHARE_WITH_OPTIONS } from '../lib/constants';
 import { useAuth } from '../lib/auth';
+import LastEdited from '../components/LastEdited';
 
 const TODAY_PREFIX = new Date().toISOString().slice(0, 10);
 
@@ -158,6 +159,7 @@ export default function Calendaring() {
             <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} />
             <Select label="Share With" value={editing.share_with || ''} onChange={v => setEditing({ ...editing, share_with: v })} options={SHARE_WITH_OPTIONS} />
             <Checkbox label="Announce in sacrament meeting" checked={!!editing.announce_in_sacrament} onChange={v => setEditing({ ...editing, announce_in_sacrament: v ? 1 : 0 })} />
+            <LastEdited updatedBy={editing.updated_by} updatedAt={editing.updated_at} />
             <div className="flex justify-between pt-2">
               <div>
                 {editing.id && (

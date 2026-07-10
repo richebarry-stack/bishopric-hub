@@ -137,6 +137,7 @@ export interface CallingPipeline {
   organization: string;
   type: string; // 'Calling' | 'Release'
   updated_at: string;
+  updated_by?: string;
 }
 
 export interface InterviewPipeline {
@@ -160,6 +161,8 @@ export interface Task {
   done: number;
   share_with: string;
   due_date: string;
+  updated_at?: string;
+  updated_by?: string;
 }
 
 export interface RotatingAssignment {
@@ -301,6 +304,7 @@ export interface MemberNeed {
   pray_for: number;
   shared_with_wc: number;
   updated_at: string;
+  updated_by?: string;
 }
 
 export interface CalendarEvent {
@@ -310,6 +314,8 @@ export interface CalendarEvent {
   notes: string;
   announce_in_sacrament: number;
   share_with: string;
+  updated_at?: string;
+  updated_by?: string;
 }
 
 export interface MissionaryPipeline {
