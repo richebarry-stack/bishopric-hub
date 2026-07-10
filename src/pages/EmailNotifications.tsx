@@ -5,6 +5,7 @@ const JOB_LABELS: Record<string, string> = {
   syncConduct: 'Sacrament conducting sync',
   cleanupSessions: 'Expired session cleanup',
   cleanupLoginAttempts: 'Login attempt log cleanup',
+  cleanupPresence: 'Stale presence cleanup',
 };
 
 function formatWhen(iso: string | null): string {

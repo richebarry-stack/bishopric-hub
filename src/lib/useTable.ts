@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
 import { toast } from './toast';
+import { markEditing } from './editingActivity';
 
 export function useTable<T extends { id: number }>(tableName: string, options?: { enabled?: boolean; pollMs?: number | false }) {
   const queryClient = useQueryClient();
@@ -25,7 +26,7 @@ export function useTable<T extends { id: number }>(tableName: string, options?: 
   };
 
   const createMutation = useMutation({
-    mutationFn: ({ data }: { data: Record<string, unknown>; silent?: boolean }) => api.create<T>(tableName, data),
+    mutationFn: ({ data }: { data: Record<string, unknown>; silent?: boolean }) => { markEditing(); return api.create<T>(tableName, data); },
     onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey });
       if (!variables.silent) toast.success('Saved');
@@ -35,6 +36,7 @@ export function useTable<T extends { id: number }>(tableName: string, options?: 
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Record<string, unknown>; silent?: boolean }) => {
+      markEditing();
       const cached = queryClient.getQueryData<T[]>(queryKey);
       const baseUpdatedAt = (cached?.find(r => r.id === id) as { updated_at?: string } | undefined)?.updated_at ?? null;
       return api.update<T>(tableName, id, { ...data, _base_updated_at: baseUpdatedAt });
@@ -47,7 +49,7 @@ export function useTable<T extends { id: number }>(tableName: string, options?: 
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.delete(tableName, id),
+    mutationFn: (id: number) => { markEditing(); return api.delete(tableName, id); },
     onSuccess: () => queryClient.invalidateQueries({ queryKey }),
     onError,
   });

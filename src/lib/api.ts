@@ -91,6 +91,12 @@ export const api = {
   automationStatus: {
     get: () => request<{ last_run: string | null; results: Record<string, { ok: boolean; error?: string; [key: string]: unknown }> }>('/automation-status'),
   },
+  presence: {
+    heartbeat: (path: string, editing: boolean) =>
+      request<{ others: { user_id: number; user_name: string; path: string; editing: number }[] }>('/presence', {
+        method: 'POST', body: JSON.stringify({ path, editing }),
+      }),
+  },
   syncConduct: () => {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');

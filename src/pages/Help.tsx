@@ -447,6 +447,12 @@ export default function Help() {
         <div className="space-y-4">
           {([
             {
+              date: 'Jul 10, 2026',
+              items: [
+                'Added a live "who\'s online" indicator: the sidebar now shows which other users are currently in the app and what page they\'re on, and a banner appears at the top of a page when someone else is viewing it (or actively editing it, shown in amber) — helps avoid two people working on the same thing at once.',
+              ],
+            },
+            {
               date: 'Jul 9, 2026',
               items: [
                 'Current Sacrament Meeting: each person in "To Be Sustained" and "To Be Thanked" can now be removed individually for just that week (click the × next to their name) — useful when a sustaining or release is deferred to a later Sunday. They stay off that week\'s agenda and history, but reappear automatically the following week since their calling status hasn\'t changed.',

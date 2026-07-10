@@ -97,6 +97,16 @@ export async function cleanupLoginAttempts(db: D1Database): Promise<JobResult> {
   return { ok: true, deleted: result.meta.changes ?? 0 };
 }
 
+/** Purges stale presence rows. Freshness for display is already enforced at read
+ * time (<90s); this is just table hygiene for users who never come back. */
+export async function cleanupPresence(db: D1Database): Promise<JobResult> {
+  // presence.updated_at is stamped with JS ISO strings (see the /api/presence handler),
+  // so the cutoff must be computed the same way rather than with SQLite's datetime().
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const result = await db.prepare('DELETE FROM presence WHERE updated_at < ?').bind(cutoff).run();
+  return { ok: true, deleted: result.meta.changes ?? 0 };
+}
+
 export async function runDailyJobs(db: D1Database): Promise<Record<string, JobResult>> {
   const todayStr = new Date().toISOString().slice(0, 10);
   const results: Record<string, JobResult> = {};
@@ -109,6 +119,9 @@ export async function runDailyJobs(db: D1Database): Promise<Record<string, JobRe
 
   try { results.cleanupLoginAttempts = await cleanupLoginAttempts(db); }
   catch (e) { results.cleanupLoginAttempts = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+
+  try { results.cleanupPresence = await cleanupPresence(db); }
+  catch (e) { results.cleanupPresence = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 
   return results;
 }

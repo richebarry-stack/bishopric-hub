@@ -12,6 +12,7 @@ interface Session {
   role: string;
   church_role: string;
   hub: string;
+  name: string;
 }
 
 const TABLES: Record<string, { name: string; orderBy?: string }> = {
@@ -111,7 +112,7 @@ async function getSession(request: Request, db: D1Database): Promise<Session | n
   if (!match) return null;
   const sessionId = match[1];
   const session = await db.prepare(
-    `SELECT s.id, s.user_id, s.expires_at, u.role, u.church_role, u.hub
+    `SELECT s.id, s.user_id, s.expires_at, u.role, u.church_role, u.hub, u.name
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.id = ? AND s.expires_at > datetime("now")`
   ).bind(sessionId).first<Session>();
@@ -591,6 +592,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           .bind(JSON.stringify({ last_run: nowIso, results }), new Date().toISOString()).run();
       })());
     }
+  }
+
+  // Presence heartbeat: upserts the caller's own row, then returns everyone else's
+  // fresh (<90s old) presence in the same request — piggybacks on the client's
+  // existing 30s polling instead of adding a separate channel.
+  if (routeParts[0] === 'presence' && method === 'POST') {
+    if (session.role === 'guest') return json({ others: [] });
+    const { path, editing } = await request.json() as { path: string; editing?: boolean };
+    const nowIso = new Date().toISOString();
+    await db.prepare(
+      `INSERT INTO presence (user_id, user_name, path, editing, updated_at) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET user_name = excluded.user_name, path = excluded.path,
+         editing = excluded.editing, updated_at = excluded.updated_at`
+    ).bind(session.user_id, session.name, path || '', editing ? 1 : 0, nowIso).run();
+    const cutoffIso = new Date(Date.now() - 90 * 1000).toISOString();
+    const others = await db.prepare(
+      'SELECT user_id, user_name, path, editing FROM presence WHERE user_id != ? AND updated_at > ?'
+    ).bind(session.user_id, cutoffIso).all();
+    return json({ others: others.results });
   }
 
   // Nav label customisation (admin writes, all authenticated users read)

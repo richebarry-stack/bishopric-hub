@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 import { SECURITY_QUESTIONS } from '../lib/constants';
+import { usePresence, type PresenceUser } from '../lib/usePresence';
 
 export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?: boolean }[] = [
   { path: '/', label: 'Dashboard', icon: '⌂' },
@@ -130,6 +131,21 @@ export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: s
   },
 ];
 const BH_ALL_ITEMS = [BH_DASHBOARD_ITEM, ...BH_NAV_CATEGORIES.flatMap(cat => cat.items)];
+
+// Flattened path → friendly label map (for the presence indicator), covering every hub's pages.
+const PATH_LABELS: Record<string, string> = {};
+for (const item of [
+  ...BH_ALL_ITEMS,
+  WC_DASHBOARD_ITEM, ...WC_NAV_CATEGORIES.flatMap(cat => cat.items),
+  ...YC_NAV_ITEMS, ...CAL_NAV_ITEMS,
+]) {
+  if (!(item.path in PATH_LABELS)) PATH_LABELS[item.path] = item.label;
+}
+function pathLabel(path: string): string {
+  if (PATH_LABELS[path]) return PATH_LABELS[path];
+  const segment = path.split('/').filter(Boolean).pop();
+  return segment ? segment.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Dashboard';
+}
 
 const NAV_ORDER_KEY = (userId: number) => `nav_order_${userId}`;
 export const LAST_VISITED_KEY = 'last_visited_page';
@@ -327,6 +343,36 @@ function RenameLinksModal({ labels, onSave, onClose }: {
   );
 }
 
+function PresenceOnlineList({ others }: { others: PresenceUser[] }) {
+  if (others.length === 0) return null;
+  return (
+    <div className="px-3 py-2 border-t border-gray-100">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">Online now</p>
+      <ul className="space-y-1">
+        {others.map(o => (
+          <li key={o.user_id} className="flex items-center gap-1.5 text-xs text-gray-600">
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${o.editing ? 'bg-amber-500' : 'bg-green-500'}`} title={o.editing ? 'Editing' : 'Viewing'} />
+            <span className="truncate">{o.user_name} <span className="text-gray-400">— {pathLabel(o.path)}</span></span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function PresenceBanner({ others, path }: { others: PresenceUser[]; path: string }) {
+  const here = others.filter(o => o.path === path);
+  if (here.length === 0) return null;
+  const editing = here.some(o => o.editing);
+  const names = here.map(o => o.user_name).join(', ');
+  const verb = here.length === 1 ? 'is' : 'are';
+  return (
+    <div className={`mb-3 px-3 py-2 rounded-md text-sm border ${editing ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-blue-50 text-blue-800 border-blue-200'}`}>
+      {names} {verb} {editing ? 'actively editing' : 'also viewing'} this page.
+    </div>
+  );
+}
+
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showChangePw, setShowChangePw] = useState(false);
@@ -336,6 +382,7 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, selectedHub, chooseHub, isGuest, guestType } = useAuth();
+  const othersOnline = usePresence(location.pathname, !isGuest);
 
   const HUB_DEFAULT: Record<string, string> = {
     yc: '/youth-activities',
@@ -575,6 +622,7 @@ export default function Layout() {
             ))
           )}
         </nav>
+        <PresenceOnlineList others={othersOnline} />
         <div className="p-2 border-t border-gray-200 space-y-1">
           {isAdmin && !isWc && !isCal && (
             <button onClick={() => setShowRename(true)}
@@ -620,6 +668,7 @@ export default function Layout() {
           <h1 className={`text-lg font-bold ${isGuest ? 'text-amber-800' : 'text-gray-900'}`}>Bishopric Hub</h1>
         </header>
         <main className="p-4 lg:p-6">
+          <PresenceBanner others={othersOnline} path={location.pathname} />
           <Outlet />
         </main>
       </div>
