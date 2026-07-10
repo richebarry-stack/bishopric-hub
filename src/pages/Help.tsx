@@ -453,6 +453,7 @@ export default function Help() {
                 'Speakers & Prayers and Interview Pipeline now show a card layout on phones instead of a hard-to-read sideways-scrolling table, with all the same actions (notes, include/exclude, select, delete) available.',
                 'Faster loading: pages now load on demand instead of all at once, so the initial page load is noticeably faster, especially on phones.',
                 'Action Items, Member Needs, Calendar Events, and Calling Pipeline now show "Last edited by [name]" in the edit form once a record has been saved by someone.',
+                'Fixed: a user\'s "Last Access" on the Users page could lag a day behind if they had logged in less than 24 hours after their previous visit — it now updates as soon as they access the app on a new calendar day.',
               ],
             },
             {

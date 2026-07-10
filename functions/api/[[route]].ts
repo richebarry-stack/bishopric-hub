@@ -117,10 +117,11 @@ async function getSession(request: Request, db: D1Database): Promise<Session | n
      WHERE s.id = ? AND s.expires_at > datetime("now")`
   ).bind(sessionId).first<Session>();
   if (session) {
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    // Update once per calendar day (not just once per rolling 24h) so a login
+    // shows up as "today" immediately, even if the previous update was <24h ago.
     await db.prepare(
-      `UPDATE users SET last_access = ? WHERE id = ? AND (last_access = '' OR last_access < ?)`
-    ).bind(new Date().toISOString(), session.user_id, oneDayAgo).run();
+      `UPDATE users SET last_access = ? WHERE id = ? AND (last_access = '' OR date(last_access) < date('now'))`
+    ).bind(new Date().toISOString(), session.user_id).run();
   }
   return session;
 }
