@@ -1,41 +1,49 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './lib/auth';
+import { lazyWithReload } from './lib/lazyWithReload';
 import Layout from './components/Layout';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import CallingPipeline from './pages/CallingPipeline';
-import InterviewPipeline from './pages/InterviewPipeline';
-import Tasks from './pages/Tasks';
-import SacramentPlanning from './pages/SacramentPlanning';
-import CurrentSacrament from './pages/CurrentSacrament';
-import BishopricMeetings from './pages/BishopricMeetings';
-import MemberNeeds from './pages/MemberNeeds';
-import MissionaryPipeline from './pages/MissionaryPipeline';
-import Babies from './pages/Babies';
-import OutOfTown from './pages/OutOfTown';
-import Calendaring from './pages/Calendaring';
-import BishopSchedule from './pages/BishopSchedule';
-import Assignments from './pages/Assignments';
-import Users from './pages/Users';
-import EmailNotifications from './pages/EmailNotifications';
-import ImportantLinks from './pages/ImportantLinks';
 import ForceResetPassword from './pages/ForceResetPassword';
 import SecurityQuestionsSetup from './pages/SecurityQuestionsSetup';
-import Help from './pages/Help';
-import YouthActivities from './pages/YouthActivities';
-import SacramentProgram from './pages/SacramentProgram';
-import WardCouncilMembers from './pages/WardCouncilMembers';
-import SpeakersAndPrayers from './pages/SpeakersAndPrayers';
-import WardMembers from './pages/WardMembers';
-import WcDashboard from './pages/WcDashboard';
-import WcMeetings from './pages/WcMeetings';
-import WcWins from './pages/WcWins';
-import WcDiscussionTopics from './pages/WcDiscussionTopics';
-import HubSuggestions from './pages/HubSuggestions';
 import ToastContainer from './components/Toast';
 import { ConfirmProvider } from './components/ConfirmDialog';
+
+const Dashboard = lazyWithReload(() => import('./pages/Dashboard'));
+const CallingPipeline = lazyWithReload(() => import('./pages/CallingPipeline'));
+const InterviewPipeline = lazyWithReload(() => import('./pages/InterviewPipeline'));
+const Tasks = lazyWithReload(() => import('./pages/Tasks'));
+const SacramentPlanning = lazyWithReload(() => import('./pages/SacramentPlanning'));
+const CurrentSacrament = lazyWithReload(() => import('./pages/CurrentSacrament'));
+const BishopricMeetings = lazyWithReload(() => import('./pages/BishopricMeetings'));
+const MemberNeeds = lazyWithReload(() => import('./pages/MemberNeeds'));
+const MissionaryPipeline = lazyWithReload(() => import('./pages/MissionaryPipeline'));
+const Babies = lazyWithReload(() => import('./pages/Babies'));
+const OutOfTown = lazyWithReload(() => import('./pages/OutOfTown'));
+const Calendaring = lazyWithReload(() => import('./pages/Calendaring'));
+const BishopSchedule = lazyWithReload(() => import('./pages/BishopSchedule'));
+const Assignments = lazyWithReload(() => import('./pages/Assignments'));
+const Users = lazyWithReload(() => import('./pages/Users'));
+const EmailNotifications = lazyWithReload(() => import('./pages/EmailNotifications'));
+const ImportantLinks = lazyWithReload(() => import('./pages/ImportantLinks'));
+const Help = lazyWithReload(() => import('./pages/Help'));
+const YouthActivities = lazyWithReload(() => import('./pages/YouthActivities'));
+const SacramentProgram = lazyWithReload(() => import('./pages/SacramentProgram'));
+const WardCouncilMembers = lazyWithReload(() => import('./pages/WardCouncilMembers'));
+const SpeakersAndPrayers = lazyWithReload(() => import('./pages/SpeakersAndPrayers'));
+const WardMembers = lazyWithReload(() => import('./pages/WardMembers'));
+const WcDashboard = lazyWithReload(() => import('./pages/WcDashboard'));
+const WcMeetings = lazyWithReload(() => import('./pages/WcMeetings'));
+const WcWins = lazyWithReload(() => import('./pages/WcWins'));
+const WcDiscussionTopics = lazyWithReload(() => import('./pages/WcDiscussionTopics'));
+const HubSuggestions = lazyWithReload(() => import('./pages/HubSuggestions'));
+
+const FullScreenLoading = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <p className="text-gray-400">Loading...</p>
+  </div>
+);
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 10_000, retry: 1, refetchInterval: 30_000 } },
@@ -68,11 +76,7 @@ function AppRoutes() {
   const [securitySkipped, setSecuritySkipped] = useState(false);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-400">Loading...</p>
-      </div>
-    );
+    return <FullScreenLoading />;
   }
 
   if (!user) return <Login />;
@@ -181,7 +185,9 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <ConfirmProvider>
-            <AppRoutes />
+            <Suspense fallback={<FullScreenLoading />}>
+              <AppRoutes />
+            </Suspense>
             <ToastContainer />
           </ConfirmProvider>
         </BrowserRouter>

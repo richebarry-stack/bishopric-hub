@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
@@ -669,7 +669,9 @@ export default function Layout() {
         </header>
         <main className="p-4 lg:p-6">
           <PresenceBanner others={othersOnline} path={location.pathname} />
-          <Outlet />
+          <Suspense fallback={<p className="text-gray-400 text-sm">Loading…</p>}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>
