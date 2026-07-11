@@ -1,5 +1,6 @@
 # Cloudflare config — contains your D1 database_id; copy wrangler.jsonc.example and fill in your values
 wrangler.jsonc
+wrangler.demo.jsonc
 
 # Wrangler local dev state (local SQLite, cache)
 .wrangler/
