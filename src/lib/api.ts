@@ -84,6 +84,11 @@ export const api = {
     save: (timeZone: string) =>
       request('/app-timezone', { method: 'PUT', body: JSON.stringify({ timeZone }) }),
   },
+  wardName: {
+    get: () => request<{ wardName: string }>('/ward-name'),
+    save: (wardName: string) =>
+      request('/ward-name', { method: 'PUT', body: JSON.stringify({ wardName }) }),
+  },
   wardMembers: {
     import: (data: {
       updates: { id: number; birth_date: string }[];

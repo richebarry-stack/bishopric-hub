@@ -557,6 +557,13 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 11, 2026 (11)',
+              items: [
+                'The app\'s title is now configurable — set a Ward Name under Automation & Notifications and the login page/sidebar show "<Ward Name> Ward Leadership Hub" instead of a fixed "Bishopric Hub".',
+                'Guest accounts (the youth and sacrament read-only logins) no longer appear on the Users page and can\'t be deleted — they\'re login shortcuts, not real people.',
+              ],
+            },
+            {
               date: 'Jul 11, 2026 (10)',
               items: [
                 'Only one user account can hold the Bishop calling, and likewise for First Counselor and Second Counselor — assigning one of these to a new person is blocked until the previous holder\'s calling is changed first.',

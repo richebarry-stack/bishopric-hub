@@ -476,6 +476,28 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ error: 'Not found' }, 404);
   }
 
+  // Ward name — shown as "<ward name> Ward Leadership Hub" on the login page and
+  // sidebar, so it must be readable without a session. Admin-only to change.
+  if (routeParts[0] === 'ward-name') {
+    if (method === 'GET') {
+      const row = await db.prepare("SELECT value FROM ui_settings WHERE key = 'ward_name'").first<{ value: string }>();
+      return json({ wardName: row?.value || '' });
+    }
+    if (method === 'PUT') {
+      const session = await getSession(request, db);
+      if (!session) return json({ error: 'Unauthorized' }, 401);
+      if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+      const body = await request.json() as { wardName?: string };
+      const wardName = (body.wardName || '').trim();
+      const now = new Date().toISOString();
+      await db.prepare(
+        "INSERT INTO ui_settings (key, value, updated_at) VALUES ('ward_name', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
+      ).bind(wardName, now).run();
+      return json({ ok: true });
+    }
+    return json({ error: 'Method not allowed' }, 405);
+  }
+
   // All other endpoints require auth
   // (session checked below)
 
@@ -500,15 +522,17 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     if (method === 'GET') {
+      // Guest accounts (guest_yc/guest_sac) aren't real people — they're login shortcuts
+      // for the read-only guest views, so they never show up in user management.
       // WC-hub users only see WC users
       if (session.hub === 'wc') {
-        const users = await db.prepare("SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE hub IN ('wc','both') ORDER BY name ASC").all();
+        const users = await db.prepare("SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE hub IN ('wc','both') AND role != 'guest' ORDER BY name ASC").all();
         return json(users.results);
       }
       const filterHub = url.searchParams.get('hub');
       const users = filterHub === 'wc'
-        ? await db.prepare("SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE hub IN ('wc','both') ORDER BY name ASC").all()
-        : await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users ORDER BY name ASC').all();
+        ? await db.prepare("SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE hub IN ('wc','both') AND role != 'guest' ORDER BY name ASC").all()
+        : await db.prepare("SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE role != 'guest' ORDER BY name ASC").all();
       return json(users.results);
     }
 
@@ -639,6 +663,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const userId = Number(routeParts[1]);
       if (userId === session.user_id) return json({ error: 'Cannot delete yourself' }, 400);
       const target = await db.prepare('SELECT role FROM users WHERE id = ?').bind(userId).first<{ role: string }>();
+      if (target?.role === 'guest') return json({ error: 'Guest accounts cannot be deleted' }, 400);
       if (target?.role === 'admin') {
         const adminCount = await db.prepare("SELECT COUNT(*) as cnt FROM users WHERE role = 'admin'").first<{ cnt: number }>();
         if (adminCount && adminCount.cnt <= 1) return json({ error: 'Must have at least one admin' }, 400);
