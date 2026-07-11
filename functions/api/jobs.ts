@@ -141,8 +141,8 @@ export async function syncYouthInterviews(db: D1Database): Promise<JobResult> {
   const nowIso = now.toISOString();
 
   const membersResult = await db.prepare(
-    "SELECT id, name, birth_date FROM ward_members WHERE active = 1 AND birth_date IS NOT NULL AND birth_date != ''"
-  ).all<{ id: number; name: string; birth_date: string }>();
+    "SELECT id, last_name, first_name, birth_date FROM ward_members WHERE active = 1 AND birth_date IS NOT NULL AND birth_date != ''"
+  ).all<{ id: number; last_name: string; first_name: string; birth_date: string }>();
 
   const existingResult = await db.prepare(
     "SELECT id, ward_member_id, member, type_of_interview FROM interview_pipeline WHERE type_of_interview IN ('Youth 12-15', 'Youth 16-17')"
@@ -165,17 +165,18 @@ export async function syncYouthInterviews(db: D1Database): Promise<JobResult> {
     const age = computeYouthAge(wm.birth_date, now);
     if (age === null || age < 12) continue;
     const type = age >= 16 ? 'Youth 16-17' : 'Youth 12-15';
+    const legalName = wm.first_name ? `${wm.last_name}, ${wm.first_name}` : wm.last_name;
 
     const linkedRow = linkedByWardMemberId.get(wm.id);
     if (linkedRow) {
-      if (linkedRow.type_of_interview !== type || linkedRow.member !== wm.name) {
-        stmts.push(db.prepare('UPDATE interview_pipeline SET type_of_interview = ?, member = ?, updated_at = ? WHERE id = ?').bind(type, wm.name, nowIso, linkedRow.id));
+      if (linkedRow.type_of_interview !== type || linkedRow.member !== legalName) {
+        stmts.push(db.prepare('UPDATE interview_pipeline SET type_of_interview = ?, member = ?, updated_at = ? WHERE id = ?').bind(type, legalName, nowIso, linkedRow.id));
         updated++;
       }
       continue;
     }
 
-    const unlinkedRow = unlinkedByName.get(wm.name.trim().toLowerCase());
+    const unlinkedRow = unlinkedByName.get(legalName.trim().toLowerCase());
     if (unlinkedRow) {
       stmts.push(db.prepare('UPDATE interview_pipeline SET ward_member_id = ?, type_of_interview = ?, updated_at = ? WHERE id = ?').bind(wm.id, type, nowIso, unlinkedRow.id));
       linked++;
@@ -184,7 +185,7 @@ export async function syncYouthInterviews(db: D1Database): Promise<JobResult> {
 
     stmts.push(db.prepare(
       'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, ward_member_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).bind(wm.name, type, 'Unassigned', bishopName, wm.id, nowIso, nowIso));
+    ).bind(legalName, type, 'Unassigned', bishopName, wm.id, nowIso, nowIso));
     created++;
   }
 

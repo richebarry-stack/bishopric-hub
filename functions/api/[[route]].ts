@@ -40,7 +40,7 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'sacrament-ward-business': { name: 'sacrament_ward_business', orderBy: 'meeting_date DESC' },
   'sacrament-agenda-exclusions': { name: 'sacrament_agenda_exclusions', orderBy: 'id ASC' },
   'important-links': { name: 'important_links', orderBy: 'id ASC' },
-  'ward-members': { name: 'ward_members', orderBy: 'name ASC' },
+  'ward-members': { name: 'ward_members', orderBy: 'last_name ASC, first_name ASC' },
   'youth-activities': { name: 'youth_activities', orderBy: 'date ASC' },
   'wc-meetings': { name: 'wc_meetings', orderBy: 'date ASC' },
   'wc-wins': { name: 'wc_wins', orderBy: 'date DESC' },
@@ -1032,7 +1032,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
     const body = await request.json() as {
       updates?: { id: number; birth_date: string }[];
-      creates?: { name: string; birth_date: string | null }[];
+      creates?: { last_name: string; first_name: string; birth_date: string | null }[];
       deactivate?: number[];
     };
     const updates = (body.updates || []).slice(0, 1000);
@@ -1043,14 +1043,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (!u.birth_date || !dateRe.test(u.birth_date)) return json({ error: `Invalid birth_date for id ${u.id}` }, 400);
     }
     for (const c of creates) {
-      if (c.birth_date && !dateRe.test(c.birth_date)) return json({ error: `Invalid birth_date for "${c.name}"` }, 400);
-      if (!c.name || !c.name.trim()) return json({ error: 'Name required for new member' }, 400);
+      if (c.birth_date && !dateRe.test(c.birth_date)) return json({ error: `Invalid birth_date for "${c.last_name}"` }, 400);
+      if (!c.last_name || !c.last_name.trim()) return json({ error: 'Last name required for new member' }, 400);
     }
 
     const now = new Date().toISOString();
     const stmts = [
       ...updates.map(u => db.prepare('UPDATE ward_members SET birth_date = ?, updated_at = ? WHERE id = ?').bind(u.birth_date, now, u.id)),
-      ...creates.map(c => db.prepare('INSERT INTO ward_members (name, active, birth_date, updated_at) VALUES (?, 1, ?, ?)').bind(c.name.trim(), c.birth_date || null, now)),
+      ...creates.map(c => db.prepare('INSERT INTO ward_members (last_name, first_name, active, birth_date, updated_at) VALUES (?, ?, 1, ?, ?)').bind(c.last_name.trim(), (c.first_name || '').trim(), c.birth_date || null, now)),
       ...deactivate.map(id => db.prepare('UPDATE ward_members SET active = 0, updated_at = ? WHERE id = ?').bind(now, id)),
     ];
     if (stmts.length > 0) await db.batch(stmts);

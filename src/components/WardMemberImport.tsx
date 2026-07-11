@@ -3,10 +3,12 @@ import Modal from './Modal';
 import { parseCsv, normalizeDate } from '../lib/csv';
 import { api } from '../lib/api';
 import { toast } from '../lib/toast';
+import { legalName } from '../lib/displayName';
 
 interface RosterMember {
   id: number;
-  name: string;
+  first_name: string;
+  last_name: string;
   active: number;
   birth_date: string | null;
 }
@@ -63,6 +65,12 @@ function splitLastFirst(name: string): { last: string; first: string } {
   return { last: last.toLowerCase(), first: first.toLowerCase() };
 }
 
+/** Same split as splitLastFirst but preserving case, for actual creates. */
+function splitLastFirstCased(name: string): { last: string; first: string } {
+  const [last = '', first = ''] = name.split(',').map(p => p.trim());
+  return { last, first };
+}
+
 function firstToken(s: string): string {
   return s.split(/\s+/)[0] || '';
 }
@@ -111,7 +119,7 @@ export default function WardMemberImport({ roster, onClose, onImported }: {
         }));
       setParsedRows(parsed);
 
-      const byExact = new Map(roster.map(m => [m.name.toLowerCase(), m]));
+      const byExact = new Map(roster.map(m => [legalName(m).toLowerCase(), m]));
       const matchedRows: MatchedRow[] = [];
       const createRows: ParsedRow[] = [];
       const unresolvedRows: UnresolvedRow[] = [];
@@ -121,12 +129,12 @@ export default function WardMemberImport({ roster, onClose, onImported }: {
         if (exact) { matchedRows.push({ csvRow: row, member: exact }); continue; }
 
         const { last, first } = splitLastFirst(row.normalizedName);
-        const sameLastName = roster.filter(m => splitLastFirst(m.name).last === last);
-        const firstTokenMatch = sameLastName.find(m => firstToken(splitLastFirst(m.name).first) === firstToken(first));
+        const sameLastName = roster.filter(m => m.last_name.toLowerCase() === last);
+        const firstTokenMatch = sameLastName.find(m => firstToken(m.first_name.toLowerCase()) === firstToken(first));
         if (firstTokenMatch) { matchedRows.push({ csvRow: row, member: firstTokenMatch }); continue; }
 
         const prefixMatch = sameLastName.filter(m => {
-          const mf = splitLastFirst(m.name).first;
+          const mf = m.first_name.toLowerCase();
           return mf.startsWith(firstToken(first)) || firstToken(first).startsWith(firstToken(mf));
         });
         if (prefixMatch.length === 1) { matchedRows.push({ csvRow: row, member: prefixMatch[0] }); continue; }
@@ -171,7 +179,10 @@ export default function WardMemberImport({ roster, onClose, onImported }: {
       const updates = finalMatches
         .filter(m => m.csvRow.birthDate && m.csvRow.birthDate !== m.member.birth_date)
         .map(m => ({ id: m.member.id, birth_date: m.csvRow.birthDate as string }));
-      const creates = finalCreates.map(c => ({ name: c.normalizedName, birth_date: c.birthDate }));
+      const creates = finalCreates.map(c => {
+        const { last, first } = splitLastFirstCased(c.normalizedName);
+        return { last_name: last, first_name: first, birth_date: c.birthDate };
+      });
       const deactivate = missing.filter(m => deactivateChecked[m.id]).map(m => m.id);
 
       const result = await api.wardMembers.import({ updates, creates, deactivate });
@@ -215,7 +226,7 @@ export default function WardMemberImport({ roster, onClose, onImported }: {
               {finalMatches.length === 0 && <p className="px-3 py-2 text-gray-400">None</p>}
               {finalMatches.map((m, i) => (
                 <div key={i} className="px-3 py-1.5 flex justify-between">
-                  <span>{m.member.name}</span>
+                  <span>{legalName(m.member)}</span>
                   {m.csvRow.birthDate && m.csvRow.birthDate !== m.member.birth_date && (
                     <span className="text-gray-400">{m.member.birth_date || '—'} → <span className="text-blue-600">{m.csvRow.birthDate}</span></span>
                   )}
@@ -237,7 +248,7 @@ export default function WardMemberImport({ roster, onClose, onImported }: {
                       {u.candidates.map(c => (
                         <button key={c.id} type="button" onClick={() => resolveAsMatch(i, c.id)}
                           className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-white">
-                          Match to "{c.name}"
+                          Match to "{legalName(c)}"
                         </button>
                       ))}
                       <button type="button" onClick={() => resolveAsCreate(i)}
@@ -269,7 +280,7 @@ export default function WardMemberImport({ roster, onClose, onImported }: {
                 <label key={m.id} className="px-3 py-1.5 flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={!!deactivateChecked[m.id]}
                     onChange={e => setDeactivateChecked(d => ({ ...d, [m.id]: e.target.checked }))} />
-                  {m.name}
+                  {legalName(m)}
                 </label>
               ))}
             </div>

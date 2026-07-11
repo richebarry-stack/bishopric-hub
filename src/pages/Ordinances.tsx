@@ -6,6 +6,7 @@ import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Textarea } from '../components/FormFields';
 import { ORDINANCE_TYPES, ORDINANCE_STATUSES, ORDINANCE_STATUS_COLORS } from '../lib/constants';
 import { useConfirm } from '../components/ConfirmDialog';
+import { legalName } from '../lib/displayName';
 
 const EMPTY: Partial<Ordinance> = { member_name: '', ordinance_type: '', status: 'Upcoming', target_date: '', completed_date: '', notes: '' };
 
@@ -29,8 +30,9 @@ function suggestionsFromRoster(members: WardMember[], existing: Ordinance[]): Su
     if (!birthYear) continue;
     const ageThisYear = year - birthYear;
     const add = (type: string) => {
-      const key = `${m.name.trim().toLowerCase()}|${type}`;
-      if (!tracked.has(key)) out.push({ name: m.name, ordinance_type: type, age: ageThisYear });
+      const name = legalName(m);
+      const key = `${name.trim().toLowerCase()}|${type}`;
+      if (!tracked.has(key)) out.push({ name, ordinance_type: type, age: ageThisYear });
     };
     if (ageThisYear === 8) add('Baptism');
     if (m.gender === 'M') {

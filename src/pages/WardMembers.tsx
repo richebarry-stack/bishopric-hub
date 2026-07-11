@@ -3,20 +3,9 @@ import { useTable } from '../lib/useTable';
 import { toast } from '../lib/toast';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useAuth } from '../lib/auth';
+import { legalName } from '../lib/displayName';
+import type { WardMember } from '../lib/api';
 import WardMemberImport from '../components/WardMemberImport';
-
-interface WardMember {
-  id: number;
-  name: string;
-  active: number;
-  out_of_ward: number;
-  exclude_speakers: number;
-  exclude_prayers: number;
-  birth_date: string | null;
-  gender: string | null;
-  preferred_name: string | null;
-  updated_at: string;
-}
 
 function currentAge(birthDate: string | null): number | null {
   if (!birthDate) return null;
@@ -59,30 +48,73 @@ function BirthDateCell({ member, onSave }: { member: WardMember; onSave: (v: str
   }
   return (
     <button type="button" onClick={() => setEditing(true)}
-      className="text-xs text-gray-500 hover:text-blue-600 hover:underline" aria-label={`Edit birth date for ${member.name}`}>
+      className="text-xs text-gray-500 hover:text-blue-600 hover:underline" aria-label={`Edit birth date for ${legalName(member)}`}>
       {member.birth_date || 'Set birth date'}
     </button>
   );
 }
 
-function PreferredNameCell({ member, onSave }: { member: WardMember; onSave: (v: string) => void }) {
+function NameCell({ member, onSave }: { member: WardMember; onSave: (fields: { first_name: string; last_name: string }) => void }) {
   const [editing, setEditing] = useState(false);
+  const [first, setFirst] = useState(member.first_name);
+  const [last, setLast] = useState(member.last_name);
+
   if (editing) {
+    const commit = () => {
+      setEditing(false);
+      const f = first.trim(), l = last.trim();
+      if (l && (f !== member.first_name || l !== member.last_name)) onSave({ first_name: f, last_name: l });
+      else { setFirst(member.first_name); setLast(member.last_name); }
+    };
     return (
-      <input
-        type="text"
-        autoFocus
-        defaultValue={member.preferred_name || ''}
-        onBlur={e => { setEditing(false); if (e.target.value !== (member.preferred_name || '')) onSave(e.target.value.trim()); }}
-        onKeyDown={e => { if (e.key === 'Escape') setEditing(false); if (e.key === 'Enter') e.currentTarget.blur(); }}
-        className="text-xs rounded border border-gray-300 px-1.5 py-0.5 w-full"
-      />
+      <div className="flex gap-1">
+        <input autoFocus value={last} onChange={e => setLast(e.target.value)} placeholder="Last"
+          onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
+          className="text-sm rounded border border-gray-300 px-1.5 py-0.5 w-24" />
+        <input value={first} onChange={e => setFirst(e.target.value)} placeholder="First"
+          onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
+          className="text-sm rounded border border-gray-300 px-1.5 py-0.5 w-24" />
+      </div>
     );
   }
   return (
+    <button type="button" onClick={() => setEditing(true)} className="text-left hover:text-blue-600" aria-label={`Edit name for ${legalName(member)}`}>
+      {legalName(member)}
+    </button>
+  );
+}
+
+function PreferredNameCell({ member, onSave }: { member: WardMember; onSave: (fields: { preferred_first_name: string; preferred_last_name: string }) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [first, setFirst] = useState(member.preferred_first_name || '');
+  const [last, setLast] = useState(member.preferred_last_name || '');
+
+  if (editing) {
+    const commit = () => {
+      setEditing(false);
+      const f = first.trim(), l = last.trim();
+      if (f !== (member.preferred_first_name || '') || l !== (member.preferred_last_name || '')) {
+        onSave({ preferred_first_name: f, preferred_last_name: l });
+      }
+    };
+    return (
+      <div className="flex gap-1">
+        <input autoFocus value={last} onChange={e => setLast(e.target.value)} placeholder="Last"
+          onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
+          className="text-xs rounded border border-gray-300 px-1.5 py-0.5 w-20" />
+        <input value={first} onChange={e => setFirst(e.target.value)} placeholder="First"
+          onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
+          className="text-xs rounded border border-gray-300 px-1.5 py-0.5 w-20" />
+      </div>
+    );
+  }
+  const shown = member.preferred_first_name || member.preferred_last_name
+    ? `${member.preferred_last_name || ''}${member.preferred_last_name && member.preferred_first_name ? ', ' : ''}${member.preferred_first_name || ''}`
+    : '';
+  return (
     <button type="button" onClick={() => setEditing(true)}
-      className="text-xs text-gray-500 hover:text-blue-600 hover:underline" aria-label={`Edit preferred name for ${member.name}`}>
-      {member.preferred_name || <span className="text-gray-300">—</span>}
+      className="text-xs text-gray-500 hover:text-blue-600 hover:underline" aria-label={`Edit preferred name for ${legalName(member)}`}>
+      {shown || <span className="text-gray-300">—</span>}
     </button>
   );
 }
@@ -92,7 +124,7 @@ function GenderCell({ member, onSave }: { member: WardMember; onSave: (v: string
     <select
       value={member.gender || ''}
       onChange={e => onSave(e.target.value)}
-      aria-label={`Gender for ${member.name}`}
+      aria-label={`Gender for ${legalName(member)}`}
       className="text-xs rounded border border-gray-200 px-1.5 py-0.5 bg-transparent hover:border-gray-300"
     >
       <option value="">—</option>
@@ -109,7 +141,7 @@ interface GroupedRows {
   unknown: WardMember[];
 }
 
-function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSavePreferredName, onToggleOutOfWard }: {
+function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard }: {
   title: string;
   members: WardMember[];
   onToggleActive: (m: WardMember) => void;
@@ -117,7 +149,8 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
   onToggleExclude: (m: WardMember, field: 'exclude_speakers' | 'exclude_prayers') => void;
   onSaveBirthDate: (m: WardMember, v: string) => void;
   onSaveGender: (m: WardMember, v: string) => void;
-  onSavePreferredName: (m: WardMember, v: string) => void;
+  onSaveName: (m: WardMember, fields: { first_name: string; last_name: string }) => void;
+  onSavePreferredName: (m: WardMember, fields: { preferred_first_name: string; preferred_last_name: string }) => void;
   onToggleOutOfWard: (m: WardMember) => void;
 }) {
   if (members.length === 0) return null;
@@ -131,7 +164,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
               <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
-              <th className="text-left px-4 py-2 font-medium text-gray-600 w-28">Preferred Name</th>
+              <th className="text-left px-4 py-2 font-medium text-gray-600 w-36">Preferred Name</th>
               <th className="text-left px-4 py-2 font-medium text-gray-600 w-28">Birth Date</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-16">Gender</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-24">Status</th>
@@ -144,14 +177,14 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
             {members.map(m => (
               <tr key={m.id} className={`border-b border-gray-50 hover:bg-gray-50 ${!m.active ? 'opacity-60' : ''}`}>
                 <td className="px-4 py-2 font-medium text-gray-900">
-                  {m.name}
+                  <NameCell member={m} onSave={fields => onSaveName(m, fields)} />
                   <AgeTag birthDate={m.birth_date} />
                   {!!m.out_of_ward && (
                     <span className="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 ml-1.5 align-middle">Out of ward</span>
                   )}
                 </td>
                 <td className="px-4 py-2">
-                  <PreferredNameCell member={m} onSave={v => onSavePreferredName(m, v)} />
+                  <PreferredNameCell member={m} onSave={fields => onSavePreferredName(m, fields)} />
                 </td>
                 <td className="px-4 py-2">
                   <BirthDateCell member={m} onSave={v => onSaveBirthDate(m, v)} />
@@ -168,14 +201,14 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                 </td>
                 <td className="px-4 py-2 text-center">
                   <button type="button" onClick={() => onToggleExclude(m, 'exclude_speakers')}
-                    aria-label={`Toggle speaker eligibility for ${m.name}`}
+                    aria-label={`Toggle speaker eligibility for ${legalName(m)}`}
                     className={`text-xs px-2 py-0.5 rounded-full min-h-[28px] ${m.exclude_speakers ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
                     {m.exclude_speakers ? 'Excluded' : 'Included'}
                   </button>
                 </td>
                 <td className="px-4 py-2 text-center">
                   <button type="button" onClick={() => onToggleExclude(m, 'exclude_prayers')}
-                    aria-label={`Toggle prayer eligibility for ${m.name}`}
+                    aria-label={`Toggle prayer eligibility for ${legalName(m)}`}
                     className={`text-xs px-2 py-0.5 rounded-full min-h-[28px] ${m.exclude_prayers ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
                     {m.exclude_prayers ? 'Excluded' : 'Included'}
                   </button>
@@ -215,17 +248,18 @@ export default function WardMembers() {
   const [showInactive, setShowInactive] = useState(false);
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [newName, setNewName] = useState('');
+  const [newLast, setNewLast] = useState('');
+  const [newFirst, setNewFirst] = useState('');
   const [saving, setSaving] = useState(false);
 
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
     return rows
       .filter(r => showInactive || r.active)
-      .filter(r => !q || r.name.toLowerCase().includes(q))
+      .filter(r => !q || legalName(r).toLowerCase().includes(q))
       .sort((a, b) => {
         if (a.active !== b.active) return b.active - a.active;
-        return a.name.localeCompare(b.name);
+        return legalName(a).localeCompare(legalName(b));
       });
   }, [rows, filter, showInactive]);
 
@@ -242,21 +276,23 @@ export default function WardMembers() {
   const inactiveCount = rows.length - activeCount;
 
   const handleAdd = useCallback(async () => {
-    const name = newName.trim();
-    if (!name || saving) return;
-    if (rows.some(r => r.name.toLowerCase() === name.toLowerCase())) {
+    const last = newLast.trim();
+    const first = newFirst.trim();
+    if (!last || saving) return;
+    if (rows.some(r => r.last_name.toLowerCase() === last.toLowerCase() && r.first_name.toLowerCase() === first.toLowerCase())) {
       toast.error('This member already exists.');
       return;
     }
     setSaving(true);
     try {
-      await create({ name, active: 1 } as unknown as Record<string, unknown>);
-      setNewName('');
+      await create({ last_name: last, first_name: first, active: 1 } as unknown as Record<string, unknown>);
+      setNewLast('');
+      setNewFirst('');
       setAdding(false);
     } finally {
       setSaving(false);
     }
-  }, [newName, saving, rows, create]);
+  }, [newLast, newFirst, saving, rows, create]);
 
   const toggleActive = useCallback((m: WardMember) => {
     update(m.id, { active: m.active ? 0 : 1 } as unknown as Record<string, unknown>);
@@ -274,8 +310,12 @@ export default function WardMembers() {
     update(m.id, { gender: v } as unknown as Record<string, unknown>);
   }, [update]);
 
-  const savePreferredName = useCallback((m: WardMember, v: string) => {
-    update(m.id, { preferred_name: v } as unknown as Record<string, unknown>);
+  const saveName = useCallback((m: WardMember, fields: { first_name: string; last_name: string }) => {
+    update(m.id, fields as unknown as Record<string, unknown>);
+  }, [update]);
+
+  const savePreferredName = useCallback((m: WardMember, fields: { preferred_first_name: string; preferred_last_name: string }) => {
+    update(m.id, fields as unknown as Record<string, unknown>);
   }, [update]);
 
   const toggleOutOfWard = useCallback((m: WardMember) => {
@@ -284,10 +324,10 @@ export default function WardMembers() {
 
   const confirm = useConfirm();
   const handleDelete = useCallback(async (m: WardMember) => {
-    if (await confirm({ message: `Permanently delete ${m.name}? This cannot be undone.` })) remove(m.id);
+    if (await confirm({ message: `Permanently delete ${legalName(m)}? This cannot be undone.` })) remove(m.id);
   }, [remove, confirm]);
 
-  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude, onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard };
+  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude, onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSaveName: saveName, onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard };
 
   return (
     <div>
@@ -328,16 +368,20 @@ export default function WardMembers() {
 
       {adding && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 flex items-center gap-2">
-          <input value={newName} onChange={e => setNewName(e.target.value)}
+          <input value={newLast} onChange={e => setNewLast(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            placeholder="Lastname, Firstname"
+            placeholder="Last name"
             autoFocus
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm flex-1 max-w-xs" />
-          <button onClick={handleAdd} disabled={saving || !newName.trim()}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm w-36" />
+          <input value={newFirst} onChange={e => setNewFirst(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            placeholder="First name"
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm w-36" />
+          <button onClick={handleAdd} disabled={saving || !newLast.trim()}
             className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
             {saving ? 'Adding...' : 'Add'}
           </button>
-          <button onClick={() => { setAdding(false); setNewName(''); }}
+          <button onClick={() => { setAdding(false); setNewLast(''); setNewFirst(''); }}
             className="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
         </div>
       )}

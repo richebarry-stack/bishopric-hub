@@ -4,6 +4,7 @@ import { Input, Select, Textarea } from '../FormFields';
 import type { InterviewPipeline as InterviewType, WardMember } from '../../lib/api';
 import { INTERVIEW_STATUSES, SETUP_STATUSES } from '../../lib/constants';
 import { YOUTH_TYPES, NO_REC_TYPES, YOUTH_STATE_COLORS, computeYouthAge, computeYouthState } from './shared';
+import { legalName } from '../../lib/displayName';
 
 function AssignedToField({ label, value, onChange, options, datalistId, help }: {
   label: string; value: string; onChange: (v: string) => void; options: string[]; datalistId: string; help?: string;
@@ -91,13 +92,13 @@ export default function InterviewEditModal({
               list="ward-member-link-options"
               placeholder="Start typing a name…"
               onChange={e => {
-                const match = wardMembers.find(wm => wm.name === e.target.value);
-                if (match) onChange({ ward_member_id: match.id, member: match.name });
+                const match = wardMembers.find(wm => legalName(wm) === e.target.value);
+                if (match) onChange({ ward_member_id: match.id, member: legalName(match) });
               }}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <datalist id="ward-member-link-options">
-              {wardMembers.map(wm => <option key={wm.id} value={wm.name} />)}
+              {wardMembers.map(wm => <option key={wm.id} value={legalName(wm)} />)}
             </datalist>
           </div>
         )}

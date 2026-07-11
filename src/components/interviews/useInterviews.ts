@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../../lib/useTable';
 import type { InterviewPipeline as InterviewType, WardMember, User } from '../../lib/api';
-import { displayName } from '../../lib/displayName';
+import { displayName, legalName } from '../../lib/displayName';
 import { toast } from '../../lib/toast';
 import { YOUTH_TYPES, computeYouthAge, computeYouthState, type RowMeta } from './shared';
 
@@ -50,7 +50,7 @@ export function useInterviews() {
     for (const wm of wardMembers) {
       if (wm.birth_date) {
         const age = computeYouthAge(wm.birth_date);
-        if (age !== null) m.set(wm.name.trim().toLowerCase(), age);
+        if (age !== null) m.set(legalName(wm).trim().toLowerCase(), age);
       }
     }
     return m;
@@ -152,9 +152,15 @@ export function useInterviews() {
       const linked = wardMembersById.get(wardMemberId);
       if (linked) {
         const wardMemberUpdate: Record<string, unknown> = {};
-        if (newName && newName !== linked.name) wardMemberUpdate.name = newName;
-        const newPreferredName = preferredNameDraft.trim();
-        if (newPreferredName !== (linked.preferred_name || '')) wardMemberUpdate.preferred_name = newPreferredName;
+        const [newLast, newFirst] = newName.includes(',')
+          ? newName.split(',').map(p => p.trim())
+          : [newName, ''];
+        if (newName && (newLast !== linked.last_name || newFirst !== linked.first_name)) {
+          wardMemberUpdate.last_name = newLast;
+          wardMemberUpdate.first_name = newFirst;
+        }
+        const newPreferredFirst = preferredNameDraft.trim();
+        if (newPreferredFirst !== (linked.preferred_first_name || '')) wardMemberUpdate.preferred_first_name = newPreferredFirst;
         if (Object.keys(wardMemberUpdate).length > 0) await updateWardMember(wardMemberId, wardMemberUpdate);
       }
     }
@@ -169,7 +175,7 @@ export function useInterviews() {
 
   useEffect(() => {
     const editingLinkedMember = editing?.ward_member_id ? wardMembersById.get(editing.ward_member_id) : undefined;
-    setPreferredNameDraft(editingLinkedMember?.preferred_name || '');
+    setPreferredNameDraft(editingLinkedMember?.preferred_first_name || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing?.id, editing?.ward_member_id]);
 

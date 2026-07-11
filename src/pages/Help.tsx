@@ -514,6 +514,14 @@ export default function Help() {
         <div className="space-y-4">
           {([
             {
+              date: 'Jul 11, 2026 (5)',
+              items: [
+                'Ward Members: split the single Name field into separate First Name and Last Name fields, plus separate Preferred First Name and Preferred Last Name fields (previously one combined Preferred Name field). Existing preferred names were carried over automatically; anyone without one had it filled in from their legal name.',
+                'Speakers & Prayers counting now matches history entries to the roster using fuzzy name matching (case-insensitive, either name order, legal or preferred name) instead of requiring an exact text match — some previously-uncounted entries (typos, nicknames, name-order differences) will now show up, so counts may increase slightly for some people.',
+                'CSV import, the youth-interview auto-sync, and the interview pages were all updated to work with the new first/last name fields.',
+              ],
+            },
+            {
               date: 'Jul 11, 2026 (4)',
               items: [
                 'My Actions: added clerk-only reminders to record sustainings, settings apart, releases, and baby church records in LCR — these show regardless of who a calling or baby is otherwise assigned to, and disappear once checked off on Calling Pipeline / Babies.',

@@ -87,7 +87,7 @@ export const api = {
   wardMembers: {
     import: (data: {
       updates: { id: number; birth_date: string }[];
-      creates: { name: string; birth_date: string | null }[];
+      creates: { last_name: string; first_name: string; birth_date: string | null }[];
       deactivate: number[];
     }) => request<{ ok: true; updated: number; created: number; deactivated: number }>('/ward-members/import', {
       method: 'POST', body: JSON.stringify(data),
@@ -463,14 +463,16 @@ export interface HubSuggestion {
 
 export interface WardMember {
   id: number;
-  name: string;
+  first_name: string;
+  last_name: string;
+  preferred_first_name: string | null;
+  preferred_last_name: string | null;
   active: number;
   out_of_ward: number;
   exclude_speakers: number;
   exclude_prayers: number;
   birth_date: string | null;
   gender: string | null;
-  preferred_name: string | null;
   updated_at: string;
 }
 

@@ -3,6 +3,8 @@ import { useTable } from '../lib/useTable';
 import { api } from '../lib/api';
 import type { SacramentSpeaker, Prayer, WardMember, SacramentMusic, SacramentTheme, SacramentAnnouncement, SacramentAgendaNote, SacramentWardBusiness } from '../lib/api';
 import { AgendaEditor, type AgendaCalling } from './CurrentSacrament';
+import { displayName, legalName } from '../lib/displayName';
+import { buildNameIndex, matchMember, normalizeNameKey } from '../lib/nameMatch';
 
 function currentAge(birthDate: string | null | undefined): number | null {
   if (!birthDate) return null;
@@ -145,8 +147,15 @@ function SortHeader({ label, active, dir, onClick, className }: {
 
 // ─── Speakers tab ─────────────────────────────────────────────────────────────
 
+// `key` is the stable identity for a person: `id:<wardMemberId>` when matched
+// to the roster (fuzzy, via nameMatch), otherwise `raw:<normalized text>` for
+// unmatched free-text entries (e.g. missionaries, visitors). `label` is what's
+// displayed (preferred name if set); `noteKey` is the legal name used to store
+// per-person notes, kept stable across preferred-name changes.
 interface SpeakerRow {
-  name: string;
+  key: string;
+  noteKey: string;
+  label: string;
   dates: string[];   // sorted desc
   count: number;
   lastDate: string;
@@ -196,19 +205,19 @@ function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey,
               <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-gray-400">No results</td></tr>
             )}
             {rows.map(r => {
-              const wm = memberMap.get(r.name);
+              const wm = memberMap.get(r.key);
               const excluded = wm?.exclude_speakers ?? false;
               return (
                 <>
-                  <tr key={r.name} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${excluded ? 'opacity-50' : ''}`}
-                    onClick={() => setExpanded(expanded === r.name ? null : r.name)}>
+                  <tr key={r.key} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${excluded ? 'opacity-50' : ''}`}
+                    onClick={() => setExpanded(expanded === r.key ? null : r.key)}>
                     <td className="px-3 py-2 font-medium text-gray-900">
-                      {r.name}
+                      {r.label}
                       {r.age !== null && <span className="text-xs text-gray-400 font-normal ml-1.5">age {r.age}</span>}
                     </td>
                     <td className="px-3 py-2 text-center text-gray-600">{r.count}</td>
                     <td className="px-3 py-2 text-gray-600">{formatDate(r.lastDate)}</td>
-                    <td className="px-3 py-1.5"><NoteField name={r.name} category="speaker" notes={notes} onSave={onSaveNote} /></td>
+                    <td className="px-3 py-1.5"><NoteField name={r.noteKey} category="speaker" notes={notes} onSave={onSaveNote} /></td>
                     <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
                       {wm && (
                         <button onClick={() => onUpdateMember(wm.id, { exclude_speakers: excluded ? 0 : 1 })}
@@ -217,10 +226,10 @@ function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey,
                         </button>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-gray-400 text-xs">{expanded === r.name ? '▲' : '▼'}</td>
+                    <td className="px-3 py-2 text-gray-400 text-xs">{expanded === r.key ? '▲' : '▼'}</td>
                   </tr>
-                  {expanded === r.name && (
-                    <tr key={`${r.name}-exp`} className="bg-gray-50 border-b border-gray-100">
+                  {expanded === r.key && (
+                    <tr key={`${r.key}-exp`} className="bg-gray-50 border-b border-gray-100">
                       <td colSpan={6} className="px-6 py-2">
                         <SpeakerDatesChips r={r} onDateClick={onDateClick} />
                       </td>
@@ -236,15 +245,15 @@ function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey,
       <div className="md:hidden space-y-2">
         {rows.length === 0 && <p className="text-center text-sm text-gray-400 py-4">No results</p>}
         {rows.map(r => {
-          const wm = memberMap.get(r.name);
+          const wm = memberMap.get(r.key);
           const excluded = wm?.exclude_speakers ?? false;
-          const isOpen = expanded === r.name;
+          const isOpen = expanded === r.key;
           return (
-            <div key={r.name} className={`rounded-lg border border-gray-200 p-3 ${excluded ? 'opacity-50' : 'bg-white'}`}>
-              <div className="flex items-start justify-between gap-2 cursor-pointer" onClick={() => setExpanded(isOpen ? null : r.name)}>
+            <div key={r.key} className={`rounded-lg border border-gray-200 p-3 ${excluded ? 'opacity-50' : 'bg-white'}`}>
+              <div className="flex items-start justify-between gap-2 cursor-pointer" onClick={() => setExpanded(isOpen ? null : r.key)}>
                 <div className="min-w-0">
                   <p className="font-medium text-gray-900 truncate">
-                    {r.name}
+                    {r.label}
                     {r.age !== null && <span className="text-xs text-gray-400 font-normal ml-1.5">age {r.age}</span>}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">{r.count} time{r.count === 1 ? '' : 's'} · Most recent {formatDate(r.lastDate) || '—'}</p>
@@ -252,7 +261,7 @@ function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey,
                 <span className="text-gray-400 text-xs shrink-0">{isOpen ? '▲' : '▼'}</span>
               </div>
               <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1"><NoteField name={r.name} category="speaker" notes={notes} onSave={onSaveNote} /></div>
+                <div className="flex-1"><NoteField name={r.noteKey} category="speaker" notes={notes} onSave={onSaveNote} /></div>
                 {wm && (
                   <button onClick={() => onUpdateMember(wm.id, { exclude_speakers: excluded ? 0 : 1 })}
                     className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${excluded ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
@@ -269,11 +278,11 @@ function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey,
   );
 }
 
-function SpeakersTab({ speakers, notes, onSaveNote, activeMembers, wardMembers, onUpdateMember, onDateClick }: {
+function SpeakersTab({ speakers, notes, onSaveNote, activeWardMembers, wardMembers, onUpdateMember, onDateClick }: {
   speakers: SacramentSpeaker[];
   notes: Map<string, string>;
   onSaveNote: (name: string, category: string, text: string) => void;
-  activeMembers: Set<string>;
+  activeWardMembers: WardMember[];
   wardMembers: WardMember[];
   onUpdateMember: (id: number, data: Record<string, unknown>) => void;
   onDateClick: (date: string) => void;
@@ -285,48 +294,49 @@ function SpeakersTab({ speakers, notes, onSaveNote, activeMembers, wardMembers, 
 
   const memberMap = useMemo(() => {
     const m = new Map<string, WardMember>();
-    for (const wm of wardMembers) m.set(wm.name, wm);
+    for (const wm of wardMembers) m.set(`id:${wm.id}`, wm);
     return m;
   }, [wardMembers]);
 
-  const birthDateMap = useMemo(() => {
-    const m = new Map<string, string | null>();
-    for (const wm of wardMembers) m.set(wm.name, wm.birth_date);
-    return m;
-  }, [wardMembers]);
+  const nameIndex = useMemo(() => buildNameIndex(activeWardMembers), [activeWardMembers]);
+  const hasActiveRoster = activeWardMembers.length > 0;
 
   const rows = useMemo<SpeakerRowEx[]>(() => {
-    const map = new Map<string, string[]>();
+    const map = new Map<string, { label: string; noteKey: string; birthDate: string | null; dates: string[] }>();
     for (const s of speakers) {
       if (!s.speaker?.trim()) continue;
-      const name = s.speaker.trim();
-      if (activeMembers.size > 0 && !activeMembers.has(name)) continue;
-      const existing = map.get(name) ?? [];
-      existing.push(s.meeting_date?.slice(0, 10) ?? '');
-      map.set(name, existing);
+      const matched = matchMember(nameIndex, s.speaker);
+      if (!matched && hasActiveRoster) continue; // dropped: not an active roster member
+      const key = matched ? `id:${matched.id}` : `raw:${normalizeNameKey(s.speaker)}`;
+      const label = matched ? displayName(matched) : s.speaker.trim();
+      const noteKey = matched ? legalName(matched) : s.speaker.trim();
+      const existing = map.get(key) ?? { label, noteKey, birthDate: matched?.birth_date ?? null, dates: [] };
+      existing.dates.push(s.meeting_date?.slice(0, 10) ?? '');
+      map.set(key, existing);
     }
-    if (activeMembers.size > 0) {
-      for (const name of activeMembers) {
-        if (!map.has(name)) map.set(name, []);
+    if (hasActiveRoster) {
+      for (const wm of activeWardMembers) {
+        const key = `id:${wm.id}`;
+        if (!map.has(key)) map.set(key, { label: displayName(wm), noteKey: legalName(wm), birthDate: wm.birth_date, dates: [] });
       }
     }
-    return Array.from(map.entries()).map(([name, dates]) => {
+    return Array.from(map.entries()).map(([key, { label, noteKey, birthDate, dates }]) => {
       const sorted = [...new Set(dates)].filter(Boolean).sort((a, b) => b.localeCompare(a));
-      return { name, dates: sorted, count: sorted.length, lastDate: sorted[0] ?? '', age: currentAge(birthDateMap.get(name)) };
+      return { key, label, noteKey, dates: sorted, count: sorted.length, lastDate: sorted[0] ?? '', age: currentAge(birthDate) };
     });
-  }, [speakers, activeMembers, birthDateMap]);
+  }, [speakers, activeWardMembers, hasActiveRoster, nameIndex]);
 
   const [onlyWithHistory, setOnlyWithHistory] = useState(false);
 
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
-    return rows.filter(r => (!q || r.name.toLowerCase().includes(q)) && (!onlyWithHistory || r.count > 0));
+    return rows.filter(r => (!q || r.label.toLowerCase().includes(q)) && (!onlyWithHistory || r.count > 0));
   }, [rows, filter, onlyWithHistory]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
       let cmp = 0;
-      if (sortKey === 'name') cmp = a.name.localeCompare(b.name);
+      if (sortKey === 'name') cmp = a.label.localeCompare(b.label);
       else if (sortKey === 'count') cmp = a.count - b.count;
       else cmp = a.lastDate.localeCompare(b.lastDate);
       return sortDir === 'asc' ? cmp : -cmp;
@@ -338,9 +348,16 @@ function SpeakersTab({ speakers, notes, onSaveNote, activeMembers, wardMembers, 
     else { setSortKey(key); setSortDir('asc'); }
   };
 
-  const adults   = sorted.filter(r => ageGroup(birthDateMap.get(r.name)) === 'adult');
-  const youth    = sorted.filter(r => ageGroup(birthDateMap.get(r.name)) === 'youth');
-  const children = sorted.filter(r => ageGroup(birthDateMap.get(r.name)) === 'child');
+  const memberById = useMemo(() => {
+    const m = new Map<string, WardMember>();
+    for (const wm of activeWardMembers) m.set(`id:${wm.id}`, wm);
+    return m;
+  }, [activeWardMembers]);
+  const groupOf = (r: SpeakerRowEx) => ageGroup(memberById.get(r.key)?.birth_date);
+
+  const adults   = sorted.filter(r => groupOf(r) === 'adult');
+  const youth    = sorted.filter(r => groupOf(r) === 'youth');
+  const children = sorted.filter(r => groupOf(r) === 'child');
 
   const tableProps = { notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember, onDateClick };
 
@@ -383,7 +400,9 @@ function SpeakersTab({ speakers, notes, onSaveNote, activeMembers, wardMembers, 
 // ─── Prayers tab ──────────────────────────────────────────────────────────────
 
 interface PrayerRow {
-  name: string;
+  key: string;
+  noteKey: string;
+  label: string;
   openingDates: string[];
   closingDates: string[];
   count: number;
@@ -451,19 +470,19 @@ function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, 
               <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-gray-400">No results</td></tr>
             )}
             {rows.map(r => {
-              const wm = memberMap.get(r.name);
+              const wm = memberMap.get(r.key);
               const excluded = wm?.exclude_prayers ?? false;
               return (
                 <>
-                  <tr key={r.name} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${excluded ? 'opacity-50' : ''}`}
-                    onClick={() => setExpanded(expanded === r.name ? null : r.name)}>
+                  <tr key={r.key} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${excluded ? 'opacity-50' : ''}`}
+                    onClick={() => setExpanded(expanded === r.key ? null : r.key)}>
                     <td className="px-3 py-2 font-medium text-gray-900">
-                      {r.name}
+                      {r.label}
                       {r.age !== null && <span className="text-xs text-gray-400 font-normal ml-1.5">age {r.age}</span>}
                     </td>
                     <td className="px-3 py-2 text-center text-gray-600">{r.count}</td>
                     <td className="px-3 py-2 text-gray-600">{formatDate(r.lastDate)}</td>
-                    <td className="px-3 py-1.5"><NoteField name={r.name} category="prayer" notes={notes} onSave={onSaveNote} /></td>
+                    <td className="px-3 py-1.5"><NoteField name={r.noteKey} category="prayer" notes={notes} onSave={onSaveNote} /></td>
                     <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
                       {wm && (
                         <button onClick={() => onUpdateMember(wm.id, { exclude_prayers: excluded ? 0 : 1 })}
@@ -472,10 +491,10 @@ function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, 
                         </button>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-gray-400 text-xs">{expanded === r.name ? '▲' : '▼'}</td>
+                    <td className="px-3 py-2 text-gray-400 text-xs">{expanded === r.key ? '▲' : '▼'}</td>
                   </tr>
-                  {expanded === r.name && (
-                    <tr key={`${r.name}-exp`} className="bg-gray-50 border-b border-gray-100">
+                  {expanded === r.key && (
+                    <tr key={`${r.key}-exp`} className="bg-gray-50 border-b border-gray-100">
                       <td colSpan={6} className="px-6 py-2">
                         <PrayerDatesChips r={r} onDateClick={onDateClick} />
                       </td>
@@ -491,15 +510,15 @@ function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, 
       <div className="md:hidden space-y-2">
         {rows.length === 0 && <p className="text-center text-sm text-gray-400 py-4">No results</p>}
         {rows.map(r => {
-          const wm = memberMap.get(r.name);
+          const wm = memberMap.get(r.key);
           const excluded = wm?.exclude_prayers ?? false;
-          const isOpen = expanded === r.name;
+          const isOpen = expanded === r.key;
           return (
-            <div key={r.name} className={`rounded-lg border border-gray-200 p-3 ${excluded ? 'opacity-50' : 'bg-white'}`}>
-              <div className="flex items-start justify-between gap-2 cursor-pointer" onClick={() => setExpanded(isOpen ? null : r.name)}>
+            <div key={r.key} className={`rounded-lg border border-gray-200 p-3 ${excluded ? 'opacity-50' : 'bg-white'}`}>
+              <div className="flex items-start justify-between gap-2 cursor-pointer" onClick={() => setExpanded(isOpen ? null : r.key)}>
                 <div className="min-w-0">
                   <p className="font-medium text-gray-900 truncate">
-                    {r.name}
+                    {r.label}
                     {r.age !== null && <span className="text-xs text-gray-400 font-normal ml-1.5">age {r.age}</span>}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">{r.count} total · Most recent {formatDate(r.lastDate) || '—'}</p>
@@ -507,7 +526,7 @@ function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, 
                 <span className="text-gray-400 text-xs shrink-0">{isOpen ? '▲' : '▼'}</span>
               </div>
               <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1"><NoteField name={r.name} category="prayer" notes={notes} onSave={onSaveNote} /></div>
+                <div className="flex-1"><NoteField name={r.noteKey} category="prayer" notes={notes} onSave={onSaveNote} /></div>
                 {wm && (
                   <button onClick={() => onUpdateMember(wm.id, { exclude_prayers: excluded ? 0 : 1 })}
                     className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${excluded ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
@@ -524,11 +543,11 @@ function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, 
   );
 }
 
-function PrayersTab({ prayers, notes, onSaveNote, activeMembers, wardMembers, onUpdateMember, onDateClick }: {
+function PrayersTab({ prayers, notes, onSaveNote, activeWardMembers, wardMembers, onUpdateMember, onDateClick }: {
   prayers: Prayer[];
   notes: Map<string, string>;
   onSaveNote: (name: string, category: string, text: string) => void;
-  activeMembers: Set<string>;
+  activeWardMembers: WardMember[];
   wardMembers: WardMember[];
   onUpdateMember: (id: number, data: Record<string, unknown>) => void;
   onDateClick: (date: string) => void;
@@ -540,59 +559,60 @@ function PrayersTab({ prayers, notes, onSaveNote, activeMembers, wardMembers, on
 
   const memberMap = useMemo(() => {
     const m = new Map<string, WardMember>();
-    for (const wm of wardMembers) m.set(wm.name, wm);
+    for (const wm of wardMembers) m.set(`id:${wm.id}`, wm);
     return m;
   }, [wardMembers]);
 
-  const birthDateMap = useMemo(() => {
-    const m = new Map<string, string | null>();
-    for (const wm of wardMembers) m.set(wm.name, wm.birth_date);
-    return m;
-  }, [wardMembers]);
+  const nameIndex = useMemo(() => buildNameIndex(activeWardMembers), [activeWardMembers]);
+  const hasActiveRoster = activeWardMembers.length > 0;
 
   const rows = useMemo<PrayerRowEx[]>(() => {
-    const map = new Map<string, { opening: string[]; closing: string[] }>();
+    const map = new Map<string, { label: string; noteKey: string; birthDate: string | null; opening: string[]; closing: string[] }>();
     for (const p of prayers) {
       if (!p.name?.trim()) continue;
-      const name = p.name.trim();
-      if (activeMembers.size > 0 && !activeMembers.has(name)) continue;
-      const entry = map.get(name) ?? { opening: [], closing: [] };
+      const matched = matchMember(nameIndex, p.name);
+      if (!matched && hasActiveRoster) continue;
+      const key = matched ? `id:${matched.id}` : `raw:${normalizeNameKey(p.name)}`;
+      const label = matched ? displayName(matched) : p.name.trim();
+      const noteKey = matched ? legalName(matched) : p.name.trim();
+      const entry = map.get(key) ?? { label, noteKey, birthDate: matched?.birth_date ?? null, opening: [], closing: [] };
       const date = p.meeting_date?.slice(0, 10) ?? '';
       if (date) {
         if (p.opening_closing?.toLowerCase().includes('open')) entry.opening.push(date);
         else entry.closing.push(date);
       }
-      map.set(name, entry);
+      map.set(key, entry);
     }
-    if (activeMembers.size > 0) {
-      for (const name of activeMembers) {
-        if (!map.has(name)) map.set(name, { opening: [], closing: [] });
+    if (hasActiveRoster) {
+      for (const wm of activeWardMembers) {
+        const key = `id:${wm.id}`;
+        if (!map.has(key)) map.set(key, { label: displayName(wm), noteKey: legalName(wm), birthDate: wm.birth_date, opening: [], closing: [] });
       }
     }
-    return Array.from(map.entries()).map(([name, { opening, closing }]) => {
+    return Array.from(map.entries()).map(([key, { label, noteKey, birthDate, opening, closing }]) => {
       const allDates = [...new Set([...opening, ...closing])].filter(Boolean).sort((a, b) => b.localeCompare(a));
       return {
-        name,
+        key, label, noteKey,
         openingDates: [...new Set(opening)].sort((a, b) => b.localeCompare(a)),
         closingDates: [...new Set(closing)].sort((a, b) => b.localeCompare(a)),
         count: allDates.length,
         lastDate: allDates[0] ?? '',
-        age: currentAge(birthDateMap.get(name)),
+        age: currentAge(birthDate),
       };
     });
-  }, [prayers, activeMembers, birthDateMap]);
+  }, [prayers, activeWardMembers, hasActiveRoster, nameIndex]);
 
   const [onlyWithHistory, setOnlyWithHistory] = useState(false);
 
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
-    return rows.filter(r => (!q || r.name.toLowerCase().includes(q)) && (!onlyWithHistory || r.count > 0));
+    return rows.filter(r => (!q || r.label.toLowerCase().includes(q)) && (!onlyWithHistory || r.count > 0));
   }, [rows, filter, onlyWithHistory]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
       let cmp = 0;
-      if (sortKey === 'name') cmp = a.name.localeCompare(b.name);
+      if (sortKey === 'name') cmp = a.label.localeCompare(b.label);
       else if (sortKey === 'count') cmp = a.count - b.count;
       else cmp = a.lastDate.localeCompare(b.lastDate);
       return sortDir === 'asc' ? cmp : -cmp;
@@ -604,9 +624,16 @@ function PrayersTab({ prayers, notes, onSaveNote, activeMembers, wardMembers, on
     else { setSortKey(key); setSortDir('asc'); }
   };
 
-  const adults   = sorted.filter(r => ageGroup(birthDateMap.get(r.name)) === 'adult');
-  const youth    = sorted.filter(r => ageGroup(birthDateMap.get(r.name)) === 'youth');
-  const children = sorted.filter(r => ageGroup(birthDateMap.get(r.name)) === 'child');
+  const memberById = useMemo(() => {
+    const m = new Map<string, WardMember>();
+    for (const wm of activeWardMembers) m.set(`id:${wm.id}`, wm);
+    return m;
+  }, [activeWardMembers]);
+  const groupOf = (r: PrayerRowEx) => ageGroup(memberById.get(r.key)?.birth_date);
+
+  const adults   = sorted.filter(r => groupOf(r) === 'adult');
+  const youth    = sorted.filter(r => groupOf(r) === 'youth');
+  const children = sorted.filter(r => groupOf(r) === 'child');
 
   const tableProps = { notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember, onDateClick };
 
@@ -672,16 +699,9 @@ export default function SpeakersAndPrayers() {
   const { rows: wardMembers, isLoading: loadingMembers, update: updateMember } = useTable<WardMember>('ward-members');
   const [notes, setNotes] = useState<Map<string, string>>(new Map());
 
-  // All active members appear in both lists; excluded ones are dimmed with a toggle to re-include
-  const speakerMembers = useMemo(
-    () => new Set(wardMembers.filter(m => m.active).map(m => m.name)),
-    [wardMembers]
-  );
-
-  const prayerMembers = useMemo(
-    () => new Set(wardMembers.filter(m => m.active).map(m => m.name)),
-    [wardMembers]
-  );
+  // All active members appear in both lists; excluded ones are dimmed with a toggle to re-include.
+  // History rows are matched to these via fuzzy name matching (legal or preferred, either order).
+  const activeWardMembers = useMemo(() => wardMembers.filter(m => m.active), [wardMembers]);
 
   const handleUpdateMember = useCallback((id: number, data: Record<string, unknown>) => {
     updateMember(id, data);
@@ -750,9 +770,9 @@ export default function SpeakersAndPrayers() {
       {isLoading ? (
         <p className="text-gray-400 text-sm">Loading…</p>
       ) : tab === 'speakers' ? (
-        <SpeakersTab speakers={filteredSpeakers} notes={notes} onSaveNote={handleSaveNote} activeMembers={speakerMembers} wardMembers={wardMembers} onUpdateMember={handleUpdateMember} onDateClick={setPreviewDate} />
+        <SpeakersTab speakers={filteredSpeakers} notes={notes} onSaveNote={handleSaveNote} activeWardMembers={activeWardMembers} wardMembers={wardMembers} onUpdateMember={handleUpdateMember} onDateClick={setPreviewDate} />
       ) : (
-        <PrayersTab prayers={filteredPrayers} notes={notes} onSaveNote={handleSaveNote} activeMembers={prayerMembers} wardMembers={wardMembers} onUpdateMember={handleUpdateMember} onDateClick={setPreviewDate} />
+        <PrayersTab prayers={filteredPrayers} notes={notes} onSaveNote={handleSaveNote} activeWardMembers={activeWardMembers} wardMembers={wardMembers} onUpdateMember={handleUpdateMember} onDateClick={setPreviewDate} />
       )}
     </div>
   );
