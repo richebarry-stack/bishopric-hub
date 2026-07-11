@@ -29,7 +29,7 @@ function AssignedToField({ label, value, onChange, options, datalistId, help }: 
 
 export default function InterviewEditModal({
   editing, onClose, onChange, onSave, wardMembers, wardMembersById, ageByName, activeYouthWardMemberIds,
-  bishopricOptions, allowedTypes, preferredNameDraft, setPreferredNameDraft,
+  bishopricOptions, setupOptions, allowedTypes, preferredNameDraft, setPreferredNameDraft,
 }: {
   editing: Partial<InterviewType> | null;
   onClose: () => void;
@@ -40,6 +40,7 @@ export default function InterviewEditModal({
   ageByName: Map<string, number>;
   activeYouthWardMemberIds: Set<number>;
   bishopricOptions: string[];
+  setupOptions: string[];
   allowedTypes: string[];
   preferredNameDraft: string;
   setPreferredNameDraft: (v: string) => void;
@@ -153,7 +154,7 @@ export default function InterviewEditModal({
             label="Setup assigned to"
             value={editing.setup_assigned_to || ''}
             onChange={v => onChange({ setup_assigned_to: v })}
-            options={bishopricOptions}
+            options={setupOptions}
             datalistId="interview-setup-assigned-to-options"
             help="Who schedules the interview."
           />

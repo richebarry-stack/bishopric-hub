@@ -514,6 +514,13 @@ export default function Help() {
         <div className="space-y-4">
           {([
             {
+              date: 'Jul 11, 2026 (6)',
+              items: [
+                'Ordinances: each December, young men who will turn 12 next year are now added to the tracker automatically, a month ahead of the new year (in addition to the existing "suggested this year" box).',
+                'Interview setup assignment can now be given to the executive secretary or an assistant executive secretary, not just the bishop and counselors — who actually conducts the interview is unaffected.',
+              ],
+            },
+            {
               date: 'Jul 11, 2026 (5)',
               items: [
                 'Ward Members: split the single Name field into separate First Name and Last Name fields, plus separate Preferred First Name and Preferred Last Name fields (previously one combined Preferred Name field). Existing preferred names were carried over automatically; anyone without one had it filled in from their legal name.',

@@ -84,7 +84,7 @@ export default function InterviewsPage({ title, description, types, showAge, sho
           <input list="interview-bulk-setup-assign-options" value={h.bulkSetupAssignedTo} onChange={e => h.setBulkSetupAssignedTo(e.target.value)} placeholder="Setup assign…"
             className="rounded border border-blue-300 px-2 py-1 text-sm bg-white w-32" />
           <datalist id="interview-bulk-setup-assign-options">
-            {h.bishopricOptions.map(o => <option key={o} value={o} />)}
+            {h.setupOptions.map(o => <option key={o} value={o} />)}
           </datalist>
           <button onClick={h.handleBulkSetupAssign} disabled={!h.bulkSetupAssignedTo.trim()}
             className="px-3 py-1 bg-blue-600 text-white rounded text-sm disabled:opacity-40 hover:bg-blue-700">Assign</button>
@@ -144,6 +144,7 @@ export default function InterviewsPage({ title, description, types, showAge, sho
         ageByName={h.ageByName}
         activeYouthWardMemberIds={h.activeYouthWardMemberIds}
         bishopricOptions={h.bishopricOptions}
+        setupOptions={h.setupOptions}
         allowedTypes={allowedTypes.length ? allowedTypes : INTERVIEW_TYPES}
         preferredNameDraft={h.preferredNameDraft}
         setPreferredNameDraft={h.setPreferredNameDraft}

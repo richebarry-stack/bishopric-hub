@@ -34,6 +34,12 @@ export function useInterviews() {
     allUsers.filter(u => u.church_role && /bishop|counselor/i.test(u.church_role)).map(u => u.name),
     [allUsers]);
 
+  // Setting up an interview (scheduling) is typically handled by the executive
+  // secretary or an assistant, in addition to the bishop/counselors.
+  const setupOptions = useMemo(() =>
+    allUsers.filter(u => u.church_role && /bishop|counselor|executive secretary/i.test(u.church_role)).map(u => u.name),
+    [allUsers]);
+
   const assignedOptions = useMemo(() => {
     const names = [...new Set(rows.map(r => r.assigned_to).filter(Boolean))].sort();
     return names;
@@ -182,7 +188,7 @@ export function useInterviews() {
   return {
     rows, isLoading, filtered, remove,
     wardMembers, wardMembersById, wardMembersLoading, ageByName, activeYouthWardMemberIds,
-    bishopricOptions, assignedOptions,
+    bishopricOptions, setupOptions, assignedOptions,
     rowMetaById, agedOutYouthCount,
     editing, setEditing,
     preferredNameDraft, setPreferredNameDraft,
