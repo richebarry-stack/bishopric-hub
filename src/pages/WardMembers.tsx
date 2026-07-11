@@ -6,7 +6,7 @@ import { useAuth } from '../lib/auth';
 import { legalName } from '../lib/displayName';
 import type { WardMember, InterviewPipeline } from '../lib/api';
 import WardMemberImport from '../components/WardMemberImport';
-import { YOUTH_TYPES } from '../components/interviews/shared';
+import { YOUTH_TYPES, formatRecommendDate } from '../components/interviews/shared';
 
 function currentAge(birthDate: string | null): number | null {
   if (!birthDate) return null;
@@ -123,12 +123,12 @@ function PreferredNameCell({ member, onSave }: { member: WardMember; onSave: (fi
 function RecommendCell({ member, onSave }: { member: WardMember; onSave: (fields: { recommend_type: string; recommend_expires: string }) => void }) {
   const [editing, setEditing] = useState(false);
   const [type, setType] = useState(member.recommend_type || '');
-  const [expires, setExpires] = useState((member.recommend_expires || '').slice(0, 10));
+  const [expires, setExpires] = useState((member.recommend_expires || '').slice(0, 7));
 
   if (editing) {
     const commit = () => {
       setEditing(false);
-      if (type !== (member.recommend_type || '') || expires !== (member.recommend_expires || '').slice(0, 10)) {
+      if (type !== (member.recommend_type || '') || expires !== (member.recommend_expires || '').slice(0, 7)) {
         onSave({ recommend_type: type, recommend_expires: expires });
       }
     };
@@ -140,13 +140,13 @@ function RecommendCell({ member, onSave }: { member: WardMember; onSave: (fields
           <option value="Endowed">Endowed</option>
           <option value="Limited">Limited</option>
         </select>
-        <input type="date" value={expires} onChange={e => setExpires(e.target.value)} onBlur={commit}
+        <input type="month" value={expires} onChange={e => setExpires(e.target.value)} onBlur={commit}
           className="text-xs rounded border border-gray-300 px-1 py-0.5" />
       </div>
     );
   }
   const shown = member.recommend_type
-    ? `${member.recommend_type}${member.recommend_expires ? ` · ${member.recommend_expires.slice(0, 10)}` : ''}`
+    ? `${member.recommend_type}${member.recommend_expires ? ` · ${formatRecommendDate(member.recommend_expires)}` : ''}`
     : '';
   return (
     <button type="button" onClick={() => setEditing(true)}
@@ -178,7 +178,7 @@ interface GroupedRows {
   unknown: WardMember[];
 }
 
-function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend }: {
+function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, showRecommend = true }: {
   title: string;
   members: WardMember[];
   onToggleActive: (m: WardMember) => void;
@@ -190,6 +190,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
   onSavePreferredName: (m: WardMember, fields: { preferred_first_name: string; preferred_last_name: string }) => void;
   onToggleOutOfWard: (m: WardMember) => void;
   onSaveRecommend: (m: WardMember, fields: { recommend_type: string; recommend_expires: string }) => void;
+  showRecommend?: boolean;
 }) {
   if (members.length === 0) return null;
   return (
@@ -204,7 +205,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
               <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
               <th className="text-left px-4 py-2 font-medium text-gray-600 w-36">Preferred Name</th>
               <th className="text-left px-4 py-2 font-medium text-gray-600 w-28">Birth Date</th>
-              <th className="text-left px-4 py-2 font-medium text-gray-600 w-40">Temple Recommend</th>
+              {showRecommend && <th className="text-left px-4 py-2 font-medium text-gray-600 w-40">Temple Recommend</th>}
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-16">Gender</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-24">Status</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Speakers</th>
@@ -229,9 +230,11 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                 <td className="px-4 py-2">
                   <BirthDateCell member={m} onSave={v => onSaveBirthDate(m, v)} />
                 </td>
-                <td className="px-4 py-2">
-                  <RecommendCell member={m} onSave={fields => onSaveRecommend(m, fields)} />
-                </td>
+                {showRecommend && (
+                  <td className="px-4 py-2">
+                    <RecommendCell member={m} onSave={fields => onSaveRecommend(m, fields)} />
+                  </td>
+                )}
                 <td className="px-4 py-2 text-center">
                   <GenderCell member={m} onSave={v => onSaveGender(m, v)} />
                 </td>
@@ -371,7 +374,7 @@ export default function WardMembers() {
   const saveRecommend = useCallback((m: WardMember, fields: { recommend_type: string; recommend_expires: string }) => {
     update(m.id, fields as unknown as Record<string, unknown>);
     const linkedYouthInterview = interviews.find(i => i.ward_member_id === m.id && YOUTH_TYPES.has(i.type_of_interview));
-    if (linkedYouthInterview && (linkedYouthInterview.date_recommend_expires || '').slice(0, 10) !== fields.recommend_expires) {
+    if (linkedYouthInterview && (linkedYouthInterview.date_recommend_expires || '').slice(0, 7) !== fields.recommend_expires) {
       updateInterview(linkedYouthInterview.id, { date_recommend_expires: fields.recommend_expires } as unknown as Record<string, unknown>, { silent: true });
     }
   }, [update, interviews, updateInterview]);
@@ -442,7 +445,7 @@ export default function WardMembers() {
 
       <MemberSection title="Adults" members={grouped.adults} {...sectionProps} />
       <MemberSection title="Youth" members={grouped.youth} {...sectionProps} />
-      <MemberSection title="Children" members={grouped.children} {...sectionProps} />
+      <MemberSection title="Children" members={grouped.children} {...sectionProps} showRecommend={false} />
       <MemberSection title="No Birth Date" members={grouped.unknown} {...sectionProps} />
 
       <p className="text-xs text-gray-400 mt-2">

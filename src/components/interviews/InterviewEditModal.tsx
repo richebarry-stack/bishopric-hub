@@ -176,7 +176,7 @@ export default function InterviewEditModal({
         </div>
 
         {!hideRecExpires && (
-          <Input label="Date Recommend Expires" value={(editing.date_recommend_expires || '').slice(0, 10)} onChange={v => onChange({ date_recommend_expires: v })} type="date" />
+          <Input label="Recommend Expires" value={(editing.date_recommend_expires || '').slice(0, 7)} onChange={v => onChange({ date_recommend_expires: v })} type="month" />
         )}
         <Input label="Last Interview Date" value={(editing.last_interview_datetime || '').slice(0, 10)} onChange={v => onChange({ last_interview_datetime: v })} type="date" />
         <Input label="Next Interview Date" value={(editing.next_interview_date || '').slice(0, 10)} onChange={v => onChange({ next_interview_date: v })} type="date" />

@@ -296,15 +296,17 @@ const RECOMMEND_TYPE_TO_INTERVIEW_TYPE: Record<string, string> = { Endowed: 'End
  * already expired), auto-creates an Unassigned interview entry of the matching
  * type (Endowed Temple Rec / Limited) so it surfaces on Adult Temple Interviews.
  * Never duplicates — skips members who already have an interview_pipeline row of
- * that type linked to them, regardless of that row's status. */
+ * that type linked to them, regardless of that row's status. Skips current youth
+ * (ages 12-17) entirely — their recommend is tracked on their Youth Interview row
+ * instead, via syncYouthInterviews. */
 export async function syncTempleRecommendInterviews(db: D1Database): Promise<JobResult> {
   const now = new Date();
   const cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() + 2);
   const nowIso = now.toISOString();
 
   const membersResult = await db.prepare(
-    "SELECT id, first_name, last_name, recommend_type, recommend_expires FROM ward_members WHERE active = 1 AND recommend_type IN ('Endowed', 'Limited') AND recommend_expires IS NOT NULL AND recommend_expires != ''"
-  ).all<{ id: number; first_name: string; last_name: string; recommend_type: string; recommend_expires: string }>();
+    "SELECT id, first_name, last_name, birth_date, recommend_type, recommend_expires FROM ward_members WHERE active = 1 AND recommend_type IN ('Endowed', 'Limited') AND recommend_expires IS NOT NULL AND recommend_expires != ''"
+  ).all<{ id: number; first_name: string; last_name: string; birth_date: string | null; recommend_type: string; recommend_expires: string }>();
 
   const existingResult = await db.prepare(
     "SELECT ward_member_id, type_of_interview FROM interview_pipeline WHERE ward_member_id IS NOT NULL AND type_of_interview IN ('Endowed Temple Rec', 'Limited')"
@@ -316,12 +318,17 @@ export async function syncTempleRecommendInterviews(db: D1Database): Promise<Job
   for (const wm of membersResult.results) {
     const interviewType = RECOMMEND_TYPE_TO_INTERVIEW_TYPE[wm.recommend_type];
     if (!interviewType || existing.has(`${wm.id}|${interviewType}`)) continue;
-    const expiry = new Date(wm.recommend_expires.slice(0, 10) + 'T12:00:00');
-    if (isNaN(expiry.getTime()) || expiry.getTime() > cutoff.getTime()) continue;
+    if (wm.birth_date && computeYouthAge(wm.birth_date, now) !== null) continue;
+    // recommend_expires is month/year only (e.g. "2026-11") — recommends expire at
+    // month's end, so compare against the last day of that month.
+    const [y, mo] = wm.recommend_expires.slice(0, 7).split('-').map(Number);
+    if (!y || !mo) continue;
+    const expiry = new Date(y, mo, 0);
+    if (expiry.getTime() > cutoff.getTime()) continue;
     const legalName = wm.first_name ? `${wm.last_name}, ${wm.first_name}` : wm.last_name;
     stmts.push(db.prepare(
       'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, date_recommend_expires, ward_member_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(legalName, interviewType, 'Unassigned', '', wm.recommend_expires.slice(0, 10), wm.id, nowIso, nowIso));
+    ).bind(legalName, interviewType, 'Unassigned', '', wm.recommend_expires.slice(0, 7), wm.id, nowIso, nowIso));
     created++;
   }
   if (stmts.length > 0) await db.batch(stmts);

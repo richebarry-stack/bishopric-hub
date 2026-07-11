@@ -638,6 +638,9 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Youth Interviews: the temple recommend expiration date entered on a youth\'s interview now stays in sync with their Temple Recommend field on Ward Members, in both directions.',
                 'Adult Temple Interviews: added a "Sync now" button to immediately check for recommends expiring within 2 months and add them to the list, instead of waiting for the once-a-day automatic check.',
                 'Backfilled every youth\'s Temple Recommend field on Ward Members from their existing Youth Interview recommend expiration date.',
+                'Temple recommend expiration is now month/year only (recommends expire at month\'s end, so the exact day never mattered) — on Ward Members and on Youth/Adult Temple Interviews alike. Cleaned up previously stored dates to match.',
+                'Fixed: the daily/manual temple-recommend sync was mistakenly adding current youth to the Adult Temple Interviews list as duplicate entries — it now only ever applies to adults; youth stay tracked solely on their Youth Interview row.',
+                'Ward Members: removed the Temple Recommend column from the Children section — children don\'t hold recommends.',
               ],
             },
             {
