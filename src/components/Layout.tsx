@@ -21,7 +21,8 @@ export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?:
   { path: '/out-of-town', label: 'Out of Town', icon: '⇢' },
   { path: '/bishop-schedule', label: 'Bishop Schedule', icon: '🕐' },
   { path: '/assignments', label: 'Bishopric Assignments', icon: '⟳' },
-  { path: '/bishopric-meetings', label: 'Bishopric Meetings', icon: '▦' },
+  { path: '/current-bishopric-meeting', label: 'Current Bishopric Meeting', icon: '▤' },
+  { path: '/bishopric-meetings', label: 'Bishopric Meeting Planning', icon: '▦' },
   { path: '/important-links', label: 'Important Links', icon: '⇗' },
   { path: '/speakers-and-prayers', label: 'Speakers & Prayers', icon: '⊞' },
   { path: '/ward-members', label: 'Ward Members', icon: '♟' },
@@ -97,7 +98,8 @@ export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: s
   {
     label: 'Bishopric',
     items: [
-      { path: '/bishopric-meetings',   label: 'Bishopric Meetings',     icon: 'ti-users'           },
+      { path: '/current-bishopric-meeting', label: 'Current Bishopric Meeting', icon: 'ti-clipboard-text' },
+      { path: '/bishopric-meetings',   label: 'Bishopric Meeting Planning', icon: 'ti-users'       },
       { path: '/assignments',          label: 'Bishopric Assignments',  icon: 'ti-list-check'      },
       { path: '/bishop-schedule',      label: 'Bishop Schedule',        icon: 'ti-calendar-time'   },
       { path: '/tasks',                label: 'Action Items',           icon: 'ti-checklist'       },

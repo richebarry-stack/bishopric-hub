@@ -193,6 +193,17 @@ export interface BishopricMeeting {
   recurrence_interval_weeks: number | null;
 }
 
+export interface BishopricAgendaItem {
+  id: number;
+  meeting_date: string;
+  item: string;
+  notes: string;
+  done: number;
+  position: number;
+  updated_at: string;
+  updated_by: string | null;
+}
+
 export interface OutOfTown {
   id: number;
   who: string;

@@ -17,6 +17,7 @@ const Tasks = lazyWithReload(() => import('./pages/Tasks'));
 const SacramentPlanning = lazyWithReload(() => import('./pages/SacramentPlanning'));
 const CurrentSacrament = lazyWithReload(() => import('./pages/CurrentSacrament'));
 const BishopricMeetings = lazyWithReload(() => import('./pages/BishopricMeetings'));
+const CurrentBishopricMeeting = lazyWithReload(() => import('./pages/CurrentBishopricMeeting'));
 const MemberNeeds = lazyWithReload(() => import('./pages/MemberNeeds'));
 const MissionaryPipeline = lazyWithReload(() => import('./pages/MissionaryPipeline'));
 const Babies = lazyWithReload(() => import('./pages/Babies'));
@@ -167,6 +168,7 @@ function AppRoutes() {
         <Route path="/sacrament-planning" element={<SacramentPlanning />} />
         <Route path="/current-sacrament" element={<CurrentSacrament />} />
         <Route path="/bishopric-meetings" element={<BishopricMeetings />} />
+        <Route path="/current-bishopric-meeting" element={<CurrentBishopricMeeting />} />
         <Route path="/member-needs" element={<MemberNeeds />} />
         <Route path="/missionary-pipeline" element={<MissionaryPipeline />} />
         <Route path="/babies" element={<Babies />} />

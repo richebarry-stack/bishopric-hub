@@ -511,6 +511,12 @@ export default function Help() {
         <div className="space-y-4">
           {([
             {
+              date: 'Jul 11, 2026 (2)',
+              items: [
+                'Renamed "Bishopric Meetings" to "Bishopric Meeting Planning" (scheduling, recurring series, minutes — unchanged) and added a new "Current Bishopric Meeting" page for actually running the next meeting: agenda items you can add, check off, reorder, and attach notes to, plus quick editing of that meeting\'s own fields, all in one place.',
+              ],
+            },
+            {
               date: 'Jul 11, 2026',
               items: [
                 'Sacrament Program (the read-only page shown to the sacrament guest account) now follows the order used in the Church handbook: Presiding, Conducting, Chorister, Organist, Opening Hymn, Opening Prayer, Ward and Stake Business, Sacrament Hymn, Administration of the Sacrament, Speakers (interleaved with any intermediate musical number), Closing Hymn, Closing Prayer. Prayer names are now shown; Ward and Stake Business and Administration of the Sacrament appear as headings only, with no details.',
