@@ -30,7 +30,7 @@ function AssignedToField({ value, onChange, options }: { value: string; onChange
 }
 
 function shortYouthType(type: string): string {
-  return type.replace(/ Youth$/, '');
+  return type.replace(/^Youth /, '');
 }
 
 const EMPTY: Partial<InterviewType> = {
@@ -66,7 +66,11 @@ function formatRecommendDate(dateStr: string): string {
   return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
-const YOUTH_TYPES = new Set(['Annual Youth', 'Semi-Annual Youth']);
+const YOUTH_TYPES = new Set(['Youth 12-15', 'Youth 16-17']);
+
+// Both age brackets get an interview every 6 months per the Handbook — the
+// distinction between them is who conducts, not how often.
+const YOUTH_CADENCE_MONTHS = 6;
 
 type YouthState = 'Due' | 'Scheduled' | 'Up to date';
 const YOUTH_STATE_RANK: Record<YouthState, number> = { Due: 0, Scheduled: 1, 'Up to date': 2 };
@@ -77,10 +81,10 @@ const YOUTH_STATE_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 // Computed from dates instead of a manually-set status: a future next_interview_date
-// means it's Scheduled; otherwise a last_interview_datetime within the age-based
+// means it's Scheduled; otherwise a last_interview_datetime within the 6-month
 // cadence means Up to date; otherwise it's Due (never interviewed, or lapsed).
-function computeYouthState(row: { next_interview_date?: string; last_interview_datetime?: string }, age: number): YouthState {
-  const cadenceMonths = age >= 16 ? 6 : 12;
+function computeYouthState(row: { next_interview_date?: string; last_interview_datetime?: string }): YouthState {
+  const cadenceMonths = YOUTH_CADENCE_MONTHS;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   if (row.next_interview_date) {
     const nid = new Date(row.next_interview_date.slice(0, 10) + 'T12:00:00');
@@ -348,7 +352,7 @@ export default function InterviewPipeline() {
       } else if (YOUTH_TYPES.has(r.type_of_interview)) {
         age = ageByName.get(r.member?.trim().toLowerCase() ?? '');
       }
-      const youthState = age !== undefined && YOUTH_TYPES.has(r.type_of_interview) ? computeYouthState(r, age) : undefined;
+      const youthState = age !== undefined && YOUTH_TYPES.has(r.type_of_interview) ? computeYouthState(r) : undefined;
       m.set(r.id, { age, displayName: name, youthState });
     }
     return m;
@@ -444,7 +448,7 @@ export default function InterviewPipeline() {
     : (editing?.member ? ageByName.get(editing.member.trim().toLowerCase()) ?? null : null);
   const editingIsManagedYouth = !!editing && !!editing.ward_member_id && YOUTH_TYPES.has(editing.type_of_interview || '')
     && editingAge !== null && activeYouthWardMemberIds.has(editing.ward_member_id);
-  const editingYouthState = editingIsManagedYouth && editing && editingAge !== null ? computeYouthState(editing, editingAge) : null;
+  const editingYouthState = editingIsManagedYouth && editing ? computeYouthState(editing) : null;
   const showLinkPicker = !!editing && !editing.ward_member_id && YOUTH_TYPES.has(editing.type_of_interview || '');
 
   // Reset the preferred-name draft whenever a different row (or a newly-linked
@@ -462,8 +466,9 @@ export default function InterviewPipeline() {
         </button>
       </div>
       <p className="text-sm text-gray-500 mb-4">
-        Bishop and counselor interviews — temple recommends, annual interviews, mission prep, and more.
+        Bishop and counselor interviews — temple recommends, mission prep, and more.
         Youth interviews are kept in sync with the ward roster automatically; their status is computed from the interview dates rather than set by hand.
+        Every youth (ages 12–17) is interviewed every 6 months: for ages 12–15, alternate between the bishop and the counselor over that youth's quorum/class; for ages 16–17, both interviews should be with the bishop himself, if possible.
       </p>
 
       <div className="flex flex-col sm:flex-row gap-2 mb-2">
@@ -591,6 +596,11 @@ export default function InterviewPipeline() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Type of Interview</label>
                 <p className="text-sm text-gray-600">{editing.type_of_interview} <span className="text-xs text-gray-400">(auto-managed by age)</span></p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {editing.type_of_interview === 'Youth 16-17'
+                    ? 'Both interviews this year should be with the bishop himself, if possible.'
+                    : 'Alternate every 6 months: bishop, then the counselor over this youth\'s quorum/class.'}
+                </p>
               </div>
             ) : (
               <div>

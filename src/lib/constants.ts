@@ -142,8 +142,8 @@ export const CALLING_STATUS_COLORS: Record<string, { bg: string; text: string }>
 };
 
 export const INTERVIEW_TYPES = [
-  'Annual Youth',
-  'Semi-Annual Youth',
+  'Youth 12-15',
+  'Youth 16-17',
   'Annual',
   'Calling',
   'Endowed Temple Rec',

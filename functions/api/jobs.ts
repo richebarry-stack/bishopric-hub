@@ -129,9 +129,13 @@ function computeYouthAge(birthDate: string, now: Date): number | null {
 }
 
 /** Ensures every active youth (ages 12-17) has exactly one linked interview_pipeline
- * row, bucketed into 'Annual Youth' (12-15) or 'Semi-Annual Youth' (16-17), correcting
- * the type as they age. Adopts a matching unlinked legacy row by name if one exists,
- * otherwise creates a new one. Never touches status/dates/assigned_to on existing rows. */
+ * row, bucketed into 'Youth 12-15' or 'Youth 16-17', correcting the bucket as they
+ * age. Both brackets get an interview every 6 months per the Handbook — 12-15
+ * alternates between the bishop and an assigned counselor, 16-17 is the bishop both
+ * times — so new rows default assigned_to to the bishop as a starting point; the
+ * bishopric reassigns to the counselor for the 12-15 group's alternate interview.
+ * Adopts a matching unlinked legacy row by name if one exists, otherwise creates a
+ * new one. Never touches status/dates/assigned_to on already-existing rows. */
 export async function syncYouthInterviews(db: D1Database): Promise<JobResult> {
   const now = new Date();
   const nowIso = now.toISOString();
@@ -141,8 +145,11 @@ export async function syncYouthInterviews(db: D1Database): Promise<JobResult> {
   ).all<{ id: number; name: string; birth_date: string }>();
 
   const existingResult = await db.prepare(
-    "SELECT id, ward_member_id, member, type_of_interview FROM interview_pipeline WHERE type_of_interview IN ('Annual Youth', 'Semi-Annual Youth')"
+    "SELECT id, ward_member_id, member, type_of_interview FROM interview_pipeline WHERE type_of_interview IN ('Youth 12-15', 'Youth 16-17')"
   ).all<{ id: number; ward_member_id: number | null; member: string; type_of_interview: string }>();
+
+  const bishop = await db.prepare("SELECT name FROM users WHERE church_role = 'Bishop' LIMIT 1").first<{ name: string }>();
+  const bishopName = bishop?.name ?? '';
 
   const linkedByWardMemberId = new Map<number, { id: number; type_of_interview: string; member: string }>();
   const unlinkedByName = new Map<string, { id: number }>();
@@ -157,7 +164,7 @@ export async function syncYouthInterviews(db: D1Database): Promise<JobResult> {
   for (const wm of membersResult.results) {
     const age = computeYouthAge(wm.birth_date, now);
     if (age === null || age < 12) continue;
-    const type = age >= 16 ? 'Semi-Annual Youth' : 'Annual Youth';
+    const type = age >= 16 ? 'Youth 16-17' : 'Youth 12-15';
 
     const linkedRow = linkedByWardMemberId.get(wm.id);
     if (linkedRow) {
@@ -176,8 +183,8 @@ export async function syncYouthInterviews(db: D1Database): Promise<JobResult> {
     }
 
     stmts.push(db.prepare(
-      'INSERT INTO interview_pipeline (member, type_of_interview, status, ward_member_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(wm.name, type, 'Unassigned', wm.id, nowIso, nowIso));
+      'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, ward_member_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).bind(wm.name, type, 'Unassigned', bishopName, wm.id, nowIso, nowIso));
     created++;
   }
 
