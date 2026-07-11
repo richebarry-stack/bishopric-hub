@@ -1,11 +1,14 @@
-import type { InterviewPipeline as InterviewType } from '../../lib/api';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { api, type InterviewPipeline as InterviewType } from '../../lib/api';
 import { INTERVIEW_TYPES, INTERVIEW_STATUSES, SETUP_STATUSES } from '../../lib/constants';
+import { toast } from '../../lib/toast';
 import InterviewTable from './InterviewTable';
 import InterviewEditModal from './InterviewEditModal';
 import { useInterviews, EMPTY_INTERVIEW } from './useInterviews';
 import { YOUTH_TYPES } from './shared';
 
-export default function InterviewsPage({ title, description, types, showAge, showRecExpires = true, showCalling = false, mergedSectionLabel }: {
+export default function InterviewsPage({ title, description, types, showAge, showRecExpires = true, showCalling = false, mergedSectionLabel, showSyncNow = false }: {
   title: string;
   description: string;
   types: string[];
@@ -14,8 +17,25 @@ export default function InterviewsPage({ title, description, types, showAge, sho
   showCalling?: boolean;
   /** When set, all `types` are rendered as a single merged section under this label (e.g. Youth Interviews). */
   mergedSectionLabel?: string;
+  /** Shows a "Sync now" button that immediately runs the expiring-recommend-to-interview sync, instead of waiting for the once-a-day automatic pass. */
+  showSyncNow?: boolean;
 }) {
   const h = useInterviews();
+  const queryClient = useQueryClient();
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncNow = async () => {
+    setSyncing(true);
+    try {
+      const result = await api.syncTempleRecommends();
+      await queryClient.invalidateQueries({ queryKey: ['interview-pipeline'] });
+      toast.success(result.created > 0 ? `Added ${result.created} interview${result.created === 1 ? '' : 's'}` : 'Already up to date');
+    } catch {
+      toast.error('Sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const pageRows = applyYouthAgedOutFilter(h.filtered.filter(r => types.includes(r.type_of_interview)), h);
 
@@ -29,10 +49,19 @@ export default function InterviewsPage({ title, description, types, showAge, sho
     <div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
         <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-        <button onClick={() => h.setEditing({ ...EMPTY_INTERVIEW, type_of_interview: allowedTypes[0] || '' })}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
-          + New Interview
-        </button>
+        <div className="flex items-center gap-2">
+          {showSyncNow && (
+            <button onClick={handleSyncNow} disabled={syncing}
+              title="Immediately check for recommends expiring within 2 months and add them below, instead of waiting for the once-a-day automatic check."
+              className="border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+              {syncing ? 'Syncing…' : 'Sync now'}
+            </button>
+          )}
+          <button onClick={() => h.setEditing({ ...EMPTY_INTERVIEW, type_of_interview: allowedTypes[0] || '' })}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+            + New Interview
+          </button>
+        </div>
       </div>
       <p className="text-sm text-gray-500 mb-4">{description}</p>
 

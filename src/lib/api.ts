@@ -108,6 +108,8 @@ export const api = {
     const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     return request('/sync-conduct', { method: 'POST', body: JSON.stringify({ today }) });
   },
+  syncTempleRecommends: () =>
+    request<{ ok: boolean; created: number }>('/sync-temple-recommends', { method: 'POST' }),
   list: <T>(table: string) => request<T[]>(`/${table}`),
   get: <T>(table: string, id: number) => request<T>(`/${table}/${id}`),
   create: <T>(table: string, data: Record<string, unknown>) =>

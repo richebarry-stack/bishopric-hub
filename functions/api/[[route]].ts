@@ -1,4 +1,4 @@
-import { syncConduct, runDailyJobs, syncSettingApartInterviews } from './jobs';
+import { syncConduct, runDailyJobs, syncSettingApartInterviews, syncTempleRecommendInterviews } from './jobs';
 
 interface Env {
   DB: D1Database;
@@ -1100,6 +1100,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const body = await request.json() as { today?: string };
     const todayStr = body.today || new Date().toISOString().slice(0, 10);
     const result = await syncConduct(db, todayStr);
+    return json(result);
+  }
+
+  // Manually trigger the same expiring-recommend-to-interview sync that runs daily
+  // (also runs automatically once a day — see runDailyJobs below)
+  if (routeParts[0] === 'sync-temple-recommends' && method === 'POST') {
+    const result = await syncTempleRecommendInterviews(db);
     return json(result);
   }
 

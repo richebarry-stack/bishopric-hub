@@ -8,6 +8,7 @@ export default function AdultTempleInterviews() {
       description="Temple recommend interviews for adult members — Endowed and Limited-use recommends. Anyone with a recommend expiring within 2 months is added here automatically (set recommend type/expiration on Ward Members)."
       types={[...TEMPLE_TYPES]}
       showRecExpires
+      showSyncNow
     />
   );
 }

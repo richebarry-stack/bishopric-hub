@@ -636,6 +636,8 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Ward Members: added an "Out of ward" flag for someone who attends the ward but whose membership record is in another ward. It\'s an informational badge only and doesn\'t change how that person is treated anywhere else in the app.',
                 'Ward Members: relabeled the "out of ward" toggle to "Flag: records elsewhere" (was confusingly similar to "Remove from ward") and added hover tooltips explaining what each button actually does.',
                 'Youth Interviews: the temple recommend expiration date entered on a youth\'s interview now stays in sync with their Temple Recommend field on Ward Members, in both directions.',
+                'Adult Temple Interviews: added a "Sync now" button to immediately check for recommends expiring within 2 months and add them to the list, instead of waiting for the once-a-day automatic check.',
+                'Backfilled every youth\'s Temple Recommend field on Ward Members from their existing Youth Interview recommend expiration date.',
               ],
             },
             {
