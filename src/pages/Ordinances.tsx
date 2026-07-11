@@ -84,7 +84,7 @@ export default function Ordinances() {
       <p className="text-sm text-gray-500 mb-4">
         Baptisms and Aaronic Priesthood advancement, tracked from discussion through recording.
         Suggestions below are computed automatically from birth dates on Ward Members.
-        Each December, young men who will turn 12 next year are added to this tracker automatically, a month ahead of the new year.
+        Each December, young men who will turn 12, 14, or 16 next year (Deacon, Teacher, or Priest) are added to this tracker automatically, a month ahead of the new year.
       </p>
 
       {!rosterHasBirthDates && (

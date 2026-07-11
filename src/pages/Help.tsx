@@ -516,7 +516,7 @@ export default function Help() {
             {
               date: 'Jul 11, 2026 (6)',
               items: [
-                'Ordinances: each December, young men who will turn 12 next year are now added to the tracker automatically, a month ahead of the new year (in addition to the existing "suggested this year" box).',
+                'Ordinances: each December, young men who will turn 12, 14, or 16 next year (Deacon, Teacher, or Priest) are now added to the tracker automatically, a month ahead of the new year (in addition to the existing "suggested this year" box).',
                 'Interview setup assignment can now be given to the executive secretary or an assistant executive secretary, not just the bishop and counselors — who actually conducts the interview is unaffected.',
               ],
             },

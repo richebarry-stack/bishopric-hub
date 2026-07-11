@@ -235,11 +235,14 @@ export async function syncSettingApartInterviews(db: D1Database): Promise<JobRes
   return { ok: true, created, removed };
 }
 
-/** In December, gets ahead of next year's Deacon ordinations by auto-tracking every
- * active young man who will turn 12 next calendar year — a heads-up a month before
- * the year turns, rather than waiting for the "suggested this year" box on the
- * Ordinances page to pick them up in January. Idempotent (skips already-tracked
- * members); a no-op outside December. */
+// Aaronic Priesthood advancement age -> ordinance type, per General Handbook guidance.
+const ADVANCEMENT_AGES: Record<number, string> = { 12: 'Deacon', 14: 'Teacher', 16: 'Priest' };
+
+/** In December, gets ahead of next year's Aaronic Priesthood advancements (Deacon,
+ * Teacher, Priest) by auto-tracking every active young man who will turn 12, 14, or
+ * 16 next calendar year — a heads-up a month before the year turns, rather than
+ * waiting for the "suggested this year" box on the Ordinances page to pick them up
+ * in January. Idempotent (skips already-tracked members); a no-op outside December. */
 export async function syncOrdinanceCandidates(db: D1Database): Promise<JobResult> {
   const now = new Date();
   if (now.getMonth() !== 11) return { ok: true, skipped: 'not December' };
@@ -251,21 +254,22 @@ export async function syncOrdinanceCandidates(db: D1Database): Promise<JobResult
   ).all<{ first_name: string; last_name: string; birth_date: string }>();
 
   const existingResult = await db.prepare(
-    "SELECT member_name FROM ordinances WHERE ordinance_type = 'Deacon'"
-  ).all<{ member_name: string }>();
-  const tracked = new Set(existingResult.results.map(r => r.member_name.trim().toLowerCase()));
+    "SELECT member_name, ordinance_type FROM ordinances WHERE ordinance_type IN ('Deacon', 'Teacher', 'Priest')"
+  ).all<{ member_name: string; ordinance_type: string }>();
+  const tracked = new Set(existingResult.results.map(r => `${r.member_name.trim().toLowerCase()}|${r.ordinance_type}`));
 
   const stmts: D1PreparedStatement[] = [];
   let created = 0;
   for (const wm of membersResult.results) {
     const birthYear = parseInt(wm.birth_date.slice(0, 4), 10);
     if (!birthYear) continue;
-    if (nextYear - birthYear !== 12) continue;
+    const ordinanceType = ADVANCEMENT_AGES[nextYear - birthYear];
+    if (!ordinanceType) continue;
     const legalName = wm.first_name ? `${wm.last_name}, ${wm.first_name}` : wm.last_name;
-    if (tracked.has(legalName.trim().toLowerCase())) continue;
+    if (tracked.has(`${legalName.trim().toLowerCase()}|${ordinanceType}`)) continue;
     stmts.push(db.prepare(
       'INSERT INTO ordinances (member_name, ordinance_type, status, updated_at) VALUES (?, ?, ?, ?)'
-    ).bind(legalName, 'Deacon', 'Upcoming', nowIso));
+    ).bind(legalName, ordinanceType, 'Upcoming', nowIso));
     created++;
   }
   if (stmts.length > 0) await db.batch(stmts);
