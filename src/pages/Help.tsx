@@ -634,6 +634,8 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Fixed: Ward Council members can now open Youth Council Meetings (read-only) — previously it redirected them to the Ward Council dashboard instead.',
                 'Ward Members: "Deactivate"/"Reactivate" are now called "Remove from ward"/"Add back to ward", and the status badge reads "In Ward"/"Removed" — same behavior, clearer wording.',
                 'Ward Members: added an "Out of ward" flag for someone who attends the ward but whose membership record is in another ward. It\'s an informational badge only and doesn\'t change how that person is treated anywhere else in the app.',
+                'Ward Members: relabeled the "out of ward" toggle to "Flag: records elsewhere" (was confusingly similar to "Remove from ward") and added hover tooltips explaining what each button actually does.',
+                'Youth Interviews: the temple recommend expiration date entered on a youth\'s interview now stays in sync with their Temple Recommend field on Ward Members, in both directions.',
               ],
             },
             {

@@ -175,6 +175,14 @@ export function useInterviews() {
         }
         const newPreferredFirst = preferredNameDraft.trim();
         if (newPreferredFirst !== (linked.preferred_first_name || '')) wardMemberUpdate.preferred_first_name = newPreferredFirst;
+        if (YOUTH_TYPES.has((data.type_of_interview as string) || '')) {
+          const newExpires = ((data.date_recommend_expires as string) || '').slice(0, 10);
+          const linkedExpires = (linked.recommend_expires || '').slice(0, 10);
+          if (newExpires !== linkedExpires) {
+            wardMemberUpdate.recommend_expires = newExpires;
+            if (newExpires) wardMemberUpdate.recommend_type = linked.recommend_type === 'Endowed' ? 'Endowed' : 'Limited';
+          }
+        }
         if (Object.keys(wardMemberUpdate).length > 0) await updateWardMember(wardMemberId, wardMemberUpdate);
       }
     }

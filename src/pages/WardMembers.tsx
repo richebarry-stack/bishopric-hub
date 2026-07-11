@@ -4,8 +4,9 @@ import { toast } from '../lib/toast';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useAuth } from '../lib/auth';
 import { legalName } from '../lib/displayName';
-import type { WardMember } from '../lib/api';
+import type { WardMember, InterviewPipeline } from '../lib/api';
 import WardMemberImport from '../components/WardMemberImport';
+import { YOUTH_TYPES } from '../components/interviews/shared';
 
 function currentAge(birthDate: string | null): number | null {
   if (!birthDate) return null;
@@ -218,7 +219,8 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                   <NameCell member={m} onSave={fields => onSaveName(m, fields)} />
                   <AgeTag birthDate={m.birth_date} />
                   {!!m.out_of_ward && (
-                    <span className="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 ml-1.5 align-middle">Out of ward</span>
+                    <span title="Attends here, but their membership record is in another ward. Informational only."
+                      className="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 ml-1.5 align-middle">Records elsewhere</span>
                   )}
                 </td>
                 <td className="px-4 py-2">
@@ -256,10 +258,12 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                 </td>
                 <td className="px-4 py-2 text-right space-x-2">
                   <button onClick={() => onToggleOutOfWard(m)}
+                    title="Informational flag only — does not remove them from ward lists or affect Speakers/Prayers eligibility."
                     className="text-xs px-2 py-1 rounded text-amber-600 hover:bg-amber-50">
-                    {m.out_of_ward ? 'Back in ward' : 'Mark out of ward'}
+                    {m.out_of_ward ? 'Clear "records elsewhere" flag' : 'Flag: records elsewhere'}
                   </button>
                   <button onClick={() => onToggleActive(m)}
+                    title="Removes them from the active ward roster and hides them from Speakers/Prayers, but keeps their history."
                     className={`text-xs px-2 py-1 rounded ${m.active
                       ? 'text-orange-600 hover:bg-orange-50'
                       : 'text-green-600 hover:bg-green-50'}`}>
@@ -285,6 +289,7 @@ export default function WardMembers() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const { rows, create, update, remove, refetch } = useTable<WardMember>('ward-members');
+  const { rows: interviews, update: updateInterview } = useTable<InterviewPipeline>('interview-pipeline');
   const [filter, setFilter] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -365,7 +370,11 @@ export default function WardMembers() {
 
   const saveRecommend = useCallback((m: WardMember, fields: { recommend_type: string; recommend_expires: string }) => {
     update(m.id, fields as unknown as Record<string, unknown>);
-  }, [update]);
+    const linkedYouthInterview = interviews.find(i => i.ward_member_id === m.id && YOUTH_TYPES.has(i.type_of_interview));
+    if (linkedYouthInterview && (linkedYouthInterview.date_recommend_expires || '').slice(0, 10) !== fields.recommend_expires) {
+      updateInterview(linkedYouthInterview.id, { date_recommend_expires: fields.recommend_expires } as unknown as Record<string, unknown>, { silent: true });
+    }
+  }, [update, interviews, updateInterview]);
 
   const confirm = useConfirm();
   const handleDelete = useCallback(async (m: WardMember) => {
@@ -437,8 +446,8 @@ export default function WardMembers() {
       <MemberSection title="No Birth Date" members={grouped.unknown} {...sectionProps} />
 
       <p className="text-xs text-gray-400 mt-2">
-        Removing a member from the ward hides them from Speakers &amp; Prayers but preserves their history.
-        "Out of ward" marks someone who attends here but whose membership record is in another ward — it's informational only and doesn't change anything else.
+        "Remove from ward" takes them off the active roster — hides them from Speakers &amp; Prayers, but preserves their history.
+        "Flag: records elsewhere" is unrelated — it just marks someone who attends here but whose membership record is in another ward. It's informational only and doesn't remove them from anything.
         Age groups: children (&lt;12 this year), youth (12–17 this year), adults (18+ this year).
       </p>
     </div>
