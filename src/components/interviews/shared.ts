@@ -1,6 +1,6 @@
 export const YOUTH_TYPES = new Set(['Youth 12-15', 'Youth 16-17']);
 
-export const TEMPLE_TYPES = new Set(['Endowed Temple Rec', 'Unendowed Temple Rec', 'Limited', 'Annual']);
+export const TEMPLE_TYPES = new Set(['Endowed Temple Rec', 'Unendowed Temple Rec', 'Limited']);
 
 export const OTHER_TYPES = new Set([
   'Calling', 'Setting Apart', 'Patriarchal Blessing', 'Before Mission', 'Post-Mission', 'Eccl Endorsement', 'Other',
@@ -13,10 +13,6 @@ export function pageForInterviewType(type: string): string {
   if (YOUTH_TYPES.has(type)) return '/youth-interviews';
   if (TEMPLE_TYPES.has(type)) return '/temple-interviews';
   return '/other-interviews';
-}
-
-export function shortYouthType(type: string): string {
-  return type.replace(/^Youth /, '');
 }
 
 export const TODAY = new Date().toISOString().slice(0, 10);
@@ -97,7 +93,7 @@ export function computeYouthAge(birthDate: string): number | null {
   return computeAge(birthDate);
 }
 
-export interface RowMeta { age?: number; displayName: string; youthState?: YouthState; }
+export interface RowMeta { age?: number; displayName: string; youthState?: YouthState; calling?: string; }
 
 export type SortKey =
   | 'member' | 'age' | 'status' | 'assigned_to' | 'setup_assigned_to' | 'setup_status'

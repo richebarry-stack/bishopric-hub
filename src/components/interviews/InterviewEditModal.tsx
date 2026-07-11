@@ -1,8 +1,8 @@
 import Modal from '../Modal';
 import StatusBadge from '../StatusBadge';
 import { Input, Select, Textarea } from '../FormFields';
-import type { InterviewPipeline as InterviewType, WardMember } from '../../lib/api';
-import { INTERVIEW_STATUSES, SETUP_STATUSES } from '../../lib/constants';
+import type { InterviewPipeline as InterviewType, WardMember, CallingPipeline } from '../../lib/api';
+import { INTERVIEW_STATUSES, SETUP_STATUSES, SETTING_APART_STATUSES } from '../../lib/constants';
 import { YOUTH_TYPES, NO_REC_TYPES, YOUTH_STATE_COLORS, computeYouthAge, computeYouthState } from './shared';
 import { legalName } from '../../lib/displayName';
 
@@ -29,7 +29,7 @@ function AssignedToField({ label, value, onChange, options, datalistId, help }: 
 
 export default function InterviewEditModal({
   editing, onClose, onChange, onSave, wardMembers, wardMembersById, ageByName, activeYouthWardMemberIds,
-  bishopricOptions, setupOptions, allowedTypes, preferredNameDraft, setPreferredNameDraft,
+  bishopricOptions, setupOptions, allowedTypes, preferredNameDraft, setPreferredNameDraft, callingsById,
 }: {
   editing: Partial<InterviewType> | null;
   onClose: () => void;
@@ -44,8 +44,12 @@ export default function InterviewEditModal({
   allowedTypes: string[];
   preferredNameDraft: string;
   setPreferredNameDraft: (v: string) => void;
+  callingsById: Map<number, CallingPipeline>;
 }) {
   if (!editing) return null;
+
+  const isSettingApart = editing.type_of_interview === 'Setting Apart';
+  const linkedCalling = editing.calling_id ? callingsById.get(editing.calling_id) : undefined;
 
   const editingLinkedMember = editing.ward_member_id ? wardMembersById.get(editing.ward_member_id) : undefined;
   const editingAge = editingLinkedMember?.birth_date
@@ -130,6 +134,13 @@ export default function InterviewEditModal({
           </div>
         )}
 
+        {linkedCalling && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Calling</label>
+            <p className="text-sm text-gray-600">{linkedCalling.calling}</p>
+          </div>
+        )}
+
         {editingIsManagedYouth ? (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -137,7 +148,10 @@ export default function InterviewEditModal({
             <p className="text-xs text-gray-400 mt-1">Computed automatically from Next/Last Interview Date below.</p>
           </div>
         ) : (
-          <Select label="Status" value={editing.status || ''} onChange={v => onChange({ status: v })} options={INTERVIEW_STATUSES} />
+          <Select label="Status" value={editing.status || ''} onChange={v => onChange({ status: v })} options={isSettingApart ? SETTING_APART_STATUSES : INTERVIEW_STATUSES} />
+        )}
+        {isSettingApart && editing.status === 'Complete' && (
+          <p className="text-xs text-gray-400 -mt-2">Marking this Complete will set the linked calling's status to "Set apart".</p>
         )}
 
         <AssignedToField

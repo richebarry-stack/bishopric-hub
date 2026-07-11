@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../../lib/useTable';
-import type { InterviewPipeline as InterviewType, WardMember, User } from '../../lib/api';
+import type { InterviewPipeline as InterviewType, WardMember, User, CallingPipeline } from '../../lib/api';
 import { displayName, legalName } from '../../lib/displayName';
 import { toast } from '../../lib/toast';
 import { YOUTH_TYPES, computeYouthAge, computeYouthState, type RowMeta } from './shared';
@@ -15,6 +15,7 @@ export const EMPTY_INTERVIEW: Partial<InterviewType> = {
 export function useInterviews() {
   const { rows, isLoading, create, update, remove } = useTable<InterviewType>('interview-pipeline');
   const { rows: wardMembers, isLoading: wardMembersLoading, update: updateWardMember } = useTable<WardMember>('ward-members');
+  const { rows: callings } = useTable<CallingPipeline>('calling-pipeline');
   const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['users'], queryFn: () => fetch('/api/users').then(r => r.json()) });
 
   const [editing, setEditing] = useState<Partial<InterviewType> | null>(null);
@@ -51,6 +52,12 @@ export function useInterviews() {
     return m;
   }, [wardMembers]);
 
+  const callingsById = useMemo(() => {
+    const m = new Map<number, CallingPipeline>();
+    for (const c of callings) m.set(c.id, c);
+    return m;
+  }, [callings]);
+
   const ageByName = useMemo(() => {
     const m = new Map<string, number>();
     for (const wm of wardMembers) {
@@ -86,10 +93,11 @@ export function useInterviews() {
         age = ageByName.get(r.member?.trim().toLowerCase() ?? '');
       }
       const youthState = age !== undefined && YOUTH_TYPES.has(r.type_of_interview) ? computeYouthState(r) : undefined;
-      m.set(r.id, { age, displayName: name, youthState });
+      const calling = r.calling_id ? callingsById.get(r.calling_id)?.calling : undefined;
+      m.set(r.id, { age, displayName: name, youthState, calling });
     }
     return m;
-  }, [rows, wardMembersById, ageByName]);
+  }, [rows, wardMembersById, ageByName, callingsById]);
 
   const filtered = rows.filter(r => {
     if (statusFilter && r.status !== statusFilter) return false;
@@ -187,7 +195,7 @@ export function useInterviews() {
 
   return {
     rows, isLoading, filtered, remove,
-    wardMembers, wardMembersById, wardMembersLoading, ageByName, activeYouthWardMemberIds,
+    wardMembers, wardMembersById, wardMembersLoading, ageByName, activeYouthWardMemberIds, callingsById,
     bishopricOptions, setupOptions, assignedOptions,
     rowMetaById, agedOutYouthCount,
     editing, setEditing,

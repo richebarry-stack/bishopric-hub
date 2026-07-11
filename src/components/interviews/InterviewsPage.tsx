@@ -5,12 +5,13 @@ import InterviewEditModal from './InterviewEditModal';
 import { useInterviews, EMPTY_INTERVIEW } from './useInterviews';
 import { YOUTH_TYPES } from './shared';
 
-export default function InterviewsPage({ title, description, types, showAge, showRecExpires = true, mergedSectionLabel }: {
+export default function InterviewsPage({ title, description, types, showAge, showRecExpires = true, showCalling = false, mergedSectionLabel }: {
   title: string;
   description: string;
   types: string[];
   showAge?: boolean;
   showRecExpires?: boolean;
+  showCalling?: boolean;
   /** When set, all `types` are rendered as a single merged section under this label (e.g. Youth Interviews). */
   mergedSectionLabel?: string;
 }) {
@@ -126,6 +127,7 @@ export default function InterviewsPage({ title, description, types, showAge, sho
                 <InterviewTable rows={typeRows} onEdit={h.setEditing} onDelete={h.remove}
                   showAge={showAge}
                   showRecExpires={showRecExpires}
+                  showCalling={showCalling}
                   rowMetaById={h.rowMetaById}
                   selected={h.selected} onToggleSelect={h.toggleSelect} />
               )}
@@ -143,6 +145,7 @@ export default function InterviewsPage({ title, description, types, showAge, sho
         wardMembersById={h.wardMembersById}
         ageByName={h.ageByName}
         activeYouthWardMemberIds={h.activeYouthWardMemberIds}
+        callingsById={h.callingsById}
         bishopricOptions={h.bishopricOptions}
         setupOptions={h.setupOptions}
         allowedTypes={allowedTypes.length ? allowedTypes : INTERVIEW_TYPES}

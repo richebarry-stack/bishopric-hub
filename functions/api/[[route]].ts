@@ -1135,6 +1135,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       `SELECT * FROM ${tableConfig.name} WHERE id = ?`
     ).bind(recordId).first();
     if (tableName === 'calling-pipeline') waitUntil(syncSettingApartInterviews(db).catch(() => {}));
+    if (tableName === 'interview-pipeline') {
+      const row = updated as { type_of_interview?: string; status?: string; calling_id?: number | null } | null;
+      if (row?.type_of_interview === 'Setting Apart' && row.status === 'Complete' && row.calling_id) {
+        waitUntil(db.prepare(
+          "UPDATE calling_pipeline SET status = '6. Set apart', updated_at = ? WHERE id = ? AND status = '5. Sustained'"
+        ).bind(new Date().toISOString(), row.calling_id).run().catch(() => {}));
+      }
+    }
     return json(updated);
   }
 

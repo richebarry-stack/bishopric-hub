@@ -1,18 +1,19 @@
 import { useState, useMemo } from 'react';
 import type { InterviewPipeline as InterviewType } from '../../lib/api';
 import StatusBadge from '../StatusBadge';
-import { INTERVIEW_STATUS_COLORS, SETUP_STATUS_COLORS } from '../../lib/constants';
+import { INTERVIEW_STATUS_COLORS, SETUP_STATUS_COLORS, SETTING_APART_STATUS_COLORS } from '../../lib/constants';
 import {
   type RowMeta, type SortKey, YOUTH_STATE_RANK, YOUTH_STATE_COLORS,
-  recommendRowClass, formatRecommendDate, isPast, shortYouthType,
+  recommendRowClass, formatRecommendDate, isPast,
 } from './shared';
 
-export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRecExpires = true, rowMetaById, selected, onToggleSelect }: {
+export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRecExpires = true, showCalling = false, rowMetaById, selected, onToggleSelect }: {
   rows: InterviewType[];
   onEdit: (r: InterviewType) => void;
   onDelete: (id: number) => void;
   showAge?: boolean;
   showRecExpires?: boolean;
+  showCalling?: boolean;
   rowMetaById: Map<number, RowMeta>;
   selected: Set<number>;
   onToggleSelect: (id: number) => void;
@@ -73,6 +74,7 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
               <th className="px-3 py-2 w-8"></th>
               <Th col="member" label="Member" />
               {showAge && <Th col="age" label="Age" />}
+              {showCalling && <th className="text-left px-3 py-2 font-medium text-gray-600 whitespace-nowrap">Calling</th>}
               <Th col="status" label="Status" />
               <Th col="assigned_to" label="Interviewer" />
               <Th col="setup_status" label="Setup" />
@@ -95,10 +97,11 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
                 </td>
                 <td className="px-3 py-2 font-medium text-gray-900">{meta?.displayName ?? r.member}</td>
                 {showAge && <td className="px-3 py-2 text-gray-600 text-center">{meta?.age ?? '—'}</td>}
+                {showCalling && <td className="px-3 py-2 text-gray-600">{meta?.calling ?? ''}</td>}
                 <td className="px-3 py-2">
                   {meta?.youthState
                     ? <StatusBadge status={meta.youthState} colors={YOUTH_STATE_COLORS} />
-                    : <StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} />}
+                    : <StatusBadge status={r.status} colors={r.type_of_interview === 'Setting Apart' ? SETTING_APART_STATUS_COLORS : INTERVIEW_STATUS_COLORS} />}
                 </td>
                 <td className="px-3 py-2 text-gray-600">{r.assigned_to}</td>
                 <td className="px-3 py-2">
@@ -113,13 +116,11 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
                   </td>
                 )}
                 <td className="px-3 py-2">
-                  {meta?.youthState && <div className="text-[10px] text-gray-400 uppercase tracking-wide">{shortYouthType(r.type_of_interview)}</div>}
                   <span className="font-mono text-sm text-gray-600">
                     {(r.last_interview_datetime || '').slice(0, 10) || (meta?.youthState ? '—' : '')}
                   </span>
                 </td>
                 <td className="px-3 py-2">
-                  {meta?.youthState && <div className="text-[10px] text-gray-400 uppercase tracking-wide">{shortYouthType(r.type_of_interview)}</div>}
                   <span className={`font-mono text-sm ${isPast(r.next_interview_date) ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
                     {(r.next_interview_date || '').slice(0, 10) || (meta?.youthState ? '—' : '')}
                   </span>
@@ -153,10 +154,11 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
                     <button onClick={e => { e.stopPropagation(); onDelete(r.id); }}
                       className="text-red-400 hover:text-red-600 text-xs shrink-0">Del</button>
                   </div>
+                  {showCalling && meta?.calling && <p className="text-xs text-gray-500 mt-0.5">{meta.calling}</p>}
                   <div className="mt-1 flex flex-wrap gap-1.5 items-center">
                     {meta?.youthState
                       ? <StatusBadge status={meta.youthState} colors={YOUTH_STATE_COLORS} />
-                      : <StatusBadge status={r.status} colors={INTERVIEW_STATUS_COLORS} />}
+                      : <StatusBadge status={r.status} colors={r.type_of_interview === 'Setting Apart' ? SETTING_APART_STATUS_COLORS : INTERVIEW_STATUS_COLORS} />}
                     <StatusBadge status={r.setup_status || 'Not started'} colors={SETUP_STATUS_COLORS} />
                   </div>
                   {r.assigned_to && <p className="text-xs text-gray-500 mt-1">Interviewer: {r.assigned_to}</p>}
@@ -165,12 +167,12 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
                     {showRecExpires && r.date_recommend_expires && <span className="text-gray-600">Rec. expires: {formatRecommendDate(r.date_recommend_expires)}</span>}
                     {r.next_interview_date && (
                       <span className={isPast(r.next_interview_date) ? 'text-red-600 font-semibold' : 'text-gray-600'}>
-                        Next{meta?.youthState ? ` (${shortYouthType(r.type_of_interview)})` : ''}: {r.next_interview_date.slice(0, 10)}
+                        Next: {r.next_interview_date.slice(0, 10)}
                       </span>
                     )}
                     {r.last_interview_datetime && (
                       <span className="text-gray-600">
-                        Last{meta?.youthState ? ` (${shortYouthType(r.type_of_interview)})` : ''}: {r.last_interview_datetime.slice(0, 10)}
+                        Last: {r.last_interview_datetime.slice(0, 10)}
                       </span>
                     )}
                   </div>

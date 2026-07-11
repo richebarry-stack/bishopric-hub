@@ -144,7 +144,6 @@ export const CALLING_STATUS_COLORS: Record<string, { bg: string; text: string }>
 export const INTERVIEW_TYPES = [
   'Youth 12-15',
   'Youth 16-17',
-  'Annual',
   'Calling',
   'Setting Apart',
   'Endowed Temple Rec',
@@ -190,16 +189,27 @@ export const INTERVIEW_STATUS_COLORS: Record<string, { bg: string; text: string 
   'Needs to be sustained': { bg: 'bg-pink-100', text: 'text-pink-800' },
 };
 
+// Setting Apart interviews use a simpler status set than the general interview list.
+export const SETTING_APART_STATUSES = ['Unassigned', 'Assigned', 'Scheduled', 'Complete'];
+
+export const SETTING_APART_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  'Unassigned': { bg: 'bg-gray-100', text: 'text-gray-600' },
+  'Assigned': { bg: 'bg-blue-100', text: 'text-blue-800' },
+  'Scheduled': { bg: 'bg-orange-100', text: 'text-orange-800' },
+  'Complete': { bg: 'bg-green-100', text: 'text-green-800' },
+};
+
 export const MEMBER_NEED_TYPES = ['Health', 'Support', 'Mission'];
 
 export const MISSIONARY_STATUSES = [
   '0-Not at this time',
   '1-Considering',
   '2-Papers Started',
-  '3-Papers Submitted',
-  '4-Call Accepted',
-  '5-Serving',
-  '6-Released',
+  '3-Papers with Stake',
+  '4-Papers Submitted',
+  '5-Call Accepted',
+  '6-Serving',
+  '7-Released',
 ];
 
 export const MISSIONARY_TEMPLE_STATUSES = [

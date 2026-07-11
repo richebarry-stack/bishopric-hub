@@ -263,7 +263,7 @@ const FULL_SECTIONS: Section[] = [
     icon: '◎',
     content: (
       <div className="space-y-2">
-        <p>Interview tracking is split across three pages so each stays easy to scan: <strong>Youth Interviews</strong>, <strong>Adult Temple Interviews</strong> (endowed/unendowed/limited-use recommends, annual interviews), and <strong>Other Interviews</strong> (calling interviews, setting apart, patriarchal blessing referrals, mission prep, and everything else). Every category always shows on its page, even with nothing pending, so it's clear what's covered.</p>
+        <p>Interview tracking is split across three pages so each stays easy to scan: <strong>Youth Interviews</strong>, <strong>Adult Temple Interviews</strong> (endowed/unendowed/limited-use recommends), and <strong>Other Interviews</strong> (calling interviews, setting apart, patriarchal blessing referrals, mission prep, and everything else). Every category always shows on its page, even with nothing pending, so it's clear what's covered.</p>
         <p>Each interview has two separate assignments: an <strong>Interviewer</strong> (who conducts the interview) and a <strong>Setup</strong> assignment (who schedules it, with its own Not started/Contacted/Scheduled/Done status). Only the setup assignment shows up on that person's My Actions — the interview itself is the interviewer's normal duty, not a to-do reminder.</p>
         <p><strong>Youth Interviews</strong> are handled automatically: every active youth (ages 12–17) is kept in a single merged section, added and re-bucketed between ages 12–15 and 16–17 as they have birthdays — no manual entry needed. Every youth is interviewed every 6 months: for ages 12–15, alternate between the bishop and the counselor over that youth's quorum/class; for ages 16–17, both interviews should be with the bishop himself, if possible.</p>
         <p>Youth status isn't set by hand; it's computed from the dates you enter: <strong>Scheduled</strong> (a future Next Interview Date is set), <strong>Up to date</strong> (interviewed within the last 6 months), or <strong>Due</strong> (neither). Members who age out or become inactive drop out of the default view — use "Show aged-out/inactive" to see them.</p>
@@ -556,6 +556,15 @@ function VersionHistoryList(limit?: number) {
 }
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
+            {
+              date: 'Jul 11, 2026 (7)',
+              items: [
+                'Missionary Pipeline: added a "Papers with Stake" status between Papers Started and Papers Submitted.',
+                'Removed the Annual category from Adult Temple Interviews (it wasn\'t in use).',
+                'Setting Apart interviews now use their own simpler status list (Unassigned, Assigned, Scheduled, Complete) and show the linked calling. Marking one Complete automatically moves that calling to "Set apart" status.',
+                'Youth Interviews: removed the redundant 12-15/16-17 labels from the Last/Next Interview columns — age is already shown in its own column.',
+              ],
+            },
             {
               date: 'Jul 11, 2026 (6)',
               items: [
