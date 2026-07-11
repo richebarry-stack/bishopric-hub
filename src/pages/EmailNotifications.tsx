@@ -26,6 +26,52 @@ function formatWhen(iso: string | null): string {
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+function WardNameSetting() {
+  const queryClient = useQueryClient();
+  const { data } = useQuery({ queryKey: ['ward-name'], queryFn: () => api.wardName.get() });
+  const [wardName, setWardName] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setWardName(data?.wardName ?? '');
+  }, [data?.wardName]);
+
+  const mutation = useMutation({
+    mutationFn: (name: string) => api.wardName.save(name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ward-name'] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    },
+  });
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+      <h2 className="font-semibold text-gray-800 text-sm">Ward Name</h2>
+      <p className="text-xs text-gray-400">
+        Shown as "{wardName.trim() || '(Ward Name)'} Ward Leadership Hub" on the login page and sidebar.
+      </p>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          placeholder="e.g. Maple Grove"
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm flex-1"
+          value={wardName}
+          onChange={(e) => setWardName(e.target.value)}
+        />
+        <button
+          className="px-3 py-1.5 text-sm rounded-lg bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50"
+          disabled={mutation.isPending}
+          onClick={() => mutation.mutate(wardName.trim())}
+        >
+          Save
+        </button>
+        {saved && <span className="text-xs text-green-600">Saved</span>}
+      </div>
+    </div>
+  );
+}
+
 function TimeZoneSetting() {
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ['app-timezone'], queryFn: () => api.appTimezone.get() });
@@ -112,6 +158,8 @@ export default function EmailNotifications() {
           </>
         )}
       </div>
+
+      <WardNameSetting />
 
       <TimeZoneSetting />
 

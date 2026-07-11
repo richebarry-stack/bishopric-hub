@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { SECURITY_QUESTIONS } from '../lib/constants';
 import { usePresence, type PresenceUser } from '../lib/usePresence';
 import { useMyActionItems } from '../lib/myActions';
+import { useAppTitle } from '../lib/wardName';
 
 export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?: boolean }[] = [
   { path: '/', label: 'Dashboard', icon: '⌂' },
@@ -406,6 +407,8 @@ export default function Layout() {
   const { user, logout, selectedHub, chooseHub, isGuest, guestType } = useAuth();
   const othersOnline = usePresence(location.pathname, !isGuest);
   const { count: myActionsCount } = useMyActionItems();
+  const appTitle = useAppTitle();
+  useEffect(() => { document.title = appTitle; }, [appTitle]);
 
   const HUB_DEFAULT: Record<string, string> = {
     yc: '/youth-activities',
@@ -513,7 +516,7 @@ export default function Layout() {
       <aside className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform lg:translate-x-0 flex flex-col h-screen lg:h-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className={`p-4 border-b shrink-0 ${isCal ? 'border-violet-200 bg-violet-50' : isYc ? 'border-amber-200 bg-amber-50' : isWc ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200'}`}>
           <h1 className={`text-lg font-bold ${isCal ? 'text-violet-800' : isYc ? 'text-amber-800' : isWc ? 'text-emerald-800' : 'text-gray-900'}`}>
-            {isCal ? 'Calendar Hub' : isYc ? 'Youth Council Hub' : isWc ? 'Ward Council Hub' : 'Bishopric Hub'}
+            {isCal ? 'Calendar Hub' : isYc ? 'Youth Council Hub' : isWc ? 'Ward Council Hub' : appTitle}
           </h1>
           {user && <p className={`text-xs mt-1 ${isCal ? 'text-violet-600' : isYc ? 'text-amber-600' : isWc ? 'text-emerald-600' : 'text-gray-500'}`}>{user.name}</p>}
           {isGuest && (
@@ -710,7 +713,7 @@ export default function Layout() {
               </svg>
             </button>
           )}
-          <h1 className={`text-lg font-bold ${isGuest ? 'text-amber-800' : 'text-gray-900'}`}>Bishopric Hub</h1>
+          <h1 className={`text-lg font-bold ${isGuest ? 'text-amber-800' : 'text-gray-900'}`}>{appTitle}</h1>
         </header>
         <main className="p-4 lg:p-6">
           <PresenceBanner others={othersOnline} path={location.pathname} />

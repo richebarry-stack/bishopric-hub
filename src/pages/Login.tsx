@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { CHURCH_ROLES } from '../lib/constants';
+import { useAppTitle } from '../lib/wardName';
 
 type ForgotStep = 'email' | 'answers' | 'done';
 type Mode = 'login' | 'register';
@@ -10,6 +11,8 @@ type Mode = 'login' | 'register';
 export default function Login() {
   const { login, loginAsGuest, chooseHub } = useAuth();
   const navigate = useNavigate();
+  const appTitle = useAppTitle();
+  useEffect(() => { document.title = appTitle; }, [appTitle]);
   const [mode, setMode] = useState<Mode>('login');
   const [guestLoading, setGuestLoading] = useState(false);
 
@@ -305,7 +308,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-sm w-full">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Bishopric Hub</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{appTitle}</h1>
           <p className="text-sm text-gray-500 mt-1">Sign in to continue</p>
         </div>
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
