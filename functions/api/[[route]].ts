@@ -226,6 +226,29 @@ function hubForChurchRole(role: string): string {
   return 'wc';
 }
 
+// Only one user account may hold each of these callings at a time.
+const SINGLETON_CALLINGS = new Set(['Bishop', 'First Counselor', 'Second Counselor']);
+
+/** Returns an error Response if another user already holds this singleton calling, else null. */
+async function checkSingletonCalling(db: D1Database, churchRole: string, excludeUserId: number | null): Promise<Response | null> {
+  if (!SINGLETON_CALLINGS.has(churchRole)) return null;
+  const existing = excludeUserId
+    ? await db.prepare('SELECT id FROM users WHERE church_role = ? AND id != ?').bind(churchRole, excludeUserId).first()
+    : await db.prepare('SELECT id FROM users WHERE church_role = ?').bind(churchRole).first();
+  if (existing) return json({ error: `There is already a ${churchRole} — change their calling first before assigning a new one.` }, 400);
+  return null;
+}
+
+/** Sets the Presiding field on every future sacrament meeting to "Bishop <lastname>",
+ * overwriting whatever was there before — used whenever a new Bishop is assigned. */
+async function resetFuturePresidingToBishop(db: D1Database, bishopName: string): Promise<void> {
+  const lastName = bishopName.trim().split(/\s+/).pop() || bishopName;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  await db.prepare(
+    "UPDATE sacrament_themes SET presiding = ?, updated_at = ? WHERE meeting_date >= ?"
+  ).bind(`Bishop ${lastName}`, new Date().toISOString(), todayStr).run();
+}
+
 function generateTempPassword(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   return Array.from(bytes, b => b.toString(36).padStart(2, '0')).join('').slice(0, 10);
@@ -498,6 +521,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       } else {
         newHub = hubForChurchRole(church_role || '');
       }
+      const singletonConflict = await checkSingletonCalling(db, church_role || '', null);
+      if (singletonConflict) return singletonConflict;
       const tempPassword = generateTempPassword();
       const hash = await hashPasswordSecure(tempPassword);
       const newRole = role === 'admin' ? 'admin' : 'user';
@@ -506,6 +531,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           'INSERT INTO users (name, email, password_hash, role, church_role, hub, must_reset_password) VALUES (?, ?, ?, ?, ?, ?, 1)'
         ).bind(name, email, hash, newRole, church_role || '', newHub).run();
         const newUser = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(result.meta.last_row_id).first();
+        if (church_role === 'Bishop') await resetFuturePresidingToBishop(db, name);
         return json({ ...newUser as object, temp_password: tempPassword }, 201);
       } catch {
         return json({ error: 'User already exists' }, 400);
@@ -531,6 +557,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (caller?.role !== 'admin') return json({ error: 'Admin only' }, 403);
       const userId = Number(routeParts[1]);
       const { church_role, hub } = await request.json() as { church_role: string; hub?: string };
+      const singletonConflict = await checkSingletonCalling(db, church_role || '', userId);
+      if (singletonConflict) return singletonConflict;
       let newHub: string;
       if (church_role && !KNOWN_CALLINGS.has(church_role)) {
         // Custom calling: use an explicitly supplied hub, or fall back to whatever hub this
@@ -545,7 +573,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         newHub = hubForChurchRole(church_role || '');
       }
       await db.prepare('UPDATE users SET church_role = ?, hub = ? WHERE id = ?').bind(church_role ?? '', newHub, userId).run();
-      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(userId).first();
+      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(userId).first<{ name: string }>();
+      if (church_role === 'Bishop' && updated?.name) await resetFuturePresidingToBishop(db, updated.name);
       return json(updated);
     }
 
@@ -837,6 +866,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (!req) return json({ error: 'Not found' }, 404);
       const conflict = await db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)').bind(req.email).first();
       if (conflict) return json({ error: 'Email already in use by an existing account' }, 409);
+      const singletonConflict = await checkSingletonCalling(db, req.church_role || '', null);
+      if (singletonConflict) return singletonConflict;
       let hub: string;
       if (req.church_role && !KNOWN_CALLINGS.has(req.church_role)) {
         const body = await request.json().catch(() => ({})) as { hub?: string };
@@ -849,6 +880,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         "INSERT INTO users (name, email, password_hash, role, church_role, hub, last_login, last_access) VALUES (?, ?, ?, 'user', ?, ?, '', '')"
       ).bind(req.name, req.email, req.password_hash, req.church_role, hub).run();
       await db.prepare('DELETE FROM registration_requests WHERE id = ?').bind(reqId).run();
+      if (req.church_role === 'Bishop') await resetFuturePresidingToBishop(db, req.name);
       return json({ ok: true });
     }
 

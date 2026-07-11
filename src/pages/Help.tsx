@@ -557,6 +557,13 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 11, 2026 (10)',
+              items: [
+                'Only one user account can hold the Bishop calling, and likewise for First Counselor and Second Counselor — assigning one of these to a new person is blocked until the previous holder\'s calling is changed first.',
+                'Sacrament meeting Presiding now defaults to "Bishop [Lastname]" for every future meeting. Assigning a new Bishop immediately updates Presiding on all future meetings to the new Bishop\'s name.',
+              ],
+            },
+            {
               date: 'Jul 11, 2026 (9)',
               items: [
                 'Action Items are now scoped per hub: the Bishopric list only shows Bishopric items, the Ward Council list only shows Ward Council items, and a new Youth Council Action Items page (and list) shows only Youth Council items — no more seeing every hub\'s items mixed together.',

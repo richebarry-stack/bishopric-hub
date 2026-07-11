@@ -85,6 +85,20 @@ export async function syncConduct(db: D1Database, todayStr: string): Promise<Job
   return { ok: true, created, updated };
 }
 
+/** Defaults the Presiding field on future sacrament meetings to "Bishop <lastname>"
+ * whenever it's blank — never overwrites a value someone has already set (that only
+ * happens immediately, as a direct effect of assigning a new Bishop — see
+ * resetFuturePresidingToBishop in functions/api/[[route]].ts). */
+export async function syncPresiding(db: D1Database, todayStr: string): Promise<JobResult> {
+  const bishop = await db.prepare("SELECT name FROM users WHERE church_role = 'Bishop' LIMIT 1").first<{ name: string }>();
+  if (!bishop?.name) return { ok: true, updated: 0 };
+  const lastName = bishop.name.trim().split(/\s+/).pop() || bishop.name;
+  const result = await db.prepare(
+    "UPDATE sacrament_themes SET presiding = ?, updated_at = ? WHERE meeting_date >= ? AND (presiding IS NULL OR presiding = '')"
+  ).bind(`Bishop ${lastName}`, new Date().toISOString(), todayStr).run();
+  return { ok: true, updated: result.meta.changes ?? 0 };
+}
+
 /** Purges expired login sessions. */
 export async function cleanupSessions(db: D1Database): Promise<JobResult> {
   const result = await db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();
@@ -320,6 +334,9 @@ export async function runDailyJobs(db: D1Database): Promise<Record<string, JobRe
 
   try { results.syncConduct = await syncConduct(db, todayStr); }
   catch (e) { results.syncConduct = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+
+  try { results.syncPresiding = await syncPresiding(db, todayStr); }
+  catch (e) { results.syncPresiding = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 
   try { results.cleanupSessions = await cleanupSessions(db); }
   catch (e) { results.cleanupSessions = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
