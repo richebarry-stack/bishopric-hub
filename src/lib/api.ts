@@ -449,6 +449,7 @@ export interface WardMember {
   id: number;
   name: string;
   active: number;
+  out_of_ward: number;
   exclude_speakers: number;
   exclude_prayers: number;
   birth_date: string | null;

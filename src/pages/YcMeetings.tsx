@@ -18,8 +18,8 @@ function formatDate(iso: string): string {
 const EMPTY: Partial<YcMeeting> = { date: '', agenda: '', notes: '' };
 
 export default function YcMeetings() {
-  const { isGuest } = useAuth();
-  const canEdit = !isGuest;
+  const { isGuest, isWcReadOnly } = useAuth();
+  const canEdit = !isGuest && !isWcReadOnly;
   const { rows, isLoading, create, update, remove } = useTable<YcMeeting>('yc-meetings');
   const [editing, setEditing] = useState<Partial<YcMeeting> | null>(null);
   const [showPast, setShowPast] = useState(false);

@@ -511,6 +511,16 @@ export default function Help() {
         <div className="space-y-4">
           {([
             {
+              date: 'Jul 11, 2026',
+              items: [
+                'Sacrament Program (the read-only page shown to the sacrament guest account) now follows the order used in the Church handbook: Presiding, Conducting, Chorister, Organist, Opening Hymn, Opening Prayer, Ward and Stake Business, Sacrament Hymn, Administration of the Sacrament, Speakers (interleaved with any intermediate musical number), Closing Hymn, Closing Prayer. Prayer names are now shown; Ward and Stake Business and Administration of the Sacrament appear as headings only, with no details.',
+                'Fixed: the youth guest account could reach the Youth Council Meetings page, which was never meant to be part of its view — it now only sees the Youth Calendar.',
+                'Fixed: Ward Council members can now open Youth Council Meetings (read-only) — previously it redirected them to the Ward Council dashboard instead.',
+                'Ward Members: "Deactivate"/"Reactivate" are now called "Remove from ward"/"Add back to ward", and the status badge reads "In Ward"/"Removed" — same behavior, clearer wording.',
+                'Ward Members: added an "Out of ward" flag for someone who attends the ward but whose membership record is in another ward. It\'s an informational badge only and doesn\'t change how that person is treated anywhere else in the app.',
+              ],
+            },
+            {
               date: 'Jul 10, 2026',
               items: [
                 'Added a live "who\'s online" indicator: the sidebar now shows which other users are currently in the app and what page they\'re on, and a banner appears at the top of a page when someone else is viewing it (or actively editing it, shown in amber) — helps avoid two people working on the same thing at once.',

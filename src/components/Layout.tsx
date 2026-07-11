@@ -40,6 +40,7 @@ export const WC_NAV_CATEGORIES: { label: string; items: { path: string; label: s
       { path: '/wc-discussion-topics',  label: 'Discussion Topics',      icon: '◈' },
       { path: '/wc-wins',               label: 'Wins for the Ward',      icon: '★' },
       { path: '/wc-members',            label: 'Ward Council Members',   icon: '⊕' },
+      { path: '/yc-meetings',           label: 'Youth Council Meetings', icon: '▦' },
     ],
   },
   {
@@ -471,7 +472,7 @@ export default function Layout() {
   const ycNavItems = isGuest
     ? (guestType === 'sac'
         ? [{ path: '/sacrament-program', label: 'Sacrament Program', icon: '♫' }]
-        : [{ path: '/youth-activities', label: 'Youth Calendar', icon: '⬡' }, { path: '/yc-meetings', label: 'Youth Council Meetings', icon: '▦' }])
+        : [{ path: '/youth-activities', label: 'Youth Calendar', icon: '⬡' }])
     : YC_NAV_ITEMS;
 
   const navItems = isCal

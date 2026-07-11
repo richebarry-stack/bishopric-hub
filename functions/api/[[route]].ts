@@ -178,7 +178,7 @@ const WC_READABLE = new Set([
   'wc-meetings',
   'sacrament-speakers', 'prayers', 'sacrament-music', 'sacrament-themes',
   'sacrament-agenda-notes', 'sacrament-announcements', 'sacrament-ward-business',
-  'missionary-pipeline',
+  'missionary-pipeline', 'yc-meetings',
 ]);
 
 // Church role → hub mapping (duplicated from frontend constants for backend use)
@@ -976,7 +976,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const guestKind = session.church_role; // 'yc' = youth calendar, 'sac' = sacrament program
       const SAC_TABLES = new Set(['sacrament-speakers', 'prayers', 'sacrament-music', 'sacrament-themes', 'sacrament-announcements']);
       if (guestKind === 'yc') {
-        if (tbl !== 'youth-activities' && tbl !== 'yc-meetings') return json({ error: 'Forbidden' }, 403);
+        if (tbl !== 'youth-activities') return json({ error: 'Forbidden' }, 403);
       } else if (guestKind === 'sac') {
         if (!SAC_TABLES.has(tbl)) return json({ error: 'Forbidden' }, 403);
         // Strip ward/stake business columns from sacrament-themes

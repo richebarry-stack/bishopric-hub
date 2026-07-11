@@ -1,0 +1,1 @@
+ALTER TABLE ward_members ADD COLUMN out_of_ward INTEGER NOT NULL DEFAULT 0;

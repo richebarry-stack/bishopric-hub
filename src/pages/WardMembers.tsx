@@ -9,6 +9,7 @@ interface WardMember {
   id: number;
   name: string;
   active: number;
+  out_of_ward: number;
   exclude_speakers: number;
   exclude_prayers: number;
   birth_date: string | null;
@@ -108,7 +109,7 @@ interface GroupedRows {
   unknown: WardMember[];
 }
 
-function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSavePreferredName }: {
+function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSavePreferredName, onToggleOutOfWard }: {
   title: string;
   members: WardMember[];
   onToggleActive: (m: WardMember) => void;
@@ -117,6 +118,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
   onSaveBirthDate: (m: WardMember, v: string) => void;
   onSaveGender: (m: WardMember, v: string) => void;
   onSavePreferredName: (m: WardMember, v: string) => void;
+  onToggleOutOfWard: (m: WardMember) => void;
 }) {
   if (members.length === 0) return null;
   return (
@@ -144,6 +146,9 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                 <td className="px-4 py-2 font-medium text-gray-900">
                   {m.name}
                   <AgeTag birthDate={m.birth_date} />
+                  {!!m.out_of_ward && (
+                    <span className="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 ml-1.5 align-middle">Out of ward</span>
+                  )}
                 </td>
                 <td className="px-4 py-2">
                   <PreferredNameCell member={m} onSave={v => onSavePreferredName(m, v)} />
@@ -156,9 +161,9 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                 </td>
                 <td className="px-4 py-2 text-center">
                   {m.active ? (
-                    <span className="text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5">Active</span>
+                    <span className="text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5">In Ward</span>
                   ) : (
-                    <span className="text-xs bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">Inactive</span>
+                    <span className="text-xs bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">Removed</span>
                   )}
                 </td>
                 <td className="px-4 py-2 text-center">
@@ -176,11 +181,15 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                   </button>
                 </td>
                 <td className="px-4 py-2 text-right space-x-2">
+                  <button onClick={() => onToggleOutOfWard(m)}
+                    className="text-xs px-2 py-1 rounded text-amber-600 hover:bg-amber-50">
+                    {m.out_of_ward ? 'Back in ward' : 'Mark out of ward'}
+                  </button>
                   <button onClick={() => onToggleActive(m)}
                     className={`text-xs px-2 py-1 rounded ${m.active
                       ? 'text-orange-600 hover:bg-orange-50'
                       : 'text-green-600 hover:bg-green-50'}`}>
-                    {m.active ? 'Deactivate' : 'Reactivate'}
+                    {m.active ? 'Remove from ward' : 'Add back to ward'}
                   </button>
                   {!m.active && (
                     <button onClick={() => onDelete(m)}
@@ -269,12 +278,16 @@ export default function WardMembers() {
     update(m.id, { preferred_name: v } as unknown as Record<string, unknown>);
   }, [update]);
 
+  const toggleOutOfWard = useCallback((m: WardMember) => {
+    update(m.id, { out_of_ward: m.out_of_ward ? 0 : 1 } as unknown as Record<string, unknown>);
+  }, [update]);
+
   const confirm = useConfirm();
   const handleDelete = useCallback(async (m: WardMember) => {
     if (await confirm({ message: `Permanently delete ${m.name}? This cannot be undone.` })) remove(m.id);
   }, [remove, confirm]);
 
-  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude, onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSavePreferredName: savePreferredName };
+  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude, onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard };
 
   return (
     <div>
@@ -288,7 +301,7 @@ export default function WardMembers() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900">Ward Members</h1>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">{activeCount} active{inactiveCount > 0 && `, ${inactiveCount} inactive`}</span>
+          <span className="text-sm text-gray-500">{activeCount} in ward{inactiveCount > 0 && `, ${inactiveCount} removed`}</span>
           {isAdmin && (
             <button onClick={() => setImporting(true)}
               className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-50">
@@ -309,7 +322,7 @@ export default function WardMembers() {
         <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
           <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)}
             className="rounded border-gray-300" />
-          Show inactive ({inactiveCount})
+          Show removed ({inactiveCount})
         </label>
       </div>
 
@@ -335,7 +348,8 @@ export default function WardMembers() {
       <MemberSection title="No Birth Date" members={grouped.unknown} {...sectionProps} />
 
       <p className="text-xs text-gray-400 mt-2">
-        Deactivating a member hides them from Speakers &amp; Prayers but preserves their history.
+        Removing a member from the ward hides them from Speakers &amp; Prayers but preserves their history.
+        "Out of ward" marks someone who attends here but whose membership record is in another ward — it's informational only and doesn't change anything else.
         Age groups: children (&lt;12 this year), youth (12–17 this year), adults (18+ this year).
       </p>
     </div>
