@@ -557,6 +557,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 11, 2026 (9)',
+              items: [
+                'Action Items are now scoped per hub: the Bishopric list only shows Bishopric items, the Ward Council list only shows Ward Council items, and a new Youth Council Action Items page (and list) shows only Youth Council items — no more seeing every hub\'s items mixed together.',
+              ],
+            },
+            {
               date: 'Jul 11, 2026 (8)',
               items: [
                 'Ward Members: added a Temple Recommend field (type — Endowed or Limited-use — and expiration date). Removed the separate Unendowed Temple Rec interview category.',

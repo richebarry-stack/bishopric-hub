@@ -79,6 +79,7 @@ export const WC_NAV_CATEGORIES: { label: string; items: { path: string; label: s
 export const YC_NAV_ITEMS = [
   { path: '/youth-activities', label: 'Youth Calendar', icon: '⬡' },
   { path: '/yc-meetings', label: 'Youth Council Meetings', icon: '▦' },
+  { path: '/tasks', label: 'Action Items', icon: '☑' },
   { path: '/help', label: 'Help', icon: '?' },
 ];
 

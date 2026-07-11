@@ -999,9 +999,61 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
       // fall through to generic TABLES handler
     } else {
-      if (tbl !== 'youth-activities' && tbl !== 'yc-meetings') return json({ error: 'Forbidden' }, 403);
+      if (tbl !== 'youth-activities' && tbl !== 'yc-meetings' && tbl !== 'tasks') return json({ error: 'Forbidden' }, 403);
+      // tasks: YC users only see/modify items shared with Youth Council
+      if (tbl === 'tasks') {
+        if (method === 'GET' && !routeParts[1]) {
+          const results = await db.prepare(
+            "SELECT * FROM tasks WHERE share_with LIKE '%Youth Council%' ORDER BY done ASC, id DESC"
+          ).all();
+          return json(results.results);
+        }
+        if (routeParts[1] && (method === 'GET' || method === 'PUT' || method === 'DELETE')) {
+          const taskRow = await db.prepare('SELECT share_with FROM tasks WHERE id = ?').bind(routeParts[1]).first<{ share_with: string }>();
+          if (!taskRow || !taskRow.share_with?.includes('Youth Council')) return json({ error: 'Forbidden' }, 403);
+        }
+        if (method === 'POST') {
+          const body = await request.json() as Record<string, unknown>;
+          if (!String(body.share_with || '').includes('Youth Council')) {
+            body.share_with = body.share_with ? body.share_with + ',Youth Council' : 'Youth Council';
+          }
+          body.updated_by = session.name;
+          delete body.id;
+          const keys = Object.keys(body);
+          const result = await db.prepare(
+            `INSERT INTO tasks (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
+          ).bind(...keys.map(k => body[k])).run();
+          const newRow = await db.prepare('SELECT * FROM tasks WHERE id = ?').bind(result.meta.last_row_id).first();
+          return json(newRow, 201);
+        }
+      }
     }
     // fall through to generic TABLES handler
+  }
+
+  // Bishopric hub: only show/modify tasks that aren't scoped to another hub's list
+  if (session.hub === 'both' && routeParts[0] === 'tasks') {
+    if (method === 'GET' && !routeParts[1]) {
+      const results = await db.prepare(
+        "SELECT * FROM tasks WHERE (share_with IS NULL OR (share_with NOT LIKE '%Ward Council%' AND share_with NOT LIKE '%Youth Council%')) ORDER BY done ASC, id DESC"
+      ).all();
+      return json(results.results);
+    }
+    if (method === 'POST') {
+      const body = await request.json() as Record<string, unknown>;
+      if (!String(body.share_with || '').includes('Bishopric') && !String(body.share_with || '').includes('Ward Council') && !String(body.share_with || '').includes('Youth Council')) {
+        body.share_with = body.share_with ? body.share_with + ',Bishopric' : 'Bishopric';
+      }
+      body.updated_by = session.name;
+      delete body.id;
+      const keys = Object.keys(body);
+      const result = await db.prepare(
+        `INSERT INTO tasks (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
+      ).bind(...keys.map(k => body[k])).run();
+      const newRow = await db.prepare('SELECT * FROM tasks WHERE id = ?').bind(result.meta.last_row_id).first();
+      return json(newRow, 201);
+    }
+    // fall through to generic TABLES handler for single GET/PUT/DELETE — bishopric keeps full access to any task
   }
 
   // Calendar hub: full CRUD on calendaring only

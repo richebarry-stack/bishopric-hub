@@ -124,6 +124,7 @@ function AppRoutes() {
         <Route element={<Layout />}>
           <Route path="/youth-activities" element={<YouthActivities />} />
           {!isYcGuest && <Route path="/yc-meetings" element={<YcMeetings />} />}
+          {!isYcGuest && <Route path="/tasks" element={<Tasks />} />}
           {!isYcGuest && <Route path="/help" element={<Help />} />}
           <Route path="*" element={<Navigate to="/youth-activities" replace />} />
         </Route>

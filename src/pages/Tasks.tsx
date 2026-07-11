@@ -74,8 +74,12 @@ function ShareWithCheckboxes({ value, onChange, options }: {
 export default function Tasks() {
   const { user, selectedHub } = useAuth();
   const isWc = user?.hub === 'wc' || (user?.hub === 'both' && selectedHub === 'wc');
-  const shareWithOptions = isWc ? ['Ward Council'] : SHARE_WITH_OPTIONS;
+  const isYc = user?.hub === 'yc';
+  const shareWithOptions = isWc ? ['Ward Council'] : isYc ? ['Youth Council'] : SHARE_WITH_OPTIONS;
 
+  // Each hub's action-item list only ever receives its own scoped rows from the
+  // backend (Bishopric/Ward Council/Youth Council are mutually exclusive by
+  // share_with tag), so no client-side filtering is needed here.
   const { rows, isLoading, create, update, remove } = useTable<Task>('tasks');
   const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['users'], queryFn: () => fetch('/api/users').then(r => r.json()) });
   const assignableNames = useMemo(() => [...new Set(allUsers.map(u => u.name))].sort(), [allUsers]);
@@ -87,14 +91,9 @@ export default function Tasks() {
 
   const assigneeOptions = useMemo(() => [...new Set(rows.map(r => r.assigned_to).filter(Boolean))].sort(), [rows]);
 
-  const openNew = () => setEditing({ ...EMPTY, share_with: isWc ? 'Ward Council' : '' });
+  const openNew = () => setEditing({ ...EMPTY, share_with: isWc ? 'Ward Council' : isYc ? 'Youth Council' : 'Bishopric' });
 
-  // hub='both' users in WC context only see WC-tagged tasks (hub='wc' is already filtered by backend)
-  const visibleRows = (isWc && user?.hub === 'both')
-    ? rows.filter(r => parseShareWith(r.share_with).includes('Ward Council'))
-    : rows;
-
-  const filtered = visibleRows.filter(r => {
+  const filtered = rows.filter(r => {
     if (!showDone && r.done) return false;
     if (assigneeFilter && r.assigned_to !== assigneeFilter) return false;
     if (filter) {
