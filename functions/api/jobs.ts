@@ -192,6 +192,48 @@ export async function syncYouthInterviews(db: D1Database): Promise<JobResult> {
   return { ok: true, created, updated, linked };
 }
 
+/** Keeps a "Setting Apart" interview_pipeline row in sync with every calling_pipeline
+ * row that has reached Sustained/Set apart but hasn't had its setting apart recorded
+ * in LCR yet. Auto-created rows are Unassigned (the bishopric assigns each one
+ * manually, since who performs it varies by calling) and linked via calling_id.
+ * Removed once the calling leaves that state (recorded, released, deleted, or moved
+ * back before Sustained) or the calling row itself is deleted. Manually-created
+ * "Setting Apart" rows (calling_id NULL) are never touched. */
+export async function syncSettingApartInterviews(db: D1Database): Promise<JobResult> {
+  const nowIso = new Date().toISOString();
+
+  const desiredResult = await db.prepare(
+    "SELECT id, member FROM calling_pipeline WHERE type = 'Calling' AND status IN ('5. Sustained', '6. Set apart') AND set_apart_recorded = 0"
+  ).all<{ id: number; member: string }>();
+  const desired = new Map(desiredResult.results.map(r => [r.id, r.member.replace(/\*\*/g, '').trim()]));
+
+  const existingResult = await db.prepare(
+    "SELECT id, calling_id FROM interview_pipeline WHERE type_of_interview = 'Setting Apart' AND calling_id IS NOT NULL"
+  ).all<{ id: number; calling_id: number }>();
+
+  const stmts: D1PreparedStatement[] = [];
+  let created = 0, removed = 0;
+
+  const existingCallingIds = new Set(existingResult.results.map(r => r.calling_id));
+  for (const [callingId, member] of desired) {
+    if (existingCallingIds.has(callingId)) continue;
+    stmts.push(db.prepare(
+      'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, setup_status, calling_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(member, 'Setting Apart', 'Unassigned', '', 'Not started', callingId, nowIso, nowIso));
+    created++;
+  }
+
+  for (const row of existingResult.results) {
+    if (!desired.has(row.calling_id)) {
+      stmts.push(db.prepare('DELETE FROM interview_pipeline WHERE id = ?').bind(row.id));
+      removed++;
+    }
+  }
+
+  if (stmts.length > 0) await db.batch(stmts);
+  return { ok: true, created, removed };
+}
+
 export async function runDailyJobs(db: D1Database): Promise<Record<string, JobResult>> {
   const todayStr = new Date().toISOString().slice(0, 10);
   const results: Record<string, JobResult> = {};
@@ -210,6 +252,9 @@ export async function runDailyJobs(db: D1Database): Promise<Record<string, JobRe
 
   try { results.syncYouthInterviews = await syncYouthInterviews(db); }
   catch (e) { results.syncYouthInterviews = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+
+  try { results.syncSettingApartInterviews = await syncSettingApartInterviews(db); }
+  catch (e) { results.syncSettingApartInterviews = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 
   return results;
 }

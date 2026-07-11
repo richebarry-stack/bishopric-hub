@@ -1,4 +1,4 @@
-import { syncConduct, runDailyJobs } from './jobs';
+import { syncConduct, runDailyJobs, syncSettingApartInterviews } from './jobs';
 
 interface Env {
   DB: D1Database;
@@ -1100,6 +1100,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const newRow = await db.prepare(
       `SELECT * FROM ${tableConfig.name} WHERE id = ?`
     ).bind(result.meta.last_row_id).first();
+    if (tableName === 'calling-pipeline') waitUntil(syncSettingApartInterviews(db).catch(() => {}));
     return json(newRow, 201);
   }
 
@@ -1133,6 +1134,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const updated = await db.prepare(
       `SELECT * FROM ${tableConfig.name} WHERE id = ?`
     ).bind(recordId).first();
+    if (tableName === 'calling-pipeline') waitUntil(syncSettingApartInterviews(db).catch(() => {}));
     return json(updated);
   }
 
@@ -1140,6 +1142,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     await db.prepare(
       `DELETE FROM ${tableConfig.name} WHERE id = ?`
     ).bind(recordId).run();
+    if (tableName === 'calling-pipeline') waitUntil(syncSettingApartInterviews(db).catch(() => {}));
     return json({ ok: true });
   }
 

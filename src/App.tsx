@@ -12,7 +12,9 @@ import { ConfirmProvider } from './components/ConfirmDialog';
 
 const Dashboard = lazyWithReload(() => import('./pages/Dashboard'));
 const CallingPipeline = lazyWithReload(() => import('./pages/CallingPipeline'));
-const InterviewPipeline = lazyWithReload(() => import('./pages/InterviewPipeline'));
+const YouthInterviews = lazyWithReload(() => import('./pages/YouthInterviews'));
+const AdultTempleInterviews = lazyWithReload(() => import('./pages/AdultTempleInterviews'));
+const OtherInterviews = lazyWithReload(() => import('./pages/OtherInterviews'));
 const Tasks = lazyWithReload(() => import('./pages/Tasks'));
 const SacramentPlanning = lazyWithReload(() => import('./pages/SacramentPlanning'));
 const CurrentSacrament = lazyWithReload(() => import('./pages/CurrentSacrament'));
@@ -163,7 +165,10 @@ function AppRoutes() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/my-actions" element={<MyActions />} />
         <Route path="/calling-pipeline" element={<CallingPipeline />} />
-        <Route path="/interview-pipeline" element={<InterviewPipeline />} />
+        <Route path="/youth-interviews" element={<YouthInterviews />} />
+        <Route path="/temple-interviews" element={<AdultTempleInterviews />} />
+        <Route path="/other-interviews" element={<OtherInterviews />} />
+        <Route path="/interview-pipeline" element={<Navigate to="/youth-interviews" replace />} />
         <Route path="/tasks" element={<Tasks />} />
         <Route path="/sacrament-planning" element={<SacramentPlanning />} />
         <Route path="/current-sacrament" element={<CurrentSacrament />} />

@@ -257,16 +257,17 @@ const FULL_SECTIONS: Section[] = [
     ),
   },
   {
-    title: 'Interview Pipeline',
+    title: 'Youth / Temple / Other Interviews',
     icon: '◎',
     content: (
       <div className="space-y-2">
-        <p>Track bishop and counselor interviews — youth interviews, temple recommends, mission prep interviews, calling interviews, and others.</p>
-        <p>Record the interview type, current status, assigned interviewer, last interview date, and next scheduled date.</p>
-        <p><strong>Youth Interviews</strong> are handled automatically: every active youth (ages 12–17) is kept in a single "Youth Interviews" section, added and re-bucketed between ages 12–15 and 16–17 as they have birthdays — no manual entry needed. Every youth is interviewed every 6 months: for ages 12–15, alternate between the bishop and the counselor over that youth's quorum/class; for ages 16–17, both interviews should be with the bishop himself, if possible. New entries default to the bishop as a starting point — reassign to the counselor for the 12–15 group's alternating interview.</p>
-        <p>Status isn't set by hand; it's computed from the dates you enter: <strong>Scheduled</strong> (a future Next Interview Date is set), <strong>Up to date</strong> (interviewed within the last 6 months), or <strong>Due</strong> (neither). The Next/Last Interview columns show which age bracket (12–15/16–17) each date is for. Members who age out or become inactive drop out of the default view — use "Show aged-out/inactive" to see them.</p>
+        <p>Interview tracking is split across three pages so each stays easy to scan: <strong>Youth Interviews</strong>, <strong>Adult Temple Interviews</strong> (endowed/unendowed/limited-use recommends, annual interviews), and <strong>Other Interviews</strong> (calling interviews, setting apart, patriarchal blessing referrals, mission prep, and everything else). Every category always shows on its page, even with nothing pending, so it's clear what's covered.</p>
+        <p>Each interview has two separate assignments: an <strong>Interviewer</strong> (who conducts the interview) and a <strong>Setup</strong> assignment (who schedules it, with its own Not started/Contacted/Scheduled/Done status). Only the setup assignment shows up on that person's My Actions — the interview itself is the interviewer's normal duty, not a to-do reminder.</p>
+        <p><strong>Youth Interviews</strong> are handled automatically: every active youth (ages 12–17) is kept in a single merged section, added and re-bucketed between ages 12–15 and 16–17 as they have birthdays — no manual entry needed. Every youth is interviewed every 6 months: for ages 12–15, alternate between the bishop and the counselor over that youth's quorum/class; for ages 16–17, both interviews should be with the bishop himself, if possible.</p>
+        <p>Youth status isn't set by hand; it's computed from the dates you enter: <strong>Scheduled</strong> (a future Next Interview Date is set), <strong>Up to date</strong> (interviewed within the last 6 months), or <strong>Due</strong> (neither). Members who age out or become inactive drop out of the default view — use "Show aged-out/inactive" to see them.</p>
+        <p>A recommend's expiration is stored by month; it's treated as expiring on the last day of that month for the color-coded due/overdue highlighting. The Rec. Expires field doesn't apply to every interview type, so it's hidden where it wouldn't mean anything (e.g. patriarchal blessing referrals, mission prep, setting apart).</p>
+        <p>Setting apart is tracked automatically: once a calling reaches <strong>Sustained</strong> in the Calling Pipeline, an unassigned "Setting Apart" entry appears on Other Interviews; it disappears once the setting apart is recorded in LCR there, or if the calling is deleted.</p>
         <p>Editing a linked youth's name here also corrects it on Ward Members (their "ward directory" name). A separate <strong>Preferred Name</strong> field lets you set a casual name (e.g. "Bud") shown instead everywhere this person appears, without touching their legal name.</p>
-        <p><strong>Assigned To</strong> is a "Select or type name…" list of bishopric accounts — picking a name here (rather than typing it) is what lets it show up correctly on that person's My Actions page.</p>
       </div>
     ),
   },
@@ -510,6 +511,17 @@ export default function Help() {
         <h2 className="text-sm font-semibold text-gray-700 mb-3">Version History</h2>
         <div className="space-y-4">
           {([
+            {
+              date: 'Jul 11, 2026 (3)',
+              items: [
+                'Interview Pipeline is now three pages — Youth Interviews, Adult Temple Interviews, and Other Interviews — so each is easier to scan; every category always shows, even with nothing pending, so it\'s clear what\'s covered. The old Interview Pipeline link redirects to Youth Interviews.',
+                'Interviews now have two separate assignments: an Interviewer (conducts the interview) and a Setup assignment (schedules it, with its own Not started/Contacted/Scheduled/Done status, settable individually or in bulk). Only the setup assignment shows up on My Actions going forward — the interview itself is no longer a separate reminder there.',
+                'Fixed: bulk "Set status" could be applied to youth interviews even though their status is computed automatically, not set by hand — it now skips those rows and tells you how many were skipped.',
+                'Edit Interview: swapped the field order so Last Interview Date comes before Next Interview Date.',
+                'Added Post-Mission and Setting Apart interview types. Setting Apart entries are now created automatically (unassigned) once a calling reaches Sustained, and removed once its setting apart is recorded in LCR or the calling is deleted.',
+                'The Rec. Expires field/column no longer shows for interview types where it doesn\'t apply (patriarchal blessing referrals, mission prep, setting apart, other) — it still always treats a recommend as expiring on the last day of its stated month.',
+              ],
+            },
             {
               date: 'Jul 11, 2026 (2)',
               items: [

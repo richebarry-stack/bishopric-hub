@@ -153,6 +153,9 @@ export interface InterviewPipeline {
   type_of_interview: string;
   status: string;
   assigned_to: string;
+  setup_assigned_to: string;
+  setup_status: string;
+  calling_id: number | null;
   last_interview_datetime: string;
   next_interview_date: string;
   comments: string;

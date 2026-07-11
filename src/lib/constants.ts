@@ -146,14 +146,25 @@ export const INTERVIEW_TYPES = [
   'Youth 16-17',
   'Annual',
   'Calling',
+  'Setting Apart',
   'Endowed Temple Rec',
   'Unendowed Temple Rec',
   'Patriarchal Blessing',
   'Limited',
   'Eccl Endorsement',
   'Before Mission',
+  'Post-Mission',
   'Other',
 ];
+
+export const SETUP_STATUSES = ['Not started', 'Contacted', 'Scheduled', 'Done'];
+
+export const SETUP_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  'Not started': { bg: 'bg-gray-100', text: 'text-gray-600' },
+  'Contacted': { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+  'Scheduled': { bg: 'bg-blue-100', text: 'text-blue-800' },
+  'Done': { bg: 'bg-green-100', text: 'text-green-800' },
+};
 
 export const INTERVIEW_STATUSES = [
   'Unassigned',
