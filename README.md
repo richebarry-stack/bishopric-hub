@@ -4,6 +4,11 @@ A private tool for LDS bishopric coordination — sacrament meeting planning, ca
 
 Built with **React 19 + TypeScript + Tailwind CSS v4**, deployed on **Cloudflare Pages** with **Cloudflare D1** (SQLite) as the database.
 
+Want to show someone how it works without exposing any real ward data? See
+[**docs/DEPLOY_DEMO_INSTANCE.md**](docs/DEPLOY_DEMO_INSTANCE.md) for a
+step-by-step guide to standing up a separate demo copy with fictional sample
+data, on its own database and web address.
+
 ---
 
 ## Features
