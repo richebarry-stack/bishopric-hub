@@ -7,16 +7,39 @@ import {
   recommendRowClass, formatRecommendDate, isPast,
 } from './shared';
 
-export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRecExpires = true, showCalling = false, rowMetaById, selected, onToggleSelect }: {
+function SetupAssignedCell({ row, setupOptions, onAssign }: {
+  row: InterviewType;
+  setupOptions: string[];
+  onAssign: (id: number, name: string) => void;
+}) {
+  return (
+    <select
+      value={row.setup_assigned_to || ''}
+      onChange={e => onAssign(row.id, e.target.value)}
+      onClick={e => e.stopPropagation()}
+      aria-label={`Setup assigned to for ${row.member}`}
+      className="text-xs rounded border border-gray-200 px-1 py-0.5 bg-transparent hover:border-gray-300 max-w-[8rem]"
+    >
+      <option value="">Assign…</option>
+      {setupOptions.map(o => <option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+}
+
+export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRecExpires = true, showCalling = false, showLastInterview = true, nextInterviewLabel = 'Next Interview', rowMetaById, selected, onToggleSelect, setupOptions, onQuickAssignSetup }: {
   rows: InterviewType[];
   onEdit: (r: InterviewType) => void;
   onDelete: (id: number) => void;
   showAge?: boolean;
   showRecExpires?: boolean;
   showCalling?: boolean;
+  showLastInterview?: boolean;
+  nextInterviewLabel?: string;
   rowMetaById: Map<number, RowMeta>;
   selected: Set<number>;
   onToggleSelect: (id: number) => void;
+  setupOptions: string[];
+  onQuickAssignSetup: (id: number, name: string) => void;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('member');
   const [sortAsc, setSortAsc] = useState(true);
@@ -79,8 +102,8 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
               <Th col="assigned_to" label="Interviewer" />
               <Th col="setup_status" label="Setup" />
               {showRecExpires && <Th col="date_recommend_expires" label="Rec. Expires" />}
-              <Th col="last_interview_datetime" label="Last Interview" />
-              <Th col="next_interview_date" label="Next Interview" />
+              {showLastInterview && <Th col="last_interview_datetime" label="Last Interview" />}
+              <Th col="next_interview_date" label={nextInterviewLabel} />
               <Th col="comments" label="Comments" />
               <th className="px-3 py-2"></th>
             </tr>
@@ -104,10 +127,10 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
                     : <StatusBadge status={r.status} colors={r.type_of_interview === 'Setting Apart' ? SETTING_APART_STATUS_COLORS : INTERVIEW_STATUS_COLORS} />}
                 </td>
                 <td className="px-3 py-2 text-gray-600">{r.assigned_to}</td>
-                <td className="px-3 py-2">
-                  <div className="flex flex-col gap-0.5">
+                <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                  <div className="flex flex-col gap-0.5 items-start">
                     <StatusBadge status={r.setup_status || 'Not started'} colors={SETUP_STATUS_COLORS} />
-                    {r.setup_assigned_to && <span className="text-xs text-gray-500">{r.setup_assigned_to}</span>}
+                    <SetupAssignedCell row={r} setupOptions={setupOptions} onAssign={onQuickAssignSetup} />
                   </div>
                 </td>
                 {showRecExpires && (
@@ -115,11 +138,13 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
                     {formatRecommendDate(r.date_recommend_expires)}
                   </td>
                 )}
-                <td className="px-3 py-2">
-                  <span className="font-mono text-sm text-gray-600">
-                    {(r.last_interview_datetime || '').slice(0, 10) || (meta?.youthState ? '—' : '')}
-                  </span>
-                </td>
+                {showLastInterview && (
+                  <td className="px-3 py-2">
+                    <span className="font-mono text-sm text-gray-600">
+                      {(r.last_interview_datetime || '').slice(0, 10) || (meta?.youthState ? '—' : '')}
+                    </span>
+                  </td>
+                )}
                 <td className="px-3 py-2">
                   <span className={`font-mono text-sm ${isPast(r.next_interview_date) ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
                     {(r.next_interview_date || '').slice(0, 10) || (meta?.youthState ? '—' : '')}
@@ -162,15 +187,18 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
                     <StatusBadge status={r.setup_status || 'Not started'} colors={SETUP_STATUS_COLORS} />
                   </div>
                   {r.assigned_to && <p className="text-xs text-gray-500 mt-1">Interviewer: {r.assigned_to}</p>}
-                  {r.setup_assigned_to && <p className="text-xs text-gray-500">Setup: {r.setup_assigned_to}</p>}
+                  <div className="flex items-center gap-1.5 mt-1" onClick={e => e.stopPropagation()}>
+                    <span className="text-xs text-gray-500">Setup:</span>
+                    <SetupAssignedCell row={r} setupOptions={setupOptions} onAssign={onQuickAssignSetup} />
+                  </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs">
                     {showRecExpires && r.date_recommend_expires && <span className="text-gray-600">Rec. expires: {formatRecommendDate(r.date_recommend_expires)}</span>}
                     {r.next_interview_date && (
                       <span className={isPast(r.next_interview_date) ? 'text-red-600 font-semibold' : 'text-gray-600'}>
-                        Next: {r.next_interview_date.slice(0, 10)}
+                        {nextInterviewLabel}: {r.next_interview_date.slice(0, 10)}
                       </span>
                     )}
-                    {r.last_interview_datetime && (
+                    {showLastInterview && r.last_interview_datetime && (
                       <span className="text-gray-600">
                         Last: {r.last_interview_datetime.slice(0, 10)}
                       </span>

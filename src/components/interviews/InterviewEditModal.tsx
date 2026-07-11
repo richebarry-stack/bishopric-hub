@@ -178,8 +178,10 @@ export default function InterviewEditModal({
         {!hideRecExpires && (
           <Input label="Recommend Expires" value={(editing.date_recommend_expires || '').slice(0, 7)} onChange={v => onChange({ date_recommend_expires: v })} type="month" />
         )}
-        <Input label="Last Interview Date" value={(editing.last_interview_datetime || '').slice(0, 10)} onChange={v => onChange({ last_interview_datetime: v })} type="date" />
-        <Input label="Next Interview Date" value={(editing.next_interview_date || '').slice(0, 10)} onChange={v => onChange({ next_interview_date: v })} type="date" />
+        {!isSettingApart && (
+          <Input label="Last Interview Date" value={(editing.last_interview_datetime || '').slice(0, 10)} onChange={v => onChange({ last_interview_datetime: v })} type="date" />
+        )}
+        <Input label={isSettingApart ? 'Scheduled Date' : 'Next Interview Date'} value={(editing.next_interview_date || '').slice(0, 10)} onChange={v => onChange({ next_interview_date: v })} type="date" />
         <Input label="Comments" value={editing.comments || ''} onChange={v => onChange({ comments: v })} />
         <Textarea label="Notes" value={editing.notes || ''} onChange={v => onChange({ notes: v })} />
         <div className="flex justify-end gap-2 pt-2">

@@ -201,8 +201,10 @@ export function useInterviews() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing?.id, editing?.ward_member_id]);
 
+  const quickAssignSetup = (id: number, name: string) => update(id, { setup_assigned_to: name }, { silent: true });
+
   return {
-    rows, isLoading, filtered, remove,
+    rows, isLoading, filtered, remove, quickAssignSetup,
     wardMembers, wardMembersById, wardMembersLoading, ageByName, activeYouthWardMemberIds, callingsById,
     bishopricOptions, setupOptions, assignedOptions,
     rowMetaById, agedOutYouthCount,

@@ -641,6 +641,9 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Temple recommend expiration is now month/year only (recommends expire at month\'s end, so the exact day never mattered) — on Ward Members and on Youth/Adult Temple Interviews alike. Cleaned up previously stored dates to match.',
                 'Fixed: the daily/manual temple-recommend sync was mistakenly adding current youth to the Adult Temple Interviews list as duplicate entries — it now only ever applies to adults; youth stay tracked solely on their Youth Interview row.',
                 'Ward Members: removed the Temple Recommend column from the Children section — children don\'t hold recommends.',
+                'Interviews: "Setup" can now be assigned directly from the list with one click (a dropdown right in the row) — no need to open the interview to set who\'s scheduling it.',
+                'Setting Apart interviews now show a single "Scheduled Date" instead of separate Last/Next Interview fields, since a setting apart only happens once.',
+                'Other Interviews: "Calling" entries are now created automatically once a calling reaches "Approved and assigned," assigned to whoever is assigned on that calling — kept in sync if reassigned, and removed once the calling moves on.',
               ],
             },
             {

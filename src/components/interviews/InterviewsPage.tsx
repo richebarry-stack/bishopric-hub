@@ -157,8 +157,11 @@ export default function InterviewsPage({ title, description, types, showAge, sho
                   showAge={showAge}
                   showRecExpires={showRecExpires}
                   showCalling={showCalling}
+                  showLastInterview={type !== 'Setting Apart'}
+                  nextInterviewLabel={type === 'Setting Apart' ? 'Scheduled Date' : 'Next Interview'}
                   rowMetaById={h.rowMetaById}
-                  selected={h.selected} onToggleSelect={h.toggleSelect} />
+                  selected={h.selected} onToggleSelect={h.toggleSelect}
+                  setupOptions={h.setupOptions} onQuickAssignSetup={h.quickAssignSetup} />
               )}
             </div>
           ))}

@@ -249,6 +249,52 @@ export async function syncSettingApartInterviews(db: D1Database): Promise<JobRes
   return { ok: true, created, removed };
 }
 
+/** Keeps a "Calling" interview_pipeline row in sync with every calling_pipeline row
+ * that's reached "3. Approved and assigned" — that's the point a bishopric member
+ * needs to actually extend the call, so it surfaces on Other Interviews. Assigned
+ * to whoever is assigned on the calling record, kept current if that's reassigned.
+ * Removed once the calling moves past that status (forward or back) or is deleted.
+ * Manually-created "Calling" rows (calling_id NULL) are never touched. */
+export async function syncCallingInterviews(db: D1Database): Promise<JobResult> {
+  const nowIso = new Date().toISOString();
+
+  const desiredResult = await db.prepare(
+    "SELECT id, member, assigned_to FROM calling_pipeline WHERE type = 'Calling' AND status = '3. Approved and assigned'"
+  ).all<{ id: number; member: string; assigned_to: string | null }>();
+  const desired = new Map(desiredResult.results.map(r => [r.id, { member: r.member.replace(/\*\*/g, '').trim(), assignedTo: r.assigned_to || '' }]));
+
+  const existingResult = await db.prepare(
+    "SELECT id, calling_id, assigned_to FROM interview_pipeline WHERE type_of_interview = 'Calling' AND calling_id IS NOT NULL"
+  ).all<{ id: number; calling_id: number; assigned_to: string | null }>();
+
+  const stmts: D1PreparedStatement[] = [];
+  let created = 0, removed = 0, updated = 0;
+
+  const existingByCallingId = new Map(existingResult.results.map(r => [r.calling_id, r]));
+  for (const [callingId, info] of desired) {
+    const existing = existingByCallingId.get(callingId);
+    if (!existing) {
+      stmts.push(db.prepare(
+        'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, setup_status, calling_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(info.member, 'Calling', info.assignedTo ? 'Assigned' : 'Unassigned', info.assignedTo, 'Not started', callingId, nowIso, nowIso));
+      created++;
+    } else if ((existing.assigned_to || '') !== info.assignedTo) {
+      stmts.push(db.prepare('UPDATE interview_pipeline SET assigned_to = ?, updated_at = ? WHERE id = ?').bind(info.assignedTo, nowIso, existing.id));
+      updated++;
+    }
+  }
+
+  for (const row of existingResult.results) {
+    if (!desired.has(row.calling_id)) {
+      stmts.push(db.prepare('DELETE FROM interview_pipeline WHERE id = ?').bind(row.id));
+      removed++;
+    }
+  }
+
+  if (stmts.length > 0) await db.batch(stmts);
+  return { ok: true, created, removed, updated };
+}
+
 // Aaronic Priesthood advancement age -> ordinance type, per General Handbook guidance.
 const ADVANCEMENT_AGES: Record<number, string> = { 12: 'Deacon', 14: 'Teacher', 16: 'Priest' };
 
@@ -359,6 +405,9 @@ export async function runDailyJobs(db: D1Database): Promise<Record<string, JobRe
 
   try { results.syncSettingApartInterviews = await syncSettingApartInterviews(db); }
   catch (e) { results.syncSettingApartInterviews = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+
+  try { results.syncCallingInterviews = await syncCallingInterviews(db); }
+  catch (e) { results.syncCallingInterviews = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 
   try { results.syncOrdinanceCandidates = await syncOrdinanceCandidates(db); }
   catch (e) { results.syncOrdinanceCandidates = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
