@@ -1,12 +1,33 @@
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../lib/useTable';
 import { useAuth } from '../lib/auth';
-import type { Task } from '../lib/api';
+import type { Task, User } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
 import { SHARE_WITH_OPTIONS } from '../lib/constants';
 import { useConfirm } from '../components/ConfirmDialog';
 import LastEdited from '../components/LastEdited';
+
+const ASSIGNED_DATALIST = 'task-assigned-to-options';
+
+function AssignedToField({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-gray-700">Assigned To</span>
+      <input
+        list={ASSIGNED_DATALIST}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Select or type name…"
+        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+      />
+      <datalist id={ASSIGNED_DATALIST}>
+        {options.map(o => <option key={o} value={o} />)}
+      </datalist>
+    </label>
+  );
+}
 
 const EMPTY: Partial<Task> = { task: '', assigned_to: '', done: 0, share_with: '', due_date: '' };
 
@@ -56,6 +77,8 @@ export default function Tasks() {
   const shareWithOptions = isWc ? ['Ward Council'] : SHARE_WITH_OPTIONS;
 
   const { rows, isLoading, create, update, remove } = useTable<Task>('tasks');
+  const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['users'], queryFn: () => fetch('/api/users').then(r => r.json()) });
+  const assignableNames = useMemo(() => [...new Set(allUsers.map(u => u.name))].sort(), [allUsers]);
   const [editing, setEditing] = useState<Partial<Task> | null>(null);
   const [showDone, setShowDone] = useState(false);
   const confirm = useConfirm();
@@ -149,7 +172,7 @@ export default function Tasks() {
         {editing && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
             <Textarea label="Task" value={editing.task || ''} onChange={v => setEditing({ ...editing, task: v })} />
-            <Input label="Assigned To" value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} />
+            <AssignedToField value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} options={assignableNames} />
             <Input label="Due Date" value={(editing.due_date || '').slice(0, 10)} onChange={v => setEditing({ ...editing, due_date: v })} type="date" />
             <ShareWithCheckboxes
               value={editing.share_with || ''}

@@ -3,7 +3,7 @@ import { useAuth } from './auth';
 import { useTable } from './useTable';
 import { stripBold } from './richText';
 import type {
-  Task, CallingPipeline, InterviewPipeline, WcMeeting, BishopricMeeting,
+  Task, CallingPipeline, InterviewPipeline,
   SacramentSpeaker, Prayer, SacramentMusic, RotatingAssignment,
 } from './api';
 
@@ -57,8 +57,6 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
   const { rows: tasks, isLoading: l1 } = useTable<Task>('tasks', { enabled: canWc });
   const { rows: callings, isLoading: l2 } = useTable<CallingPipeline>('calling-pipeline', { enabled: canBishopric });
   const { rows: interviews, isLoading: l3 } = useTable<InterviewPipeline>('interview-pipeline', { enabled: canBishopric });
-  const { rows: wcMeetings, isLoading: l4 } = useTable<WcMeeting>('wc-meetings', { enabled: canWc });
-  const { rows: bishopricMeetings, isLoading: l5 } = useTable<BishopricMeeting>('bishopric-meetings', { enabled: canBishopric });
   const { rows: speakers, isLoading: l6 } = useTable<SacramentSpeaker>('sacrament-speakers', { enabled: canWc });
   const { rows: prayers, isLoading: l7 } = useTable<Prayer>('prayers', { enabled: canWc });
   const { rows: music, isLoading: l8 } = useTable<SacramentMusic>('sacrament-music', { enabled: canWc });
@@ -99,20 +97,6 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
       }
     }
 
-    for (const m of wcMeetings) {
-      if (m.date.slice(0, 10) < todayStr) continue;
-      if (namesMatch(m.opening_prayer, name)) out.push({ id: `wc-open-${m.id}`, label: 'Opening prayer — WC Meeting', date: m.date, link: '/wc-meetings', source: 'WC Meeting' });
-      if (namesMatch(m.spiritual_thought, name)) out.push({ id: `wc-thought-${m.id}`, label: 'Spiritual thought — WC Meeting', date: m.date, link: '/wc-meetings', source: 'WC Meeting' });
-      if (namesMatch(m.closing_prayer, name)) out.push({ id: `wc-close-${m.id}`, label: 'Closing prayer — WC Meeting', date: m.date, link: '/wc-meetings', source: 'WC Meeting' });
-    }
-
-    for (const m of bishopricMeetings) {
-      if (m.no_meeting || m.date.slice(0, 10) < todayStr) continue;
-      if (namesMatch(m.opening_prayer, name)) out.push({ id: `bm-open-${m.id}`, label: 'Opening prayer — Bishopric Meeting', date: m.date, link: '/bishopric-meetings', source: 'Bishopric Meeting' });
-      if (namesMatch(m.spiritual_thought, name)) out.push({ id: `bm-thought-${m.id}`, label: 'Spiritual thought — Bishopric Meeting', date: m.date, link: '/bishopric-meetings', source: 'Bishopric Meeting' });
-      if (namesMatch(m.closing_prayer, name)) out.push({ id: `bm-close-${m.id}`, label: 'Closing prayer — Bishopric Meeting', date: m.date, link: '/bishopric-meetings', source: 'Bishopric Meeting' });
-    }
-
     for (const s of speakers) {
       if (s.meeting_date.slice(0, 10) >= todayStr && namesMatch(s.speaker, name)) {
         out.push({
@@ -146,9 +130,9 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
     }
 
     return out.sort((a, b) => (a.date || '9999-99-99').localeCompare(b.date || '9999-99-99'));
-  }, [enabled, user, tasks, callings, interviews, wcMeetings, bishopricMeetings, speakers, prayers, music, rotating]);
+  }, [enabled, user, tasks, callings, interviews, speakers, prayers, music, rotating]);
 
-  const isLoading = enabled && (l1 || l2 || l3 || l4 || l5 || l6 || l7 || l8 || l9);
+  const isLoading = enabled && (l1 || l2 || l3 || l6 || l7 || l8 || l9);
 
   return { items, count: items.length, isLoading };
 }

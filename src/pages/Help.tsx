@@ -206,8 +206,9 @@ const FULL_SECTIONS: Section[] = [
     icon: '⚡',
     content: (
       <div className="space-y-2">
-        <p>A personal page gathering everything currently assigned to you — action items, a calling you need to extend, an interview you need to conduct, an upcoming prayer or speaking assignment, and more.</p>
+        <p>A personal page gathering everything currently assigned to you — action items, a calling you need to extend, an interview you need to conduct, an upcoming sacrament speaking/prayer/music assignment, and more.</p>
         <p>The <strong>My Actions</strong> link in the sidebar shows a red count badge whenever something needs your attention, so you don't have to open the page to know. Click it to see the details and jump straight to the relevant page.</p>
+        <p>Matching is by name, so an assignment only shows up here if it was assigned to your exact account name — use the "Select or type name…" list on Action Items, Calling Pipeline, and Interview Pipeline to pick your name from the list of accounts rather than typing it, so it matches reliably.</p>
       </div>
     ),
   },
@@ -262,8 +263,9 @@ const FULL_SECTIONS: Section[] = [
       <div className="space-y-2">
         <p>Track bishop and counselor interviews — youth interviews, temple recommends, mission prep interviews, calling interviews, and others.</p>
         <p>Record the interview type, current status, assigned interviewer, last interview date, and next scheduled date.</p>
-        <p><strong>Youth Interviews</strong> are handled automatically: every active youth (ages 12–17) is kept in a single "Youth Interviews" section, added and re-bucketed between Annual (12–15) and Semi-Annual (16–17) as they have birthdays — no manual entry needed. Their status isn't set by hand; it's computed from the dates you enter: <strong>Scheduled</strong> (a future Next Interview Date is set), <strong>Up to date</strong> (interviewed within the last 12/6 months), or <strong>Due</strong> (neither). Members who age out or become inactive drop out of the default view — use "Show aged-out/inactive" to see them.</p>
-        <p>Editing a linked youth's name here also corrects it on Ward Members (their "ward directory" name). Names shown use each person's preferred name if one is set on Ward Members.</p>
+        <p><strong>Youth Interviews</strong> are handled automatically: every active youth (ages 12–17) is kept in a single "Youth Interviews" section, added and re-bucketed between Annual (12–15) and Semi-Annual (16–17) as they have birthdays — no manual entry needed. Their status isn't set by hand; it's computed from the dates you enter: <strong>Scheduled</strong> (a future Next Interview Date is set), <strong>Up to date</strong> (interviewed within the last 12/6 months), or <strong>Due</strong> (neither). The Next/Last Interview columns show which type (Annual/Semi-Annual) each date is for. Members who age out or become inactive drop out of the default view — use "Show aged-out/inactive" to see them.</p>
+        <p>Editing a linked youth's name here also corrects it on Ward Members (their "ward directory" name). A separate <strong>Preferred Name</strong> field lets you set a casual name (e.g. "Bud") shown instead everywhere this person appears, without touching their legal name.</p>
+        <p><strong>Assigned To</strong> is a "Select or type name…" list of bishopric accounts — picking a name here (rather than typing it) is what lets it show up correctly on that person's My Actions page.</p>
       </div>
     ),
   },
@@ -283,6 +285,7 @@ const FULL_SECTIONS: Section[] = [
     content: (
       <div className="space-y-2">
         <p>Action items for the bishopric. Assign tasks to individuals and check them off when done.</p>
+        <p><strong>Assigned To</strong> is a "Select or type name…" list of accounts — picking a name here (rather than typing it freely) is what lets the task show up correctly on that person's My Actions page.</p>
         <p>The <strong>Share with</strong> field controls which group sees the task (Bishopric, Ward Council, or Youth Council).</p>
       </div>
     ),
@@ -525,6 +528,9 @@ export default function Help() {
                 'Interview Pipeline: reworked youth interview tracking — Annual and Semi-Annual Youth are now one merged, roster-linked "Youth Interviews" section instead of two separate lists; every active youth is added automatically (no more manual entry, and no more duplicate rows), and their status is now computed from the interview dates (Scheduled / Up to date / Due) instead of set by hand. Editing a linked youth\'s name updates their name on Ward Members directly. Removed the old "Youth Interviews Due" box now that the table itself always reflects who\'s current.',
                 'Added a Preferred Name field on Ward Members. When set, it\'s shown instead of the legal name on Interview Pipeline and My Actions; Ward Members itself always shows the legal name.',
                 'Added a "My Actions" page — everything currently assigned to you (action items, a calling to extend, an interview to conduct, an upcoming prayer or speaking assignment, and more) in one place, with a red count badge on its sidebar link so you know at a glance whether anything needs your attention.',
+                'My Actions no longer includes WC/Bishopric Meeting opening/closing prayer and spiritual thought assignments — those are routine meeting logistics rather than something that needed a separate reminder.',
+                'Action Items and Interview Pipeline: "Assigned To" is now a "Select or type name…" list of accounts instead of a free-text field, so assignments match reliably on the My Actions page (typos and nicknames like "Rich" instead of "Rich Barry" were silently failing to match before).',
+                'Interview Pipeline: the Next Interview and Last Interview columns now show which interview type (Annual/Semi-Annual) each date belongs to; added a Preferred Name field to the edit form for linked youth (separate from the legal-name field, which still updates Ward Members).',
               ],
             },
             {

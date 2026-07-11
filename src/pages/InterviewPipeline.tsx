@@ -1,12 +1,37 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../lib/useTable';
-import type { InterviewPipeline as InterviewType, WardMember } from '../lib/api';
+import type { InterviewPipeline as InterviewType, WardMember, User } from '../lib/api';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Textarea } from '../components/FormFields'; // Select still used for Status
 import { INTERVIEW_TYPES, INTERVIEW_STATUSES, INTERVIEW_STATUS_COLORS } from '../lib/constants';
 import { displayName } from '../lib/displayName';
 import { toast } from '../lib/toast';
+
+const ASSIGNED_DATALIST = 'interview-assigned-to-options';
+
+function AssignedToField({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-gray-700">Assigned To</span>
+      <input
+        list={ASSIGNED_DATALIST}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Select or type name…"
+        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+      />
+      <datalist id={ASSIGNED_DATALIST}>
+        {options.map(o => <option key={o} value={o} />)}
+      </datalist>
+    </label>
+  );
+}
+
+function shortYouthType(type: string): string {
+  return type.replace(/ Youth$/, '');
+}
 
 const EMPTY: Partial<InterviewType> = {
   member: '', date_recommend_expires: '', type_of_interview: '', status: 'Unassigned',
@@ -188,10 +213,18 @@ function InterviewTable({ rows, onEdit, onDelete, showAge, rowMetaById, selected
                 <td className="px-3 py-2 text-sm font-medium text-gray-700">
                   {formatRecommendDate(r.date_recommend_expires)}
                 </td>
-                <td className={`px-3 py-2 font-mono text-sm ${isPast(r.next_interview_date) ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
-                  {(r.next_interview_date || '').slice(0, 10)}
+                <td className="px-3 py-2">
+                  {meta?.youthState && <div className="text-[10px] text-gray-400 uppercase tracking-wide">{shortYouthType(r.type_of_interview)}</div>}
+                  <span className={`font-mono text-sm ${isPast(r.next_interview_date) ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
+                    {(r.next_interview_date || '').slice(0, 10) || (meta?.youthState ? '—' : '')}
+                  </span>
                 </td>
-                <td className="px-3 py-2 text-gray-600 font-mono text-sm">{(r.last_interview_datetime || '').slice(0, 10)}</td>
+                <td className="px-3 py-2">
+                  {meta?.youthState && <div className="text-[10px] text-gray-400 uppercase tracking-wide">{shortYouthType(r.type_of_interview)}</div>}
+                  <span className="font-mono text-sm text-gray-600">
+                    {(r.last_interview_datetime || '').slice(0, 10) || (meta?.youthState ? '—' : '')}
+                  </span>
+                </td>
                 <td className="px-3 py-2 text-gray-700">{r.comments}</td>
                 <td className="px-3 py-2">
                   <button onClick={e => { e.stopPropagation(); onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
@@ -231,10 +264,14 @@ function InterviewTable({ rows, onEdit, onDelete, showAge, rowMetaById, selected
                     {r.date_recommend_expires && <span className="text-gray-600">Rec. expires: {formatRecommendDate(r.date_recommend_expires)}</span>}
                     {r.next_interview_date && (
                       <span className={isPast(r.next_interview_date) ? 'text-red-600 font-semibold' : 'text-gray-600'}>
-                        Next: {r.next_interview_date.slice(0, 10)}
+                        Next{meta?.youthState ? ` (${shortYouthType(r.type_of_interview)})` : ''}: {r.next_interview_date.slice(0, 10)}
                       </span>
                     )}
-                    {r.last_interview_datetime && <span className="text-gray-600">Last: {r.last_interview_datetime.slice(0, 10)}</span>}
+                    {r.last_interview_datetime && (
+                      <span className="text-gray-600">
+                        Last{meta?.youthState ? ` (${shortYouthType(r.type_of_interview)})` : ''}: {r.last_interview_datetime.slice(0, 10)}
+                      </span>
+                    )}
                   </div>
                   {r.comments && <p className="text-xs text-gray-700 mt-1 truncate">{r.comments}</p>}
                 </div>
@@ -250,7 +287,9 @@ function InterviewTable({ rows, onEdit, onDelete, showAge, rowMetaById, selected
 export default function InterviewPipeline() {
   const { rows, isLoading, create, update, remove } = useTable<InterviewType>('interview-pipeline');
   const { rows: wardMembers, isLoading: wardMembersLoading, update: updateWardMember } = useTable<WardMember>('ward-members');
+  const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['users'], queryFn: () => fetch('/api/users').then(r => r.json()) });
   const [editing, setEditing] = useState<Partial<InterviewType> | null>(null);
+  const [preferredNameDraft, setPreferredNameDraft] = useState('');
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [assignedFilter, setAssignedFilter] = useState('');
@@ -259,6 +298,10 @@ export default function InterviewPipeline() {
   const [bulkStatus, setBulkStatus] = useState('');
   const [bulkAssignedTo, setBulkAssignedTo] = useState('');
   const [showAgedOutYouth, setShowAgedOutYouth] = useState(false);
+
+  const bishopricOptions = useMemo(() =>
+    allUsers.filter(u => u.church_role && /bishop|counselor/i.test(u.church_role)).map(u => u.name),
+    [allUsers]);
 
   const assignedOptions = useMemo(() => {
     const names = [...new Set(rows.map(r => r.assigned_to).filter(Boolean))].sort();
@@ -354,8 +397,12 @@ export default function InterviewPipeline() {
     const newName = ((data.member as string) || '').trim();
     if (wardMemberId) {
       const linked = wardMembersById.get(wardMemberId);
-      if (linked && newName && newName !== linked.name) {
-        await updateWardMember(wardMemberId, { name: newName });
+      if (linked) {
+        const wardMemberUpdate: Record<string, unknown> = {};
+        if (newName && newName !== linked.name) wardMemberUpdate.name = newName;
+        const newPreferredName = preferredNameDraft.trim();
+        if (newPreferredName !== (linked.preferred_name || '')) wardMemberUpdate.preferred_name = newPreferredName;
+        if (Object.keys(wardMemberUpdate).length > 0) await updateWardMember(wardMemberId, wardMemberUpdate);
       }
     }
     if (editing.id) await update(editing.id, data);
@@ -399,6 +446,12 @@ export default function InterviewPipeline() {
     && editingAge !== null && activeYouthWardMemberIds.has(editing.ward_member_id);
   const editingYouthState = editingIsManagedYouth && editing && editingAge !== null ? computeYouthState(editing, editingAge) : null;
   const showLinkPicker = !!editing && !editing.ward_member_id && YOUTH_TYPES.has(editing.type_of_interview || '');
+
+  // Reset the preferred-name draft whenever a different row (or a newly-linked
+  // member) opens in the modal, so it doesn't carry over from the previous edit.
+  useEffect(() => {
+    setPreferredNameDraft(editingLinkedMember?.preferred_name || '');
+  }, [editing?.id, editing?.ward_member_id, editingLinkedMember?.preferred_name]);
 
   return (
     <div>
@@ -444,8 +497,11 @@ export default function InterviewPipeline() {
           <button onClick={handleBulkStatus} disabled={!bulkStatus}
             className="px-3 py-1 bg-blue-600 text-white rounded text-sm disabled:opacity-40 hover:bg-blue-700">Apply</button>
           <span className="text-blue-300">|</span>
-          <input value={bulkAssignedTo} onChange={e => setBulkAssignedTo(e.target.value)} placeholder="Assign to…"
+          <input list="interview-bulk-assign-options" value={bulkAssignedTo} onChange={e => setBulkAssignedTo(e.target.value)} placeholder="Assign to…"
             className="rounded border border-blue-300 px-2 py-1 text-sm bg-white w-36" />
+          <datalist id="interview-bulk-assign-options">
+            {bishopricOptions.map(o => <option key={o} value={o} />)}
+          </datalist>
           <button onClick={handleBulkAssign} disabled={!bulkAssignedTo.trim()}
             className="px-3 py-1 bg-blue-600 text-white rounded text-sm disabled:opacity-40 hover:bg-blue-700">Assign</button>
           <button onClick={() => setSelected(new Set())} className="ml-auto text-blue-500 hover:text-blue-700">Clear</button>
@@ -500,6 +556,19 @@ export default function InterviewPipeline() {
               )}
             </div>
 
+            {editingLinkedMember && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Name</label>
+                <input
+                  value={preferredNameDraft}
+                  onChange={e => setPreferredNameDraft(e.target.value)}
+                  placeholder="e.g. Bud"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">Shown instead of the name above wherever this person appears. Leave blank to use the legal name.</p>
+              </div>
+            )}
+
             {showLinkPicker && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Link to Ward Member (optional)</label>
@@ -548,7 +617,7 @@ export default function InterviewPipeline() {
             ) : (
               <Select label="Status" value={editing.status || ''} onChange={v => setEditing({ ...editing, status: v })} options={INTERVIEW_STATUSES} />
             )}
-            <Input label="Assigned To" value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} />
+            <AssignedToField value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} options={bishopricOptions} />
             <Input label="Date Recommend Expires" value={(editing.date_recommend_expires || '').slice(0, 10)} onChange={v => setEditing({ ...editing, date_recommend_expires: v })} type="date" />
             <Input label="Next Interview Date" value={(editing.next_interview_date || '').slice(0, 10)} onChange={v => setEditing({ ...editing, next_interview_date: v })} type="date" />
             <Input label="Last Interview Date" value={(editing.last_interview_datetime || '').slice(0, 10)} onChange={v => setEditing({ ...editing, last_interview_datetime: v })} type="date" />
