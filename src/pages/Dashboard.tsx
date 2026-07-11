@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../lib/useTable';
 import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
-import type { CallingPipeline, CalendarEvent, Task, MemberNeed, MissionaryPipeline, BishopricMeeting, AnnualDuty } from '../lib/api';
+import type { CallingPipeline, CalendarEvent, Task, MemberNeed, MissionaryPipeline, BishopricMeeting, AnnualDuty, Baby } from '../lib/api';
 import StatusBadge from '../components/StatusBadge';
 import { CALLING_STATUS_COLORS } from '../lib/constants';
 import { renderRichText } from '../lib/richText';
@@ -255,6 +255,7 @@ export default function Dashboard() {
   const { rows: missionaries } = useTable<MissionaryPipeline>('missionary-pipeline');
   const { rows: meetings } = useTable<BishopricMeeting>('bishopric-meetings');
   const { rows: annualDuties } = useTable<AnnualDuty>('annual-duties');
+  const { rows: babies } = useTable<Baby>('babies');
   const { data: tzData } = useQuery({ queryKey: ['app-timezone'], queryFn: () => api.appTimezone.get() });
   const { month: currentMonth, year: currentYear } = useTimeZoneNow(tzData?.timeZone || 'America/Denver');
 
@@ -277,10 +278,17 @@ export default function Dashboard() {
   const activeMissionaries = useMemo(() => missionaries.filter(m => ACTIVE_MISSIONARY_STATUSES.has(m.status)), [missionaries]);
   const actionCallings = useMemo(() => callings.filter(c => ACTION_STATUSES.has(c.status)), [callings]);
   const pendingTasks = useMemo(() => tasks.filter(t => !t.done), [tasks]);
-  const upcomingEvents = useMemo(() =>
-    events.filter(e => e.dates && e.dates.slice(0, 10) >= TODAY)
-      .sort((a, b) => a.dates.localeCompare(b.dates)).slice(0, 10),
-    [events]);
+  const upcomingEvents = useMemo(() => {
+    const babyCutoff = new Date(); babyCutoff.setDate(babyCutoff.getDate() - 30);
+    const babyCutoffStr = babyCutoff.toISOString().slice(0, 10);
+    const items = [
+      ...events.filter(e => e.dates && e.dates.slice(0, 10) >= TODAY)
+        .map(e => ({ id: `event-${e.id}`, name: e.name, dates: e.dates })),
+      ...babies.filter(b => b.status === 'Expecting' && b.due_birth_date && b.due_birth_date.slice(0, 10) >= babyCutoffStr)
+        .map(b => ({ id: `baby-${b.id}`, name: `Baby expected — ${b.name}`, dates: b.due_birth_date })),
+    ];
+    return items.sort((a, b) => a.dates.localeCompare(b.dates)).slice(0, 10);
+  }, [events, babies]);
   const dutiesDue = useMemo(() =>
     annualDuties.filter(d => d.last_completed_year !== currentYear && inDutyWindow(currentMonth, d.month_start, d.month_end)),
     [annualDuties, currentMonth, currentYear]);

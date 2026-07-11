@@ -139,6 +139,7 @@ export interface CallingPipeline {
   assigned_to: string;
   sustain_recorded: number;
   set_apart_recorded: number;
+  release_recorded: number;
   organization: string;
   type: string; // 'Calling' | 'Release'
   updated_at: string;
@@ -356,6 +357,7 @@ export interface Baby {
   due_birth_date: string;
   status: string;
   blessing_date: string;
+  church_record_created: number;
   notes: string;
   actions: string;
 }

@@ -206,9 +206,9 @@ const FULL_SECTIONS: Section[] = [
     icon: '⚡',
     content: (
       <div className="space-y-2">
-        <p>A personal page gathering everything currently assigned to you — action items, a calling you need to extend, an interview you need to conduct, an upcoming sacrament speaking/prayer/music assignment, and more.</p>
+        <p>A personal page gathering everything currently assigned to you — action items, a calling you need to extend, an interview you need to set up, an upcoming sacrament speaking/prayer/music assignment, and more. The clerk also sees a set of LCR record-keeping reminders here (sustainings, settings apart, releases, and baby church records that need recording) regardless of who they're assigned to.</p>
         <p>The <strong>My Actions</strong> link in the sidebar shows a red count badge whenever something needs your attention, so you don't have to open the page to know. Click it to see the details and jump straight to the relevant page.</p>
-        <p>Matching is by name, so an assignment only shows up here if it was assigned to your exact account name — use the "Select or type name…" list on Action Items, Calling Pipeline, and Interview Pipeline to pick your name from the list of accounts rather than typing it, so it matches reliably.</p>
+        <p>Matching is by name, so an assignment only shows up here if it was assigned to your exact account name — use the "Select or type name…" list on Action Items, Calling Pipeline, and the interview pages to pick your name from the list of accounts rather than typing it, so it matches reliably. Note that conducting an interview isn't itself a My Actions item — only setting one up is.</p>
       </div>
     ),
   },
@@ -253,6 +253,7 @@ const FULL_SECTIONS: Section[] = [
           '7. Need to release → 8. Need to thank at pulpit → 9. Released',
         ]} />
         <p>Callings at <strong>4. Called &amp; accepted</strong> appear automatically in the "To Be Sustained" section of the sacrament agenda. Callings at <strong>8. Need to thank at pulpit</strong> appear in "To Be Thanked."</p>
+        <p>Three checkboxes track LCR record-keeping — sustaining, setting apart, and (once released) release — each surfaced to the clerk on My Actions until checked. Reaching <strong>5. Sustained</strong> also auto-creates a "Setting Apart" entry on Other Interviews, which clears itself once the setting apart box here is checked or the calling is deleted.</p>
       </div>
     ),
   },
@@ -328,6 +329,7 @@ const FULL_SECTIONS: Section[] = [
     content: (
       <div className="space-y-2">
         <p>Track new babies — expected, born, blessed, and recorded. Fields include due/birth date and blessing date.</p>
+        <p>A "Church record created (LCR)" checkbox tracks whether the clerk has recorded the baby's record — checking it while status is Blessed also advances status to Recorded. Until it's checked on a Blessed baby, it shows up on the clerk's My Actions. Babies still Expecting also appear in the Dashboard's Upcoming Events.</p>
       </div>
     ),
   },
@@ -511,6 +513,15 @@ export default function Help() {
         <h2 className="text-sm font-semibold text-gray-700 mb-3">Version History</h2>
         <div className="space-y-4">
           {([
+            {
+              date: 'Jul 11, 2026 (4)',
+              items: [
+                'My Actions: added clerk-only reminders to record sustainings, settings apart, releases, and baby church records in LCR — these show regardless of who a calling or baby is otherwise assigned to, and disappear once checked off on Calling Pipeline / Babies.',
+                'Calling Pipeline: added a "Release recorded in LCR" checkbox alongside the existing sustain/setting-apart ones.',
+                'Babies: added a "Church record created (LCR)" checkbox; checking it while a baby is Blessed also advances their status to Recorded.',
+                'Dashboard: babies still Expecting (due within about a month) now also appear in the Upcoming Events panel.',
+              ],
+            },
             {
               date: 'Jul 11, 2026 (3)',
               items: [

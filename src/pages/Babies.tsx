@@ -3,7 +3,7 @@ import { useTable } from '../lib/useTable';
 import type { Baby } from '../lib/api';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
-import { Input, Select, Textarea } from '../components/FormFields';
+import { Input, Select, Textarea, Checkbox } from '../components/FormFields';
 import { BABY_STATUSES } from '../lib/constants';
 import { useAuth } from '../lib/auth';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -16,7 +16,7 @@ const COLORS: Record<string, { bg: string; text: string }> = {
   Recorded: { bg: 'bg-pink-100', text: 'text-pink-700' },
 };
 
-const EMPTY: Partial<Baby> = { name: '', due_birth_date: '', status: 'Expecting', blessing_date: '', notes: '', actions: '' };
+const EMPTY: Partial<Baby> = { name: '', due_birth_date: '', status: 'Expecting', blessing_date: '', church_record_created: 0, notes: '', actions: '' };
 
 function toDateOnly(v: string): string {
   if (!v) return '';
@@ -62,6 +62,7 @@ export default function Babies() {
                 {b.due_birth_date && <p>Due/Born: {toDateOnly(b.due_birth_date)}</p>}
                 {b.blessing_date && <p>Blessing: {toDateOnly(b.blessing_date)}</p>}
                 {b.actions && <p>Actions: {b.actions}</p>}
+                {!!b.church_record_created && <p className="inline-block bg-green-100 text-green-700 rounded-full px-2 py-0.5 text-xs">Record created</p>}
               </div>
             </div>
           ))}
@@ -75,6 +76,12 @@ export default function Babies() {
             <Input label="Due/Birth Date" value={toDateOnly(editing.due_birth_date || '')} onChange={v => setEditing({ ...editing, due_birth_date: v })} type="date" />
             <Select label="Status" value={editing.status || ''} onChange={v => setEditing({ ...editing, status: v })} options={BABY_STATUSES} />
             <Input label="Blessing Date" value={toDateOnly(editing.blessing_date || '')} onChange={v => setEditing({ ...editing, blessing_date: v })} type="date" />
+            <Checkbox label="Church record created (LCR)" checked={!!editing.church_record_created}
+              onChange={v => setEditing({
+                ...editing,
+                church_record_created: v ? 1 : 0,
+                status: v && editing.status === 'Blessed' ? 'Recorded' : editing.status,
+              })} />
             <Input label="Actions" value={editing.actions || ''} onChange={v => setEditing({ ...editing, actions: v })} />
             <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} />
             <div className="flex justify-end gap-2 pt-2">

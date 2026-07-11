@@ -2,9 +2,10 @@ import { useMemo } from 'react';
 import { useAuth } from './auth';
 import { useTable } from './useTable';
 import { stripBold } from './richText';
+import { pageForInterviewType } from '../components/interviews/shared';
 import type {
   Task, CallingPipeline, InterviewPipeline,
-  SacramentSpeaker, Prayer, SacramentMusic, RotatingAssignment,
+  SacramentSpeaker, Prayer, SacramentMusic, RotatingAssignment, Baby,
 } from './api';
 
 export interface ActionItem {
@@ -53,6 +54,7 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
   const canBishopric = !isGuest && hub === 'both';
   const canWc = !isGuest && (hub === 'both' || hub === 'wc');
   const enabled = canBishopric || canWc;
+  const isClerk = canBishopric && /clerk/i.test(user?.church_role || '');
 
   const { rows: tasks, isLoading: l1 } = useTable<Task>('tasks', { enabled: canWc });
   const { rows: callings, isLoading: l2 } = useTable<CallingPipeline>('calling-pipeline', { enabled: canBishopric });
@@ -61,6 +63,7 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
   const { rows: prayers, isLoading: l7 } = useTable<Prayer>('prayers', { enabled: canWc });
   const { rows: music, isLoading: l8 } = useTable<SacramentMusic>('sacrament-music', { enabled: canWc });
   const { rows: rotating, isLoading: l9 } = useTable<RotatingAssignment>('rotating-assignments', { enabled: canBishopric });
+  const { rows: babies, isLoading: l10 } = useTable<Baby>('babies', { enabled: isClerk });
 
   const items = useMemo<ActionItem[]>(() => {
     if (!enabled || !user) return [];
@@ -88,12 +91,44 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
     }
 
     for (const i of interviews) {
-      if (namesMatch(i.assigned_to, name) && i.status !== 'Delivered/Complete') {
+      if (namesMatch(i.setup_assigned_to, name) && i.setup_status !== 'Done') {
         out.push({
-          id: `interview-${i.id}`, label: `Interview: ${i.member}`,
-          detail: i.type_of_interview, date: i.next_interview_date || undefined,
-          link: '/interview-pipeline', source: 'Interview Pipeline',
+          id: `interview-setup-${i.id}`, label: `Set up interview: ${i.member}`,
+          detail: `${i.type_of_interview} — setup ${i.setup_status || 'Not started'}`,
+          link: pageForInterviewType(i.type_of_interview), source: 'Interview Setup',
         });
+      }
+    }
+
+    if (isClerk) {
+      for (const c of callings) {
+        if (c.type !== 'Calling') continue;
+        if (!c.sustain_recorded && ['5. Sustained', '6. Set apart', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) {
+          out.push({
+            id: `clerk-sustain-${c.id}`, label: `Record sustaining in LCR: ${stripBold(c.member)}`,
+            detail: c.calling, link: '/calling-pipeline', source: 'Clerk',
+          });
+        }
+        if (!c.set_apart_recorded && ['6. Set apart', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) {
+          out.push({
+            id: `clerk-setapart-${c.id}`, label: `Record setting apart in LCR: ${stripBold(c.member)}`,
+            detail: c.calling, link: '/calling-pipeline', source: 'Clerk',
+          });
+        }
+        if (!c.release_recorded && c.status === '9. Released') {
+          out.push({
+            id: `clerk-release-${c.id}`, label: `Record release in LCR: ${stripBold(c.member)}`,
+            detail: c.calling, link: '/calling-pipeline', source: 'Clerk',
+          });
+        }
+      }
+      for (const b of babies) {
+        if (b.status === 'Blessed' && !b.church_record_created) {
+          out.push({
+            id: `clerk-baby-${b.id}`, label: `Create church record: ${b.name}`,
+            link: '/babies', source: 'Clerk',
+          });
+        }
       }
     }
 
@@ -130,9 +165,9 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
     }
 
     return out.sort((a, b) => (a.date || '9999-99-99').localeCompare(b.date || '9999-99-99'));
-  }, [enabled, user, tasks, callings, interviews, speakers, prayers, music, rotating]);
+  }, [enabled, user, isClerk, tasks, callings, interviews, speakers, prayers, music, rotating, babies]);
 
-  const isLoading = enabled && (l1 || l2 || l3 || l6 || l7 || l8 || l9);
+  const isLoading = enabled && (l1 || l2 || l3 || l6 || l7 || l8 || l9 || (isClerk && l10));
 
   return { items, count: items.length, isLoading };
 }
