@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { BISHOPRIC_CALLINGS, WC_CALLINGS, YC_CALLINGS, CAL_CALLINGS } from '../lib/constants';
+import Modal from '../components/Modal';
 
 interface Section {
   title: string;
@@ -494,6 +495,7 @@ export default function Help() {
   const isMusicCoord = /music.?coordinator/i.test(user?.church_role || '');
   // hub='both' users see whichever hub they're currently viewing; single-hub accounts always see their own.
   const effectiveHub = user?.hub === 'both' ? selectedHub : user?.hub;
+  const [showFullHistory, setShowFullHistory] = useState(false);
 
   const sections = isViewer
     ? (isMusicCoord ? VIEWER_SECTIONS : VIEWER_SECTIONS.filter(s => s.title !== 'Music Coordinator — Editing Music'))
@@ -510,9 +512,50 @@ export default function Help() {
       <Accordion sections={sections} />
 
       <div className="mt-8 border-t border-gray-100 pt-6">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Version History</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-700">Version History</h2>
+          <button onClick={() => setShowFullHistory(true)} className="text-xs text-blue-600 hover:text-blue-700 font-medium">
+            View full history
+          </button>
+        </div>
         <div className="space-y-4">
-          {([
+          {VersionHistoryList(RECENT_HISTORY_COUNT)}
+        </div>
+      </div>
+
+      {showFullHistory && (
+        <Modal open onClose={() => setShowFullHistory(false)} title="Version History">
+          <div className="space-y-4">
+            {VersionHistoryList()}
+          </div>
+        </Modal>
+      )}
+
+      <p className="mt-6 text-xs text-gray-400">Build: {__APP_VERSION__}</p>
+    </div>
+  );
+}
+
+const RECENT_HISTORY_COUNT = 3;
+
+function VersionHistoryList(limit?: number) {
+  const entries = limit ? VERSION_HISTORY.slice(0, limit) : VERSION_HISTORY;
+  return entries.map(({ date, items }) => (
+    <div key={date}>
+      <p className="text-xs font-semibold text-gray-500 mb-1">{date}</p>
+      <ul className="space-y-0.5">
+        {items.map(item => (
+          <li key={item} className="text-xs text-gray-600 flex gap-2">
+            <span className="text-gray-300 shrink-0">·</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ));
+}
+
+const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Jul 11, 2026 (6)',
               items: [
@@ -709,23 +752,4 @@ export default function Help() {
                 'Initial release: Dashboard, Calling Pipeline, Interview Pipeline, Sacrament Planning, Current Sacrament, Tasks, Member Needs, Missionary Pipeline, Calendaring, Babies, Out of Town, Bishop Schedule, Assignments, Prayer List, Important Links, Users',
               ],
             },
-          ] as { date: string; items: string[] }[]).map(({ date, items }) => (
-            <div key={date}>
-              <p className="text-xs font-semibold text-gray-500 mb-1">{date}</p>
-              <ul className="space-y-0.5">
-                {items.map(item => (
-                  <li key={item} className="text-xs text-gray-600 flex gap-2">
-                    <span className="text-gray-300 shrink-0">·</span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <p className="mt-6 text-xs text-gray-400">Build: {__APP_VERSION__}</p>
-    </div>
-  );
-}
+];
