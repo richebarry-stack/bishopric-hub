@@ -557,6 +557,13 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 11, 2026 (8)',
+              items: [
+                'Ward Members: added a Temple Recommend field (type — Endowed or Limited-use — and expiration date). Removed the separate Unendowed Temple Rec interview category.',
+                'When a member\'s temple recommend expires within 2 months (or has already expired), they\'re now added to Adult Temple Interviews automatically, unassigned — no duplicate entry is created if one already exists.',
+              ],
+            },
+            {
               date: 'Jul 11, 2026 (7)',
               items: [
                 'Missionary Pipeline: added a "Papers with Stake" status between Papers Started and Papers Submitted.',

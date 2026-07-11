@@ -276,6 +276,44 @@ export async function syncOrdinanceCandidates(db: D1Database): Promise<JobResult
   return { ok: true, created };
 }
 
+const RECOMMEND_TYPE_TO_INTERVIEW_TYPE: Record<string, string> = { Endowed: 'Endowed Temple Rec', Limited: 'Limited' };
+
+/** When an active ward member's temple recommend expires within 2 months (or has
+ * already expired), auto-creates an Unassigned interview entry of the matching
+ * type (Endowed Temple Rec / Limited) so it surfaces on Adult Temple Interviews.
+ * Never duplicates — skips members who already have an interview_pipeline row of
+ * that type linked to them, regardless of that row's status. */
+export async function syncTempleRecommendInterviews(db: D1Database): Promise<JobResult> {
+  const now = new Date();
+  const cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() + 2);
+  const nowIso = now.toISOString();
+
+  const membersResult = await db.prepare(
+    "SELECT id, first_name, last_name, recommend_type, recommend_expires FROM ward_members WHERE active = 1 AND recommend_type IN ('Endowed', 'Limited') AND recommend_expires IS NOT NULL AND recommend_expires != ''"
+  ).all<{ id: number; first_name: string; last_name: string; recommend_type: string; recommend_expires: string }>();
+
+  const existingResult = await db.prepare(
+    "SELECT ward_member_id, type_of_interview FROM interview_pipeline WHERE ward_member_id IS NOT NULL AND type_of_interview IN ('Endowed Temple Rec', 'Limited')"
+  ).all<{ ward_member_id: number; type_of_interview: string }>();
+  const existing = new Set(existingResult.results.map(r => `${r.ward_member_id}|${r.type_of_interview}`));
+
+  const stmts: D1PreparedStatement[] = [];
+  let created = 0;
+  for (const wm of membersResult.results) {
+    const interviewType = RECOMMEND_TYPE_TO_INTERVIEW_TYPE[wm.recommend_type];
+    if (!interviewType || existing.has(`${wm.id}|${interviewType}`)) continue;
+    const expiry = new Date(wm.recommend_expires.slice(0, 10) + 'T12:00:00');
+    if (isNaN(expiry.getTime()) || expiry.getTime() > cutoff.getTime()) continue;
+    const legalName = wm.first_name ? `${wm.last_name}, ${wm.first_name}` : wm.last_name;
+    stmts.push(db.prepare(
+      'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, date_recommend_expires, ward_member_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(legalName, interviewType, 'Unassigned', '', wm.recommend_expires.slice(0, 10), wm.id, nowIso, nowIso));
+    created++;
+  }
+  if (stmts.length > 0) await db.batch(stmts);
+  return { ok: true, created };
+}
+
 export async function runDailyJobs(db: D1Database): Promise<Record<string, JobResult>> {
   const todayStr = new Date().toISOString().slice(0, 10);
   const results: Record<string, JobResult> = {};
@@ -300,6 +338,9 @@ export async function runDailyJobs(db: D1Database): Promise<Record<string, JobRe
 
   try { results.syncOrdinanceCandidates = await syncOrdinanceCandidates(db); }
   catch (e) { results.syncOrdinanceCandidates = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+
+  try { results.syncTempleRecommendInterviews = await syncTempleRecommendInterviews(db); }
+  catch (e) { results.syncTempleRecommendInterviews = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 
   return results;
 }

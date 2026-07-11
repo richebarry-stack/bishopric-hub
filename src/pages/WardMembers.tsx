@@ -119,6 +119,42 @@ function PreferredNameCell({ member, onSave }: { member: WardMember; onSave: (fi
   );
 }
 
+function RecommendCell({ member, onSave }: { member: WardMember; onSave: (fields: { recommend_type: string; recommend_expires: string }) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [type, setType] = useState(member.recommend_type || '');
+  const [expires, setExpires] = useState((member.recommend_expires || '').slice(0, 10));
+
+  if (editing) {
+    const commit = () => {
+      setEditing(false);
+      if (type !== (member.recommend_type || '') || expires !== (member.recommend_expires || '').slice(0, 10)) {
+        onSave({ recommend_type: type, recommend_expires: expires });
+      }
+    };
+    return (
+      <div className="flex gap-1">
+        <select value={type} onChange={e => setType(e.target.value)} onBlur={commit}
+          className="text-xs rounded border border-gray-300 px-1 py-0.5">
+          <option value="">—</option>
+          <option value="Endowed">Endowed</option>
+          <option value="Limited">Limited</option>
+        </select>
+        <input type="date" value={expires} onChange={e => setExpires(e.target.value)} onBlur={commit}
+          className="text-xs rounded border border-gray-300 px-1 py-0.5" />
+      </div>
+    );
+  }
+  const shown = member.recommend_type
+    ? `${member.recommend_type}${member.recommend_expires ? ` · ${member.recommend_expires.slice(0, 10)}` : ''}`
+    : '';
+  return (
+    <button type="button" onClick={() => setEditing(true)}
+      className="text-xs text-gray-500 hover:text-blue-600 hover:underline" aria-label={`Edit temple recommend for ${legalName(member)}`}>
+      {shown || <span className="text-gray-300">—</span>}
+    </button>
+  );
+}
+
 function GenderCell({ member, onSave }: { member: WardMember; onSave: (v: string) => void }) {
   return (
     <select
@@ -141,7 +177,7 @@ interface GroupedRows {
   unknown: WardMember[];
 }
 
-function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard }: {
+function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend }: {
   title: string;
   members: WardMember[];
   onToggleActive: (m: WardMember) => void;
@@ -152,6 +188,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
   onSaveName: (m: WardMember, fields: { first_name: string; last_name: string }) => void;
   onSavePreferredName: (m: WardMember, fields: { preferred_first_name: string; preferred_last_name: string }) => void;
   onToggleOutOfWard: (m: WardMember) => void;
+  onSaveRecommend: (m: WardMember, fields: { recommend_type: string; recommend_expires: string }) => void;
 }) {
   if (members.length === 0) return null;
   return (
@@ -166,6 +203,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
               <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
               <th className="text-left px-4 py-2 font-medium text-gray-600 w-36">Preferred Name</th>
               <th className="text-left px-4 py-2 font-medium text-gray-600 w-28">Birth Date</th>
+              <th className="text-left px-4 py-2 font-medium text-gray-600 w-40">Temple Recommend</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-16">Gender</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-24">Status</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Speakers</th>
@@ -188,6 +226,9 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                 </td>
                 <td className="px-4 py-2">
                   <BirthDateCell member={m} onSave={v => onSaveBirthDate(m, v)} />
+                </td>
+                <td className="px-4 py-2">
+                  <RecommendCell member={m} onSave={fields => onSaveRecommend(m, fields)} />
                 </td>
                 <td className="px-4 py-2 text-center">
                   <GenderCell member={m} onSave={v => onSaveGender(m, v)} />
@@ -322,12 +363,16 @@ export default function WardMembers() {
     update(m.id, { out_of_ward: m.out_of_ward ? 0 : 1 } as unknown as Record<string, unknown>);
   }, [update]);
 
+  const saveRecommend = useCallback((m: WardMember, fields: { recommend_type: string; recommend_expires: string }) => {
+    update(m.id, fields as unknown as Record<string, unknown>);
+  }, [update]);
+
   const confirm = useConfirm();
   const handleDelete = useCallback(async (m: WardMember) => {
     if (await confirm({ message: `Permanently delete ${legalName(m)}? This cannot be undone.` })) remove(m.id);
   }, [remove, confirm]);
 
-  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude, onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSaveName: saveName, onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard };
+  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude, onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSaveName: saveName, onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard, onSaveRecommend: saveRecommend };
 
   return (
     <div>

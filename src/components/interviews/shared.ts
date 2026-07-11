@@ -1,6 +1,6 @@
 export const YOUTH_TYPES = new Set(['Youth 12-15', 'Youth 16-17']);
 
-export const TEMPLE_TYPES = new Set(['Endowed Temple Rec', 'Unendowed Temple Rec', 'Limited']);
+export const TEMPLE_TYPES = new Set(['Endowed Temple Rec', 'Limited']);
 
 export const OTHER_TYPES = new Set([
   'Calling', 'Setting Apart', 'Patriarchal Blessing', 'Before Mission', 'Post-Mission', 'Eccl Endorsement', 'Other',

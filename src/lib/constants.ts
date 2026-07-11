@@ -147,7 +147,6 @@ export const INTERVIEW_TYPES = [
   'Calling',
   'Setting Apart',
   'Endowed Temple Rec',
-  'Unendowed Temple Rec',
   'Patriarchal Blessing',
   'Limited',
   'Eccl Endorsement',

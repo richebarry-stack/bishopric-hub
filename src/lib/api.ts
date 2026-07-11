@@ -473,6 +473,8 @@ export interface WardMember {
   exclude_prayers: number;
   birth_date: string | null;
   gender: string | null;
+  recommend_type: string | null;
+  recommend_expires: string | null;
   updated_at: string;
 }
 
