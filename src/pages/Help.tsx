@@ -557,6 +557,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 11, 2026 (13)',
+              items: [
+                'Temple recommend interviews: deleting an auto-created interview row now sticks — it won\'t be recreated by a resync (manual or automatic) unless the member\'s recommend date changes to a new date that\'s within the usual 2-month window.',
+              ],
+            },
+            {
               date: 'Jul 11, 2026 (12)',
               items: [
                 'My Actions now only lists calling pipeline items in "Approved and assigned" or "Need to release" status for the assigned person, instead of every non-released/declined calling.',
