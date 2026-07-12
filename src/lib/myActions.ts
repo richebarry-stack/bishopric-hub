@@ -81,8 +81,9 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
       }
     }
 
+    const CALLING_ACTION_STATUSES = new Set(['3. Approved and assigned', '7. Need to release']);
     for (const c of callings) {
-      if (namesMatch(c.assigned_to, name) && c.status !== '9. Released' && c.status !== '10. Declined') {
+      if (namesMatch(c.assigned_to, name) && CALLING_ACTION_STATUSES.has(c.status)) {
         out.push({
           id: `calling-${c.id}`, label: `${c.calling} — ${stripBold(c.member)}`,
           detail: c.status, link: '/calling-pipeline', source: 'Calling Pipeline',
