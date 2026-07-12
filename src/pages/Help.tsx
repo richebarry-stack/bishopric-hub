@@ -557,6 +557,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 11, 2026 (12)',
+              items: [
+                'My Actions now only lists calling pipeline items in "Approved and assigned" or "Need to release" status for the assigned person, instead of every non-released/declined calling.',
+              ],
+            },
+            {
               date: 'Jul 11, 2026 (11)',
               items: [
                 'The app\'s title is now configurable — set a Ward Name under Automation & Notifications and the login page/sidebar show "<Ward Name> Ward Leadership Hub" instead of a fixed "Bishopric Hub".',
