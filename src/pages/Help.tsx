@@ -557,6 +557,13 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 12, 2026',
+              items: [
+                'Fixed: editing a temple recommend expiration date for an adult on Ward Members wasn\'t reaching their existing Adult Temple Interviews row — a resync now keeps that date current instead of leaving the old one in place.',
+                'Adult Temple Interviews: a member who receives a new recommend that pushes their expiration date beyond the usual 2-month window is now removed from the list on resync, since they no longer need an interview soon.',
+              ],
+            },
+            {
               date: 'Jul 11, 2026 (13)',
               items: [
                 'Temple recommend interviews: deleting an auto-created interview row now sticks — it won\'t be recreated by a resync (manual or automatic) unless the member\'s recommend date changes to a new date that\'s within the usual 2-month window.',

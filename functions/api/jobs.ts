@@ -341,17 +341,24 @@ const RECOMMEND_TYPE_TO_INTERVIEW_TYPE: Record<string, string> = { Endowed: 'End
 /** When an active ward member's temple recommend expires within 2 months (or has
  * already expired), auto-creates an Unassigned interview entry of the matching
  * type (Endowed Temple Rec / Limited) so it surfaces on Adult Temple Interviews.
- * Never duplicates — skips members who already have an interview_pipeline row of
- * that type linked to them, regardless of that row's status. Skips current youth
- * (ages 12-17) entirely — their recommend is tracked on their Youth Interview row
- * instead, via syncYouthInterviews.
+ * Skips current youth (ages 12-17) entirely — their recommend is tracked on their
+ * Youth Interview row instead, via syncYouthInterviews. The "Link to Ward Member"
+ * picker in the UI only offers youth types, so any temple-type row with a
+ * ward_member_id set was created by this sync, never a bishopric member — safe to
+ * keep fully in sync (date, and removal) rather than just create-once.
  *
  * If a bishopric member deletes the auto-created interview row, it stays deleted
  * on future resyncs (manual or automatic) as long as recommend_expires hasn't
  * changed — recommend_interview_synced_expires on ward_members remembers the
  * expiry date that was last synced into an interview row, so a bare deletion
  * doesn't get undone. It only comes back if the recommend date changes to a new
- * value that's within the time horizon above. */
+ * value that's within the time horizon above.
+ *
+ * While a linked row exists, its date_recommend_expires is kept current with
+ * ward_members.recommend_expires — otherwise an edited date would never show up
+ * anywhere. And since a fresh recommend issuance is always 1-2 years out (well
+ * beyond the 2-month horizon), a new date pushing the member outside the horizon
+ * removes the row — there's no need for an interview once they've just renewed. */
 export async function syncTempleRecommendInterviews(db: D1Database): Promise<JobResult> {
   const now = new Date();
   const cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() + 2);
@@ -362,34 +369,42 @@ export async function syncTempleRecommendInterviews(db: D1Database): Promise<Job
   ).all<{ id: number; first_name: string; last_name: string; birth_date: string | null; recommend_type: string; recommend_expires: string; recommend_interview_synced_expires: string | null }>();
 
   const existingResult = await db.prepare(
-    "SELECT ward_member_id, type_of_interview FROM interview_pipeline WHERE ward_member_id IS NOT NULL AND type_of_interview IN ('Endowed Temple Rec', 'Limited')"
-  ).all<{ ward_member_id: number; type_of_interview: string }>();
-  const existing = new Set(existingResult.results.map(r => `${r.ward_member_id}|${r.type_of_interview}`));
+    "SELECT id, ward_member_id, type_of_interview, date_recommend_expires FROM interview_pipeline WHERE ward_member_id IS NOT NULL AND type_of_interview IN ('Endowed Temple Rec', 'Limited')"
+  ).all<{ id: number; ward_member_id: number; type_of_interview: string; date_recommend_expires: string | null }>();
+  const existingByKey = new Map(existingResult.results.map(r => [`${r.ward_member_id}|${r.type_of_interview}`, r]));
 
   const stmts: D1PreparedStatement[] = [];
-  let created = 0;
+  let created = 0, updated = 0, removed = 0;
   for (const wm of membersResult.results) {
     const interviewType = RECOMMEND_TYPE_TO_INTERVIEW_TYPE[wm.recommend_type];
     if (!interviewType) continue;
     if (wm.birth_date && computeYouthAge(wm.birth_date, now) !== null) continue;
     const expiresMonth = wm.recommend_expires.slice(0, 7);
-    if (existing.has(`${wm.id}|${interviewType}`)) {
-      // A linked row already exists — keep the marker current so a future deletion
-      // is compared against today's recommend date, not a stale one.
+    // recommend_expires is month/year only (e.g. "2026-11") — recommends expire at
+    // month's end, so compare against the last day of that month.
+    const [y, mo] = expiresMonth.split('-').map(Number);
+    const withinHorizon = !!y && !!mo && new Date(y, mo, 0).getTime() <= cutoff.getTime();
+
+    const existingRow = existingByKey.get(`${wm.id}|${interviewType}`);
+    if (existingRow) {
+      if (!withinHorizon) {
+        // Just renewed, with a new expiry well beyond the window — no interview needed yet.
+        stmts.push(db.prepare('DELETE FROM interview_pipeline WHERE id = ?').bind(existingRow.id));
+        removed++;
+      } else if ((existingRow.date_recommend_expires || '').slice(0, 7) !== expiresMonth) {
+        stmts.push(db.prepare('UPDATE interview_pipeline SET date_recommend_expires = ?, updated_at = ? WHERE id = ?').bind(expiresMonth, nowIso, existingRow.id));
+        updated++;
+      }
       if ((wm.recommend_interview_synced_expires || '') !== expiresMonth) {
         stmts.push(db.prepare('UPDATE ward_members SET recommend_interview_synced_expires = ? WHERE id = ?').bind(expiresMonth, wm.id));
       }
       continue;
     }
+
     // No linked row. If the recommend date hasn't changed since we last synced it,
     // this was deliberately deleted — leave it deleted.
     if ((wm.recommend_interview_synced_expires || '') === expiresMonth) continue;
-    // recommend_expires is month/year only (e.g. "2026-11") — recommends expire at
-    // month's end, so compare against the last day of that month.
-    const [y, mo] = expiresMonth.split('-').map(Number);
-    if (!y || !mo) continue;
-    const expiry = new Date(y, mo, 0);
-    if (expiry.getTime() > cutoff.getTime()) continue;
+    if (!withinHorizon) continue;
     const legalName = wm.first_name ? `${wm.last_name}, ${wm.first_name}` : wm.last_name;
     stmts.push(db.prepare(
       'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, date_recommend_expires, ward_member_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -398,7 +413,7 @@ export async function syncTempleRecommendInterviews(db: D1Database): Promise<Job
     created++;
   }
   if (stmts.length > 0) await db.batch(stmts);
-  return { ok: true, created };
+  return { ok: true, created, updated, removed };
 }
 
 export async function runDailyJobs(db: D1Database): Promise<Record<string, JobResult>> {
