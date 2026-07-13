@@ -557,6 +557,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 13, 2026',
+              items: [
+                'Fixed: editing an adult\'s "Recommend Expires" directly on their Adult Temple Interviews row didn\'t update Ward Members, so the next resync could re-stamp the old date back onto the interview. Editing it from either place now keeps both in sync, matching how youth interviews already worked.',
+              ],
+            },
+            {
               date: 'Jul 12, 2026',
               items: [
                 'Fixed: editing a temple recommend expiration date for an adult on Ward Members wasn\'t reaching their existing Adult Temple Interviews row — a resync now keeps that date current instead of leaving the old one in place.',

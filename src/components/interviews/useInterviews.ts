@@ -4,7 +4,7 @@ import { useTable } from '../../lib/useTable';
 import type { InterviewPipeline as InterviewType, WardMember, User, CallingPipeline } from '../../lib/api';
 import { displayName, legalName } from '../../lib/displayName';
 import { toast } from '../../lib/toast';
-import { YOUTH_TYPES, computeYouthAge, computeYouthState, type RowMeta } from './shared';
+import { YOUTH_TYPES, TEMPLE_TYPES, computeYouthAge, computeYouthState, type RowMeta } from './shared';
 
 export const EMPTY_INTERVIEW: Partial<InterviewType> = {
   member: '', date_recommend_expires: '', type_of_interview: '', status: 'Unassigned',
@@ -175,12 +175,17 @@ export function useInterviews() {
         }
         const newPreferredFirst = preferredNameDraft.trim();
         if (newPreferredFirst !== (linked.preferred_first_name || '')) wardMemberUpdate.preferred_first_name = newPreferredFirst;
-        if (YOUTH_TYPES.has((data.type_of_interview as string) || '')) {
+        const interviewType = (data.type_of_interview as string) || '';
+        if (YOUTH_TYPES.has(interviewType) || TEMPLE_TYPES.has(interviewType)) {
           const newExpires = ((data.date_recommend_expires as string) || '').slice(0, 7);
           const linkedExpires = (linked.recommend_expires || '').slice(0, 7);
           if (newExpires !== linkedExpires) {
             wardMemberUpdate.recommend_expires = newExpires;
-            if (newExpires) wardMemberUpdate.recommend_type = linked.recommend_type === 'Endowed' ? 'Endowed' : 'Limited';
+            if (newExpires) {
+              wardMemberUpdate.recommend_type = interviewType === 'Endowed Temple Rec' ? 'Endowed'
+                : interviewType === 'Limited' ? 'Limited'
+                : linked.recommend_type === 'Endowed' ? 'Endowed' : 'Limited';
+            }
           }
         }
         if (Object.keys(wardMemberUpdate).length > 0) await updateWardMember(wardMemberId, wardMemberUpdate);
