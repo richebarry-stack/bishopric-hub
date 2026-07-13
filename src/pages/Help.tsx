@@ -561,6 +561,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
               items: [
                 'Fixed: editing a temple recommend expiration date for an adult on Ward Members wasn\'t reaching their existing Adult Temple Interviews row — a resync now keeps that date current instead of leaving the old one in place.',
                 'Adult Temple Interviews: a member who receives a new recommend that pushes their expiration date beyond the usual 2-month window is now removed from the list on resync, since they no longer need an interview soon.',
+                'Adult Temple Interviews: resync now also removes anyone from the list whose recommend type/date was cleared, who went inactive, or who aged into the youth interview track — not just those who renewed past the window.',
               ],
             },
             {

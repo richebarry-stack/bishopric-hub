@@ -356,17 +356,22 @@ const RECOMMEND_TYPE_TO_INTERVIEW_TYPE: Record<string, string> = { Endowed: 'End
  *
  * While a linked row exists, its date_recommend_expires is kept current with
  * ward_members.recommend_expires — otherwise an edited date would never show up
- * anywhere. And since a fresh recommend issuance is always 1-2 years out (well
- * beyond the 2-month horizon), a new date pushing the member outside the horizon
- * removes the row — there's no need for an interview once they've just renewed. */
+ * anywhere. Every resync also removes a linked row for anyone who no longer
+ * belongs on the list: recommend renewed to a date beyond the 2-month horizon
+ * (a fresh issuance is always 1-2 years out), recommend type/date cleared, the
+ * member went inactive, or they aged into the youth interview track instead. */
 export async function syncTempleRecommendInterviews(db: D1Database): Promise<JobResult> {
   const now = new Date();
   const cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() + 2);
   const nowIso = now.toISOString();
 
+  // Unfiltered — needed so pass 1 below can also evaluate members who dropped out
+  // of "active with a matching recommend" (went inactive, cleared their recommend
+  // type, or blanked the date) and still own a stale linked interview row.
   const membersResult = await db.prepare(
-    "SELECT id, first_name, last_name, birth_date, recommend_type, recommend_expires, recommend_interview_synced_expires FROM ward_members WHERE active = 1 AND recommend_type IN ('Endowed', 'Limited') AND recommend_expires IS NOT NULL AND recommend_expires != ''"
-  ).all<{ id: number; first_name: string; last_name: string; birth_date: string | null; recommend_type: string; recommend_expires: string; recommend_interview_synced_expires: string | null }>();
+    'SELECT id, first_name, last_name, active, birth_date, recommend_type, recommend_expires, recommend_interview_synced_expires FROM ward_members'
+  ).all<{ id: number; first_name: string; last_name: string; active: number; birth_date: string | null; recommend_type: string | null; recommend_expires: string | null; recommend_interview_synced_expires: string | null }>();
+  const membersById = new Map(membersResult.results.map(m => [m.id, m]));
 
   const existingResult = await db.prepare(
     "SELECT id, ward_member_id, type_of_interview, date_recommend_expires FROM interview_pipeline WHERE ward_member_id IS NOT NULL AND type_of_interview IN ('Endowed Temple Rec', 'Limited')"
@@ -375,36 +380,60 @@ export async function syncTempleRecommendInterviews(db: D1Database): Promise<Job
 
   const stmts: D1PreparedStatement[] = [];
   let created = 0, updated = 0, removed = 0;
-  for (const wm of membersResult.results) {
-    const interviewType = RECOMMEND_TYPE_TO_INTERVIEW_TYPE[wm.recommend_type];
-    if (!interviewType) continue;
-    if (wm.birth_date && computeYouthAge(wm.birth_date, now) !== null) continue;
-    const expiresMonth = wm.recommend_expires.slice(0, 7);
-    // recommend_expires is month/year only (e.g. "2026-11") — recommends expire at
-    // month's end, so compare against the last day of that month.
-    const [y, mo] = expiresMonth.split('-').map(Number);
-    const withinHorizon = !!y && !!mo && new Date(y, mo, 0).getTime() <= cutoff.getTime();
 
-    const existingRow = existingByKey.get(`${wm.id}|${interviewType}`);
-    if (existingRow) {
-      if (!withinHorizon) {
-        // Just renewed, with a new expiry well beyond the window — no interview needed yet.
-        stmts.push(db.prepare('DELETE FROM interview_pipeline WHERE id = ?').bind(existingRow.id));
-        removed++;
-      } else if ((existingRow.date_recommend_expires || '').slice(0, 7) !== expiresMonth) {
-        stmts.push(db.prepare('UPDATE interview_pipeline SET date_recommend_expires = ?, updated_at = ? WHERE id = ?').bind(expiresMonth, nowIso, existingRow.id));
-        updated++;
-      }
-      if ((wm.recommend_interview_synced_expires || '') !== expiresMonth) {
-        stmts.push(db.prepare('UPDATE ward_members SET recommend_interview_synced_expires = ? WHERE id = ?').bind(expiresMonth, wm.id));
+  // Pass 1: every existing linked row — keep it in sync, or remove it once its
+  // owner no longer belongs on the list at all (inactive, recommend type/date
+  // cleared, aged into youth) or is simply outside the time horizon.
+  for (const row of existingResult.results) {
+    const wm = membersById.get(row.ward_member_id);
+    const isYouth = !!wm?.birth_date && computeYouthAge(wm.birth_date, now) !== null;
+    const interviewType = wm?.recommend_type ? RECOMMEND_TYPE_TO_INTERVIEW_TYPE[wm.recommend_type] : undefined;
+    const validOwner = !!wm && !!wm.active && !isYouth && interviewType === row.type_of_interview && !!wm.recommend_expires;
+
+    let withinHorizon = false;
+    let expiresMonth = '';
+    if (validOwner && wm!.recommend_expires) {
+      expiresMonth = wm!.recommend_expires.slice(0, 7);
+      // recommend_expires is month/year only (e.g. "2026-11") — recommends expire
+      // at month's end, so compare against the last day of that month.
+      const [y, mo] = expiresMonth.split('-').map(Number);
+      withinHorizon = !!y && !!mo && new Date(y, mo, 0).getTime() <= cutoff.getTime();
+    }
+
+    if (!validOwner || !withinHorizon) {
+      stmts.push(db.prepare('DELETE FROM interview_pipeline WHERE id = ?').bind(row.id));
+      removed++;
+      if (validOwner) {
+        stmts.push(db.prepare('UPDATE ward_members SET recommend_interview_synced_expires = ? WHERE id = ?').bind(expiresMonth, row.ward_member_id));
       }
       continue;
     }
 
+    if ((row.date_recommend_expires || '').slice(0, 7) !== expiresMonth) {
+      stmts.push(db.prepare('UPDATE interview_pipeline SET date_recommend_expires = ?, updated_at = ? WHERE id = ?').bind(expiresMonth, nowIso, row.id));
+      updated++;
+    }
+    if ((wm!.recommend_interview_synced_expires || '') !== expiresMonth) {
+      stmts.push(db.prepare('UPDATE ward_members SET recommend_interview_synced_expires = ? WHERE id = ?').bind(expiresMonth, wm!.id));
+    }
+  }
+
+  // Pass 2: create rows for members who need one and don't already have a linked row.
+  for (const wm of membersResult.results) {
+    if (!wm.active || !wm.recommend_type || !wm.recommend_expires) continue;
+    const interviewType = RECOMMEND_TYPE_TO_INTERVIEW_TYPE[wm.recommend_type];
+    if (!interviewType) continue;
+    if (wm.birth_date && computeYouthAge(wm.birth_date, now) !== null) continue;
+    if (existingByKey.has(`${wm.id}|${interviewType}`)) continue; // already handled in pass 1
+
+    const expiresMonth = wm.recommend_expires.slice(0, 7);
     // No linked row. If the recommend date hasn't changed since we last synced it,
     // this was deliberately deleted — leave it deleted.
     if ((wm.recommend_interview_synced_expires || '') === expiresMonth) continue;
-    if (!withinHorizon) continue;
+    const [y, mo] = expiresMonth.split('-').map(Number);
+    if (!y || !mo) continue;
+    const expiry = new Date(y, mo, 0);
+    if (expiry.getTime() > cutoff.getTime()) continue;
     const legalName = wm.first_name ? `${wm.last_name}, ${wm.first_name}` : wm.last_name;
     stmts.push(db.prepare(
       'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, date_recommend_expires, ward_member_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
