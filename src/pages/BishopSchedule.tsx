@@ -59,6 +59,13 @@ function startOfWeek(d: Date): Date {
   return r;
 }
 
+// On a Saturday, the current Sun-Sat week is the one that's ending — default to
+// next week instead so planning for tomorrow's Sunday doesn't require navigating forward.
+function defaultWeekStart(): Date {
+  const now = new Date();
+  return now.getDay() === 6 ? startOfWeek(addWeeks(now, 1)) : startOfWeek(now);
+}
+
 function toKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -111,7 +118,7 @@ interface ActiveDrag {
 
 export default function BishopSchedule() {
   const { rows, isLoading, create, update, remove } = useTable<BishopScheduleEntry>('bishop-schedule');
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [weekStart, setWeekStart] = useState(() => defaultWeekStart());
   const [editing, setEditing] = useState<FormState | null>(null);
   const confirm = useConfirm();
   const [repeatEnabled, setRepeatEnabled] = useState(false);
@@ -336,7 +343,7 @@ export default function BishopSchedule() {
     setEditing(null);
   };
 
-  const goToday = () => setWeekStart(startOfWeek(new Date()));
+  const goToday = () => setWeekStart(defaultWeekStart());
   const goPrev = () => setWeekStart(w => startOfWeek(addWeeks(w, -1)));
   const goNext = () => setWeekStart(w => startOfWeek(addWeeks(w, 1)));
 
@@ -453,22 +460,28 @@ export default function BishopSchedule() {
                           style={{ height: 20, padding: 0 }}
                           onClick={() => !dragState && !occupiedBy && handleSlotClick(dayKey, slot)}
                         >
-                          {startingHere.map(entry => {
+                          {startingHere.map((entry, entryIdx) => {
                             const isBeingMoved = dragState?.type === 'move' && dragState.entryId === entry.id;
                             const isBeingResized = dragState?.type === 'resize' && dragState.entryId === entry.id;
                             const startIdx = slotIndex(entry.start_time);
                             const endIdx = isBeingResized ? (dragRef.current?.previewEndIdx ?? slotIndex(entry.end_time)) : slotIndex(entry.end_time);
                             const span = Math.max(1, endIdx - startIdx);
                             const conflict = conflictedIds.has(entry.id);
+                            // Entries sharing an exact start time would otherwise stack fully on top of
+                            // one another, leaving all but the topmost unreachable — split the width instead.
+                            const laneCount = startingHere.length;
+                            const laneWidth = 100 / laneCount;
 
                             return (
                               <div
                                 key={entry.id}
-                                className={`absolute left-0.5 right-0.5 text-white rounded px-1 py-0.5 overflow-hidden shadow-sm select-none
+                                className={`absolute text-white rounded px-1 py-0.5 overflow-hidden shadow-sm select-none
                                   ${conflict ? 'bg-red-500' : 'bg-blue-500'}`}
                                 style={{
                                   top: 0,
                                   height: span * 20 - 1,
+                                  left: laneCount > 1 ? `calc(${entryIdx * laneWidth}% + 1px)` : '2px',
+                                  width: laneCount > 1 ? `calc(${laneWidth}% - 2px)` : 'calc(100% - 4px)',
                                   lineHeight: '1.2',
                                   touchAction: 'none',
                                   opacity: isBeingMoved ? 0.25 : 1,

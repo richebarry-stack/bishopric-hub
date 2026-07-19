@@ -557,6 +557,14 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 19, 2026',
+              items: [
+                'Bishopric Meeting Planning: adding or editing a meeting now jumps the calendar to its month, so saving a meeting in a different month than the one you\'re viewing no longer looks like it silently failed.',
+                'Bishop Schedule: two appointments starting at the exact same time now render side by side instead of stacking fully on top of each other, so the one underneath is no longer hidden and unreachable for editing or deleting.',
+                'Bishop Schedule: opening the page on a Saturday now defaults to next week instead of the week that\'s ending, since tomorrow\'s Sunday already belongs to next week.',
+              ],
+            },
+            {
               date: 'Jul 13, 2026',
               items: [
                 'Fixed: editing an adult\'s "Recommend Expires" directly on their Adult Temple Interviews row didn\'t update Ward Members, so the next resync could re-stamp the old date back onto the interview. Editing it from either place now keeps both in sync, matching how youth interviews already worked.',

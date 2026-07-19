@@ -78,6 +78,7 @@ export default function BishopricMeetings() {
       } else {
         await create(data as Record<string, unknown>);
       }
+      if (editing.date) setViewDate(new Date(editing.date.slice(0, 10) + 'T12:00:00'));
       setEditing(null);
       setRepeatEnabled(false);
       setRepeatWeeks(1);
