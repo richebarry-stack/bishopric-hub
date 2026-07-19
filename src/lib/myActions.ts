@@ -75,102 +75,114 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
     const todayStr = today();
     const out: ActionItem[] = [];
 
-    for (const t of tasks) {
-      if (!t.done && namesMatch(t.assigned_to, name)) {
-        out.push({
-          id: `task-${t.id}`, label: t.task,
-          detail: t.due_date ? `Due ${t.due_date.slice(0, 10)}` : undefined,
-          date: t.due_date, link: '/tasks', source: 'Action Item',
-        });
+    // Guard each source by its permission flag rather than trusting the `enabled` fetch
+    // option alone — react-query keeps a query's last-fetched data cached even after
+    // `enabled` flips to false (e.g. switching hub view), so without this a dual-access
+    // account could still see stale bishopric-only items after leaving the Bishopric hub.
+    if (canWc) {
+      for (const t of tasks) {
+        if (!t.done && namesMatch(t.assigned_to, name)) {
+          out.push({
+            id: `task-${t.id}`, label: t.task,
+            detail: t.due_date ? `Due ${t.due_date.slice(0, 10)}` : undefined,
+            date: t.due_date, link: '/tasks', source: 'Action Item',
+          });
+        }
       }
     }
 
-    const CALLING_ACTION_STATUSES = new Set(['3. Approved and assigned', '7. Need to release']);
-    for (const c of callings) {
-      if (namesMatch(c.assigned_to, name) && CALLING_ACTION_STATUSES.has(c.status)) {
-        out.push({
-          id: `calling-${c.id}`, label: `${c.calling} — ${stripBold(c.member)}`,
-          detail: c.status, link: '/calling-pipeline', source: 'Calling Pipeline',
-        });
-      }
-    }
-
-    for (const i of interviews) {
-      if (namesMatch(i.setup_assigned_to, name) && i.setup_status !== 'Done') {
-        out.push({
-          id: `interview-setup-${i.id}`, label: `Set up interview: ${i.member}`,
-          detail: `${i.type_of_interview} — setup ${i.setup_status || 'Not started'}`,
-          link: pageForInterviewType(i.type_of_interview), source: 'Interview Setup',
-        });
-      }
-    }
-
-    if (isClerk) {
+    if (canBishopric) {
+      const CALLING_ACTION_STATUSES = new Set(['3. Approved and assigned', '7. Need to release']);
       for (const c of callings) {
-        if (c.type !== 'Calling') continue;
-        if (!c.sustain_recorded && ['5. Sustained', '6. Set apart', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) {
+        if (namesMatch(c.assigned_to, name) && CALLING_ACTION_STATUSES.has(c.status)) {
           out.push({
-            id: `clerk-sustain-${c.id}`, label: `Record sustaining in LCR: ${stripBold(c.member)}`,
-            detail: c.calling, link: '/calling-pipeline', source: 'Clerk',
-          });
-        }
-        if (!c.set_apart_recorded && ['6. Set apart', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) {
-          out.push({
-            id: `clerk-setapart-${c.id}`, label: `Record setting apart in LCR: ${stripBold(c.member)}`,
-            detail: c.calling, link: '/calling-pipeline', source: 'Clerk',
-          });
-        }
-        if (!c.release_recorded && c.status === '9. Released') {
-          out.push({
-            id: `clerk-release-${c.id}`, label: `Record release in LCR: ${stripBold(c.member)}`,
-            detail: c.calling, link: '/calling-pipeline', source: 'Clerk',
+            id: `calling-${c.id}`, label: `${c.calling} — ${stripBold(c.member)}`,
+            detail: c.status, link: '/calling-pipeline', source: 'Calling Pipeline',
           });
         }
       }
-      for (const b of babies) {
-        if (b.status === 'Blessed' && !b.church_record_created) {
+
+      for (const i of interviews) {
+        if (namesMatch(i.setup_assigned_to, name) && i.setup_status !== 'Done') {
           out.push({
-            id: `clerk-baby-${b.id}`, label: `Create church record: ${b.name}`,
-            link: '/babies', source: 'Clerk',
+            id: `interview-setup-${i.id}`, label: `Set up interview: ${i.member}`,
+            detail: `${i.type_of_interview} — setup ${i.setup_status || 'Not started'}`,
+            link: pageForInterviewType(i.type_of_interview), source: 'Interview Setup',
           });
+        }
+      }
+
+      if (isClerk) {
+        for (const c of callings) {
+          if (c.type !== 'Calling') continue;
+          if (!c.sustain_recorded && ['5. Sustained', '6. Set apart', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) {
+            out.push({
+              id: `clerk-sustain-${c.id}`, label: `Record sustaining in LCR: ${stripBold(c.member)}`,
+              detail: c.calling, link: '/calling-pipeline', source: 'Clerk',
+            });
+          }
+          if (!c.set_apart_recorded && ['6. Set apart', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) {
+            out.push({
+              id: `clerk-setapart-${c.id}`, label: `Record setting apart in LCR: ${stripBold(c.member)}`,
+              detail: c.calling, link: '/calling-pipeline', source: 'Clerk',
+            });
+          }
+          if (!c.release_recorded && c.status === '9. Released') {
+            out.push({
+              id: `clerk-release-${c.id}`, label: `Record release in LCR: ${stripBold(c.member)}`,
+              detail: c.calling, link: '/calling-pipeline', source: 'Clerk',
+            });
+          }
+        }
+        for (const b of babies) {
+          if (b.status === 'Blessed' && !b.church_record_created) {
+            out.push({
+              id: `clerk-baby-${b.id}`, label: `Create church record: ${b.name}`,
+              link: '/babies', source: 'Clerk',
+            });
+          }
         }
       }
     }
 
-    for (const s of speakers) {
-      if (s.meeting_date.slice(0, 10) >= todayStr && namesMatch(s.speaker, name)) {
-        out.push({
-          id: `speaker-${s.id}`, label: `Speaking assignment${s.topic ? `: ${s.topic}` : ''}`,
-          date: s.meeting_date, link: '/current-sacrament', source: 'Sacrament',
-        });
+    if (canWc) {
+      for (const s of speakers) {
+        if (s.meeting_date.slice(0, 10) >= todayStr && namesMatch(s.speaker, name)) {
+          out.push({
+            id: `speaker-${s.id}`, label: `Speaking assignment${s.topic ? `: ${s.topic}` : ''}`,
+            date: s.meeting_date, link: '/current-sacrament', source: 'Sacrament',
+          });
+        }
+      }
+
+      for (const p of prayers) {
+        if (p.meeting_date.slice(0, 10) >= todayStr && namesMatch(p.name, name)) {
+          out.push({
+            id: `prayer-${p.id}`, label: `${p.opening_closing || 'Prayer'} — Sacrament Meeting`,
+            date: p.meeting_date, link: '/current-sacrament', source: 'Sacrament',
+          });
+        }
+      }
+
+      for (const mu of music) {
+        if (mu.meeting_date.slice(0, 10) < todayStr) continue;
+        if (namesMatch(mu.chorister, name)) out.push({ id: `music-cho-${mu.id}`, label: 'Chorister — Sacrament Meeting', date: mu.meeting_date, link: '/current-sacrament', source: 'Sacrament' });
+        if (namesMatch(mu.organist, name)) out.push({ id: `music-org-${mu.id}`, label: 'Organist — Sacrament Meeting', date: mu.meeting_date, link: '/current-sacrament', source: 'Sacrament' });
       }
     }
 
-    for (const p of prayers) {
-      if (p.meeting_date.slice(0, 10) >= todayStr && namesMatch(p.name, name)) {
-        out.push({
-          id: `prayer-${p.id}`, label: `${p.opening_closing || 'Prayer'} — Sacrament Meeting`,
-          date: p.meeting_date, link: '/current-sacrament', source: 'Sacrament',
-        });
+    if (canBishopric) {
+      const currentMonthAbbr = new Date().toLocaleDateString('en-US', { month: 'short' }).toLowerCase();
+      for (const r of rotating) {
+        const abbr = (r.month || '').trim().slice(0, 3).toLowerCase();
+        if (abbr !== currentMonthAbbr) continue;
+        if (namesMatch(r.plan_conduct, name)) out.push({ id: `rotate-conduct-${r.id}`, label: `Plan & conduct sacrament meeting — ${r.month}`, link: '/assignments', source: 'Bishopric Assignment' });
+        if (namesMatch(r.primary_message, name)) out.push({ id: `rotate-primary-${r.id}`, label: `Primary message — ${r.month}`, link: '/assignments', source: 'Bishopric Assignment' });
       }
-    }
-
-    for (const mu of music) {
-      if (mu.meeting_date.slice(0, 10) < todayStr) continue;
-      if (namesMatch(mu.chorister, name)) out.push({ id: `music-cho-${mu.id}`, label: 'Chorister — Sacrament Meeting', date: mu.meeting_date, link: '/current-sacrament', source: 'Sacrament' });
-      if (namesMatch(mu.organist, name)) out.push({ id: `music-org-${mu.id}`, label: 'Organist — Sacrament Meeting', date: mu.meeting_date, link: '/current-sacrament', source: 'Sacrament' });
-    }
-
-    const currentMonthAbbr = new Date().toLocaleDateString('en-US', { month: 'short' }).toLowerCase();
-    for (const r of rotating) {
-      const abbr = (r.month || '').trim().slice(0, 3).toLowerCase();
-      if (abbr !== currentMonthAbbr) continue;
-      if (namesMatch(r.plan_conduct, name)) out.push({ id: `rotate-conduct-${r.id}`, label: `Plan & conduct sacrament meeting — ${r.month}`, link: '/assignments', source: 'Bishopric Assignment' });
-      if (namesMatch(r.primary_message, name)) out.push({ id: `rotate-primary-${r.id}`, label: `Primary message — ${r.month}`, link: '/assignments', source: 'Bishopric Assignment' });
     }
 
     return out.sort((a, b) => (a.date || '9999-99-99').localeCompare(b.date || '9999-99-99'));
-  }, [enabled, user, isClerk, tasks, callings, interviews, speakers, prayers, music, rotating, babies]);
+  }, [enabled, user, isClerk, canBishopric, canWc, tasks, callings, interviews, speakers, prayers, music, rotating, babies]);
 
   const isLoading = enabled && (l1 || l2 || l3 || l6 || l7 || l8 || l9 || (isClerk && l10));
 

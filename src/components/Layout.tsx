@@ -483,7 +483,9 @@ export default function Layout() {
     ? (guestType === 'sac'
         ? [{ path: '/sacrament-program', label: 'Sacrament Program', icon: '♫' }]
         : [{ path: '/youth-activities', label: 'Youth Calendar', icon: '⬡' }])
-    : YC_NAV_ITEMS;
+    // Tasks/"Action Items" only has a route for real YC accounts (see App.tsx) — a
+    // bishopric account borrowing this view shouldn't get a nav link to a page that isn't there.
+    : YC_NAV_ITEMS.filter(item => item.path !== '/tasks' || user?.hub === 'yc');
 
   const navItems = isCal
     ? CAL_NAV_ITEMS
