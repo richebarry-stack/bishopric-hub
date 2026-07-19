@@ -563,6 +563,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Bishop Schedule: two appointments starting at the exact same time now render side by side instead of stacking fully on top of each other, so the one underneath is no longer hidden and unreachable for editing or deleting.',
                 'Bishop Schedule: opening the page on a Saturday now defaults to next week instead of the week that\'s ending, since tomorrow\'s Sunday already belongs to next week.',
                 'Bishop Schedule: short (e.g. 15-minute) appointments had a click target so small that a near-miss would silently open a blank New Appointment form instead of editing the one you meant to click. Clicking anywhere in that appointment\'s row now opens it correctly.',
+                'Security: the Ward Council hub could see bishopric members\' email addresses and login activity (e.g. on the Ward Council Members page), and the Youth Council hub could see everyone\'s email, role, and login activity across all hubs. Both now only see names and callings for anyone outside their own hub.',
               ],
             },
             {

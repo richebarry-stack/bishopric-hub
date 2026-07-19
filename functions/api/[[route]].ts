@@ -524,15 +524,33 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (method === 'GET') {
       // Guest accounts (guest_yc/guest_sac) aren't real people — they're login shortcuts
       // for the read-only guest views, so they never show up in user management.
-      // WC-hub users only see WC users
+      const FULL_FIELDS = 'id, name, email, role, church_role, hub, last_login, last_access';
+      const MINIMAL_FIELDS = 'id, name, church_role';
+
+      // WC-hub users: full account detail for their own (wc) hub, but only name/calling
+      // for the bishopric's ex-officio ward council members — bishopric account details
+      // (email, login activity, etc.) aren't Ward Council's data to see.
       if (session.hub === 'wc') {
-        const users = await db.prepare("SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE hub IN ('wc','both') AND role != 'guest' ORDER BY name ASC").all();
+        const wcUsers = await db.prepare(`SELECT ${FULL_FIELDS} FROM users WHERE hub = 'wc' AND role != 'guest' ORDER BY name ASC`).all();
+        const bishopricUsers = await db.prepare(`SELECT ${MINIMAL_FIELDS} FROM users WHERE hub = 'both' ORDER BY name ASC`).all();
+        const merged = [...wcUsers.results, ...bishopricUsers.results] as { name: string }[];
+        merged.sort((a, b) => a.name.localeCompare(b.name));
+        return json(merged);
+      }
+
+      // Any other non-bishopric session (Youth Council, Calendar hub, guests): names and
+      // callings only, across every hub — enough for assignee/name lookups without
+      // exposing anyone's email, account role, hub assignment, or login activity.
+      if (session.hub !== 'both') {
+        const users = await db.prepare(`SELECT ${MINIMAL_FIELDS} FROM users WHERE role != 'guest' ORDER BY name ASC`).all();
         return json(users.results);
       }
+
+      // Bishopric hub: full directory access.
       const filterHub = url.searchParams.get('hub');
       const users = filterHub === 'wc'
-        ? await db.prepare("SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE hub IN ('wc','both') AND role != 'guest' ORDER BY name ASC").all()
-        : await db.prepare("SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE role != 'guest' ORDER BY name ASC").all();
+        ? await db.prepare(`SELECT ${FULL_FIELDS} FROM users WHERE hub IN ('wc','both') AND role != 'guest' ORDER BY name ASC`).all()
+        : await db.prepare(`SELECT ${FULL_FIELDS} FROM users WHERE role != 'guest' ORDER BY name ASC`).all();
       return json(users.results);
     }
 
