@@ -562,6 +562,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Bishopric Meeting Planning: adding or editing a meeting now jumps the calendar to its month, so saving a meeting in a different month than the one you\'re viewing no longer looks like it silently failed.',
                 'Bishop Schedule: two appointments starting at the exact same time now render side by side instead of stacking fully on top of each other, so the one underneath is no longer hidden and unreachable for editing or deleting.',
                 'Bishop Schedule: opening the page on a Saturday now defaults to next week instead of the week that\'s ending, since tomorrow\'s Sunday already belongs to next week.',
+                'Bishop Schedule: short (e.g. 15-minute) appointments had a click target so small that a near-miss would silently open a blank New Appointment form instead of editing the one you meant to click. Clicking anywhere in that appointment\'s row now opens it correctly.',
               ],
             },
             {

@@ -220,12 +220,7 @@ export default function BishopSchedule() {
       setDragState(null);
       if (!d) return;
       if (!d.didMove) {
-        setEditing({
-          id: entry.id, date: entry.date.slice(0, 10), start_time: entry.start_time, end_time: entry.end_time,
-          title: entry.title, notes: entry.notes || '',
-          recurrence_id: entry.recurrence_id, recurrence_frequency: entry.recurrence_frequency,
-          recurrence_interval: entry.recurrence_interval, recurrence_end_date: entry.recurrence_end_date,
-        });
+        openEditor(entry);
       } else {
         const newStart = TIME_SLOTS[d.previewStartIdx];
         const newEnd = TIME_SLOTS[Math.min(d.previewEndIdx, TIME_SLOTS.length - 1)];
@@ -261,6 +256,15 @@ export default function BishopSchedule() {
     const endIdx = Math.min(si + 2, TIME_SLOTS.length - 1);
     resetRepeatState();
     setEditing({ date, start_time: time, end_time: TIME_SLOTS[endIdx], title: '', notes: '' });
+  };
+
+  const openEditor = (entry: BishopScheduleEntry) => {
+    setEditing({
+      id: entry.id, date: entry.date.slice(0, 10), start_time: entry.start_time, end_time: entry.end_time,
+      title: entry.title, notes: entry.notes || '',
+      recurrence_id: entry.recurrence_id, recurrence_frequency: entry.recurrence_frequency,
+      recurrence_interval: entry.recurrence_interval, recurrence_end_date: entry.recurrence_end_date,
+    });
   };
 
   const handleSave = async () => {
@@ -456,9 +460,16 @@ export default function BishopSchedule() {
                           className={`border-r border-gray-100 relative
                             ${isHour ? 'border-t border-gray-200' : 'border-t border-gray-50'}
                             ${dayKey === todayKey ? 'bg-blue-50/30' : ''}
-                            ${!dragState && !occupiedBy ? 'cursor-pointer hover:bg-blue-50/50' : ''}`}
+                            ${!dragState && !occupiedBy && startingHere.length === 0 ? 'cursor-pointer hover:bg-blue-50/50' : ''}`}
                           style={{ height: 20, padding: 0 }}
-                          onClick={() => !dragState && !occupiedBy && handleSlotClick(dayKey, slot)}
+                          onClick={() => {
+                            if (dragState || occupiedBy) return;
+                            // A near-miss click that lands on the cell rather than the (sometimes tiny,
+                            // e.g. 15-minute) entry box should still open that entry, not silently do
+                            // nothing or create a stray duplicate appointment in the same slot.
+                            if (startingHere.length === 1) openEditor(startingHere[0]);
+                            else if (startingHere.length === 0) handleSlotClick(dayKey, slot);
+                          }}
                         >
                           {startingHere.map((entry, entryIdx) => {
                             const isBeingMoved = dragState?.type === 'move' && dragState.entryId === entry.id;
@@ -479,9 +490,9 @@ export default function BishopSchedule() {
                                   ${conflict ? 'bg-red-500' : 'bg-blue-500'}`}
                                 style={{
                                   top: 0,
-                                  height: span * 20 - 1,
-                                  left: laneCount > 1 ? `calc(${entryIdx * laneWidth}% + 1px)` : '2px',
-                                  width: laneCount > 1 ? `calc(${laneWidth}% - 2px)` : 'calc(100% - 4px)',
+                                  height: span * 20,
+                                  left: laneCount > 1 ? `calc(${entryIdx * laneWidth}% + 1px)` : '1px',
+                                  width: laneCount > 1 ? `calc(${laneWidth}% - 2px)` : 'calc(100% - 2px)',
                                   lineHeight: '1.2',
                                   touchAction: 'none',
                                   opacity: isBeingMoved ? 0.25 : 1,
