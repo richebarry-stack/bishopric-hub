@@ -104,8 +104,11 @@ function AppRoutes() {
     );
   }
 
-  // Youth Council hub users and guests
-  if (user.hub === 'yc') {
+  // Youth Council hub — real yc accounts/guests, or a dual-access ('both') user who has
+  // switched into YC view. Scoped to youth-only routes so no bishopric or Ward Council
+  // data is reachable while looking at this hub, even though a 'both' account technically
+  // has access to it elsewhere.
+  if (user.hub === 'yc' || (user.hub === 'both' && selectedHub === 'yc')) {
     // Sacrament-only guest: one page, no nav elsewhere
     if (user.role === 'guest' && user.church_role === 'sac') {
       return (
@@ -124,7 +127,10 @@ function AppRoutes() {
         <Route element={<Layout />}>
           <Route path="/youth-activities" element={<YouthActivities />} />
           {!isYcGuest && <Route path="/yc-meetings" element={<YcMeetings />} />}
-          {!isYcGuest && <Route path="/tasks" element={<Tasks />} />}
+          {/* Tasks are scoped server-side to the account's own hub, so a bishopric account
+              borrowing this view would see its own (bishopric) tasks mislabeled as Youth
+              Council's — only expose Tasks here for genuine YC accounts. */}
+          {!isYcGuest && user.hub === 'yc' && <Route path="/tasks" element={<Tasks />} />}
           {!isYcGuest && <Route path="/help" element={<Help />} />}
           <Route path="*" element={<Navigate to="/youth-activities" replace />} />
         </Route>

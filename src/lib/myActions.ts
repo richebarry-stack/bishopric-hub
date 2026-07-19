@@ -49,10 +49,14 @@ const today = () => new Date().toISOString().slice(0, 10);
  * Hub-aware: only queries tables the user's account hub can actually read, mirroring
  * the server-side gating in functions/api/[[route]].ts. */
 export function useMyActionItems(): { items: ActionItem[]; count: number; isLoading: boolean } {
-  const { user, isGuest } = useAuth();
+  const { user, isGuest, selectedHub } = useAuth();
   const hub = user?.hub;
-  const canBishopric = !isGuest && hub === 'both';
-  const canWc = !isGuest && (hub === 'both' || hub === 'wc');
+  // A dual-access ('both') account only sees bishopric/WC action items while actually
+  // viewing that hub — switching to the WC (or YC) view hides bishopric-only items like
+  // calling pipeline follow-ups and clerk tasks, even though the account has access to them.
+  const effectiveHub = hub === 'both' ? selectedHub : hub;
+  const canBishopric = !isGuest && effectiveHub === 'bh';
+  const canWc = !isGuest && (effectiveHub === 'bh' || effectiveHub === 'wc');
   const enabled = canBishopric || canWc;
   const isClerk = canBishopric && /clerk/i.test(user?.church_role || '');
 
