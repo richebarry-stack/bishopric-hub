@@ -8,6 +8,7 @@ import { Input, Select, Checkbox, Textarea } from '../components/FormFields';
 import { CALLING_STATUSES, CALLING_STATUS_COLORS, ORGANIZATIONS } from '../lib/constants';
 import { renderRichText, stripBold } from '../lib/richText';
 import LastEdited from '../components/LastEdited';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const ASSIGNED_DATALIST = 'assigned-to-options';
 
@@ -434,6 +435,7 @@ export default function CallingPipeline() {
 type MwcSortKey = 'name' | 'potential_calling' | 'notes';
 
 function MwcTable({ rows, onEdit, onDelete }: { rows: MemberWithoutCalling[]; onEdit: (r: MemberWithoutCalling) => void; onDelete: (id: number) => void }) {
+  const confirm = useConfirm();
   const [sortKey, setSortKey] = useState<MwcSortKey>('name');
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -474,7 +476,7 @@ function MwcTable({ rows, onEdit, onDelete }: { rows: MemberWithoutCalling[]; on
               <td className="px-3 py-2 text-gray-700">{r.potential_calling}</td>
               <td className="px-3 py-2 text-gray-600">{r.notes}</td>
               <td className="px-3 py-2">
-                <button onClick={e => { e.stopPropagation(); onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
+                <button onClick={async e => { e.stopPropagation(); if (await confirm({ message: `Delete ${r.name}?` })) onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
               </td>
             </tr>
           ))}
@@ -487,6 +489,7 @@ function MwcTable({ rows, onEdit, onDelete }: { rows: MemberWithoutCalling[]; on
 type SortKey = 'member' | 'calling' | 'status' | 'assigned_to' | 'organization';
 
 function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: CallingType) => void; onDelete: (id: number) => void }) {
+  const confirm = useConfirm();
   const [sortKey, setSortKey] = useState<SortKey>('member');
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -542,7 +545,7 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
                 {r.sustain_recorded ? '✓S' : ''}{r.set_apart_recorded ? ' ✓A' : ''}
               </td>
               <td className="px-3 py-2">
-                <button onClick={e => { e.stopPropagation(); onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
+                <button onClick={async e => { e.stopPropagation(); if (await confirm({ message: `Delete ${stripBold(r.member) || 'this entry'} — ${r.calling}?` })) onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
               </td>
             </tr>
           ))}
