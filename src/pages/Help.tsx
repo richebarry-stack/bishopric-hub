@@ -565,6 +565,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Bishop Schedule: short (e.g. 15-minute) appointments had a click target so small that a near-miss would silently open a blank New Appointment form instead of editing the one you meant to click. Clicking anywhere in that appointment\'s row now opens it correctly.',
                 'Security: the Ward Council hub could see bishopric members\' email addresses and login activity (e.g. on the Ward Council Members page), and the Youth Council hub could see everyone\'s email, role, and login activity across all hubs. Both now only see names and callings for anyone outside their own hub.',
                 'Bishopric/dual-access accounts switching to the Ward Council or Youth Council hub view no longer see bishopric data leak through: the Youth Council view is now fully scoped to youth-only pages, and My Actions on the Ward Council view no longer lists bishopric-only items (calling pipeline, interviews, clerk follow-ups, rotating assignments).',
+                'Fixed: My Actions never generated a "Record release in LCR" item for the ward clerk, even when someone was fully Released and not yet recorded — Calling Pipeline tracks a release as its own pipeline entry (separate from the original calling), and the clerk check was accidentally skipping every one of those entries.',
               ],
             },
             {
