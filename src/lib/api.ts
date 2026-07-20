@@ -452,6 +452,20 @@ export interface BishopScheduleEntry {
   recurrence_end_date?: string | null;
 }
 
+export interface CounselorScheduleEntry {
+  id: number;
+  owner: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  title: string;
+  notes: string;
+  recurrence_id?: string | null;
+  recurrence_frequency?: 'daily' | 'weekly' | 'monthly_nth_weekday' | null;
+  recurrence_interval?: number | null;
+  recurrence_end_date?: string | null;
+}
+
 export interface PrayerOther {
   id: number;
   name: string;

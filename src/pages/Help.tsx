@@ -557,6 +557,17 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 20, 2026',
+              items: [
+                'Bishop Schedule: new appointments now default to 15 minutes instead of 30, since 15-minute appointments are the more common case.',
+                'Bishop Schedule: appointments can now be deleted directly from the calendar grid with a small delete icon that appears on hover, without opening the full editor first.',
+                'Youth Interviews: added a toggle to hide interviews that are already "Up to date," so the list can default to showing only those that need attention.',
+                'Bishopric Meeting Planning: added a "Jump to month" picker next to the week navigation so future or past meetings don\'t require clicking Next/Previous one month at a time. (All previously entered meetings were safe — this was a display limitation, not data loss.)',
+                'Current Sacrament Meeting: the exported agenda page can now be edited directly (click any text) before printing, instead of only reflecting exactly what was saved.',
+                'Added Counselor Schedule: First and Second Counselor each get their own appointment calendar, separate from the Bishop Schedule and from each other.',
+              ],
+            },
+            {
               date: 'Jul 19, 2026',
               items: [
                 'Bishopric Meeting Planning: adding or editing a meeting now jumps the calendar to its month, so saving a meeting in a different month than the one you\'re viewing no longer looks like it silently failed.',

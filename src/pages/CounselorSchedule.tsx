@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useTable } from '../lib/useTable';
-import type { BishopScheduleEntry } from '../lib/api';
+import type { CounselorScheduleEntry } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Textarea, Select, Checkbox } from '../components/FormFields';
 import { toast } from '../lib/toast';
@@ -13,6 +13,8 @@ import {
 } from '../lib/recurrence';
 
 const MAX_RECURRENCE_OCCURRENCES = 200;
+
+const OWNERS = ['First Counselor', 'Second Counselor'];
 
 const FREQUENCY_OPTIONS: { label: string; value: RecurrenceFrequency }[] = [
   { label: 'Daily', value: 'daily' },
@@ -110,14 +112,16 @@ interface ActiveDrag {
   startX: number;
   startY: number;
   didMove: boolean;
-  entry: BishopScheduleEntry;
+  entry: CounselorScheduleEntry;
   previewDate: string;
   previewStartIdx: number;
   previewEndIdx: number;
 }
 
-export default function BishopSchedule() {
-  const { rows, isLoading, create, update, remove } = useTable<BishopScheduleEntry>('bishop-schedule');
+export default function CounselorSchedule() {
+  const { rows: allRows, isLoading, create, update, remove } = useTable<CounselorScheduleEntry>('counselor-schedule');
+  const [activeOwner, setActiveOwner] = useState(OWNERS[0]);
+  const rows = useMemo(() => allRows.filter(r => r.owner === activeOwner), [allRows, activeOwner]);
   const [weekStart, setWeekStart] = useState(() => defaultWeekStart());
   const [editing, setEditing] = useState<FormState | null>(null);
   const confirm = useConfirm();
@@ -134,7 +138,7 @@ export default function BishopSchedule() {
   const weekDays = useMemo(() => getWeekDays(weekStart), [weekStart]);
 
   const { entriesByDate, conflictedIds } = useMemo(() => {
-    const map = new Map<string, BishopScheduleEntry[]>();
+    const map = new Map<string, CounselorScheduleEntry[]>();
     for (const e of rows) {
       const key = e.date.slice(0, 10);
       if (!map.has(key)) map.set(key, []);
@@ -160,7 +164,7 @@ export default function BishopSchedule() {
   const beginDrag = (
     _captureEl: HTMLElement,
     pointerId: number,
-    entry: BishopScheduleEntry,
+    entry: CounselorScheduleEntry,
     type: 'move' | 'resize',
     offsetSlots: number,
     startX: number,
@@ -190,10 +194,10 @@ export default function BishopSchedule() {
       d.didMove = true;
       const el = document.elementFromPoint(e.clientX, e.clientY);
       if (!el) return;
-      const td = (el as HTMLElement).closest('[data-bs-si]') as HTMLElement | null;
+      const td = (el as HTMLElement).closest('[data-cs-si]') as HTMLElement | null;
       if (!td) return;
-      const si = Number(td.dataset.bsSi);
-      const date = td.dataset.bsDate;
+      const si = Number(td.dataset.csSi);
+      const date = td.dataset.csDate;
       if (!date) return;
       if (d.type === 'move') {
         const duration = slotIndex(d.entry.end_time) - startIdx;
@@ -258,7 +262,7 @@ export default function BishopSchedule() {
     setEditing({ date, start_time: time, end_time: TIME_SLOTS[endIdx], title: '', notes: '' });
   };
 
-  const openEditor = (entry: BishopScheduleEntry) => {
+  const openEditor = (entry: CounselorScheduleEntry) => {
     setEditing({
       id: entry.id, date: entry.date.slice(0, 10), start_time: entry.start_time, end_time: entry.end_time,
       title: entry.title, notes: entry.notes || '',
@@ -271,7 +275,7 @@ export default function BishopSchedule() {
     if (!editing || !editing.title.trim()) return;
     const data: Record<string, unknown> = {
       date: editing.date, start_time: editing.start_time, end_time: editing.end_time,
-      title: editing.title, notes: editing.notes,
+      title: editing.title, notes: editing.notes, owner: activeOwner,
     };
     setSaving(true);
     try {
@@ -338,7 +342,7 @@ export default function BishopSchedule() {
 
   // Lets an appointment be deleted directly from the calendar grid (hover icon) without
   // opening the full editor first.
-  const handleQuickDelete = async (entry: BishopScheduleEntry) => {
+  const handleQuickDelete = async (entry: CounselorScheduleEntry) => {
     if (!await confirm({ message: `Delete "${entry.title}"?` })) return;
     await remove(entry.id);
   };
@@ -382,7 +386,7 @@ export default function BishopSchedule() {
   return (
     <div>
       <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-gray-900">Bishop Schedule</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Counselor Schedule</h1>
         <div className="flex items-center gap-2">
           <button onClick={goToday} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50">Today</button>
           <button onClick={goPrev} className="border border-gray-300 text-gray-700 px-2 py-1.5 rounded-md text-sm hover:bg-gray-50">‹</button>
@@ -413,7 +417,18 @@ export default function BishopSchedule() {
           </div>
         </div>
       </div>
-      <p className="text-sm text-gray-500 mb-4">The bishop's individual appointments, separate from bishopric meetings.</p>
+      <p className="text-sm text-gray-500 mb-3">Individual appointments for each counselor, separate from the bishop's schedule.</p>
+
+      <div className="flex gap-1 mb-4 border-b border-gray-200">
+        {OWNERS.map(o => (
+          <button key={o} onClick={() => setActiveOwner(o)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+              activeOwner === o ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}>
+            {o}
+          </button>
+        ))}
+      </div>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-auto max-h-[calc(100vh-10rem)]"
@@ -462,8 +477,8 @@ export default function BishopSchedule() {
                       return (
                         <td
                           key={dayKey}
-                          data-bs-date={dayKey}
-                          data-bs-si={String(si)}
+                          data-cs-date={dayKey}
+                          data-cs-si={String(si)}
                           className={`border-r border-gray-100 relative
                             ${isHour ? 'border-t border-gray-200' : 'border-t border-gray-50'}
                             ${dayKey === todayKey ? 'bg-blue-50/30' : ''}

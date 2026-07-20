@@ -736,8 +736,8 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       return `<p style="margin:0.3rem 0">${l}</p>`;
     }).join('');
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${dateLabel} — Sacrament Meeting</title>
-<style>body{font-family:Georgia,serif;max-width:580px;margin:2rem auto;color:#111;font-size:13pt}h1{font-size:1.1rem;text-align:center;border-bottom:1px solid #ccc;padding-bottom:0.6rem;margin-bottom:1.2rem}@media print{@page{margin:1.5cm}}</style>
-</head><body><h1>Sacrament Meeting<br>${dateLabel}</h1>${bodyLines}</body></html>`;
+<style>body{font-family:Georgia,serif;max-width:580px;margin:2rem auto;color:#111;font-size:13pt}h1{font-size:1.1rem;text-align:center;border-bottom:1px solid #ccc;padding-bottom:0.6rem;margin-bottom:1.2rem}@media print{@page{margin:1.5cm}.no-print{display:none}}</style>
+</head><body><p class="no-print" style="text-align:center;color:#888;font-size:10pt;margin-bottom:1rem">Click any text below to edit it before printing.</p><h1 contenteditable="true">Sacrament Meeting<br>${dateLabel}</h1><div contenteditable="true" spellcheck="false">${bodyLines}</div></body></html>`;
     const w = window.open('', '_blank');
     if (w) { w.document.write(html); w.document.close(); }
   };

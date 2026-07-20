@@ -30,6 +30,7 @@ export function useInterviews() {
   const [bulkSetupStatus, setBulkSetupStatus] = useState('');
   const [bulkSetupAssignedTo, setBulkSetupAssignedTo] = useState('');
   const [showAgedOutYouth, setShowAgedOutYouth] = useState(false);
+  const [showUpToDateYouth, setShowUpToDateYouth] = useState(true);
 
   const bishopricOptions = useMemo(() =>
     allUsers.filter(u => u.church_role && /bishop|counselor/i.test(u.church_role)).map(u => u.name),
@@ -200,6 +201,10 @@ export function useInterviews() {
     wardMembersLoading ? 0 : rows.filter(r => YOUTH_TYPES.has(r.type_of_interview) && r.ward_member_id && !activeYouthWardMemberIds.has(r.ward_member_id)).length,
     [rows, activeYouthWardMemberIds, wardMembersLoading]);
 
+  const upToDateYouthCount = useMemo(() =>
+    rows.filter(r => YOUTH_TYPES.has(r.type_of_interview) && rowMetaById.get(r.id)?.youthState === 'Up to date').length,
+    [rows, rowMetaById]);
+
   useEffect(() => {
     const editingLinkedMember = editing?.ward_member_id ? wardMembersById.get(editing.ward_member_id) : undefined;
     setPreferredNameDraft(editingLinkedMember?.preferred_first_name || '');
@@ -212,7 +217,7 @@ export function useInterviews() {
     rows, isLoading, filtered, remove, quickAssignSetup,
     wardMembers, wardMembersById, wardMembersLoading, ageByName, activeYouthWardMemberIds, callingsById,
     bishopricOptions, setupOptions, assignedOptions,
-    rowMetaById, agedOutYouthCount,
+    rowMetaById, agedOutYouthCount, upToDateYouthCount,
     editing, setEditing,
     preferredNameDraft, setPreferredNameDraft,
     filter, setFilter, statusFilter, setStatusFilter, assignedFilter, setAssignedFilter, typeFilter, setTypeFilter,
@@ -222,5 +227,6 @@ export function useInterviews() {
     handleBulkStatus, handleBulkAssign, handleBulkSetupStatus, handleBulkSetupAssign,
     handleSave,
     showAgedOutYouth, setShowAgedOutYouth,
+    showUpToDateYouth, setShowUpToDateYouth,
   };
 }

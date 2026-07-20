@@ -26,6 +26,7 @@ const Babies = lazyWithReload(() => import('./pages/Babies'));
 const OutOfTown = lazyWithReload(() => import('./pages/OutOfTown'));
 const Calendaring = lazyWithReload(() => import('./pages/Calendaring'));
 const BishopSchedule = lazyWithReload(() => import('./pages/BishopSchedule'));
+const CounselorSchedule = lazyWithReload(() => import('./pages/CounselorSchedule'));
 const Assignments = lazyWithReload(() => import('./pages/Assignments'));
 const Users = lazyWithReload(() => import('./pages/Users'));
 const EmailNotifications = lazyWithReload(() => import('./pages/EmailNotifications'));
@@ -187,6 +188,7 @@ function AppRoutes() {
         <Route path="/out-of-town" element={<OutOfTown />} />
         <Route path="/calendaring" element={<Calendaring />} />
         <Route path="/bishop-schedule" element={<BishopSchedule />} />
+        <Route path="/counselor-schedule" element={<CounselorSchedule />} />
         <Route path="/assignments" element={<Assignments />} />
         <Route path="/users" element={<Users />} />
         <Route path="/email-notifications" element={<EmailNotifications />} />

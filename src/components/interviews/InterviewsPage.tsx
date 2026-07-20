@@ -6,7 +6,7 @@ import { toast } from '../../lib/toast';
 import InterviewTable from './InterviewTable';
 import InterviewEditModal from './InterviewEditModal';
 import { useInterviews, EMPTY_INTERVIEW } from './useInterviews';
-import { YOUTH_TYPES } from './shared';
+import { YOUTH_TYPES, computeYouthState } from './shared';
 
 export default function InterviewsPage({ title, description, types, showAge, showRecExpires = true, showCalling = false, mergedSectionLabel, showSyncNow = false }: {
   title: string;
@@ -37,7 +37,7 @@ export default function InterviewsPage({ title, description, types, showAge, sho
     }
   };
 
-  const pageRows = applyYouthAgedOutFilter(h.filtered.filter(r => types.includes(r.type_of_interview)), h);
+  const pageRows = applyYouthUpToDateFilter(applyYouthAgedOutFilter(h.filtered.filter(r => types.includes(r.type_of_interview)), h), h);
 
   const grouped: [string, InterviewType[]][] = mergedSectionLabel
     ? [[mergedSectionLabel, pageRows.filter(r => YOUTH_TYPES.has(r.type_of_interview))]]
@@ -141,11 +141,21 @@ export default function InterviewsPage({ title, description, types, showAge, sho
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
                 {type}
                 <span className="text-gray-400 font-normal normal-case tracking-normal">({typeRows.length})</span>
-                {type === mergedSectionLabel && h.agedOutYouthCount > 0 && (
-                  <button onClick={() => h.setShowAgedOutYouth(s => !s)}
-                    className="ml-auto text-xs text-gray-400 hover:text-gray-600 normal-case tracking-normal font-normal">
-                    {h.showAgedOutYouth ? 'Hide' : 'Show'} aged-out/inactive ({h.agedOutYouthCount})
-                  </button>
+                {type === mergedSectionLabel && (h.agedOutYouthCount > 0 || h.upToDateYouthCount > 0) && (
+                  <div className="ml-auto flex items-center gap-3">
+                    {h.upToDateYouthCount > 0 && (
+                      <button onClick={() => h.setShowUpToDateYouth(s => !s)}
+                        className="text-xs text-gray-400 hover:text-gray-600 normal-case tracking-normal font-normal">
+                        {h.showUpToDateYouth ? 'Hide' : 'Show'} up to date ({h.upToDateYouthCount})
+                      </button>
+                    )}
+                    {h.agedOutYouthCount > 0 && (
+                      <button onClick={() => h.setShowAgedOutYouth(s => !s)}
+                        className="text-xs text-gray-400 hover:text-gray-600 normal-case tracking-normal font-normal">
+                        {h.showAgedOutYouth ? 'Hide' : 'Show'} aged-out/inactive ({h.agedOutYouthCount})
+                      </button>
+                    )}
+                  </div>
                 )}
               </h2>
               {typeRows.length === 0 ? (
@@ -196,4 +206,11 @@ function applyYouthAgedOutFilter(rows: InterviewType[], h: ReturnType<typeof use
     const isCurrentYouth = h.wardMembersLoading || !r.ward_member_id || h.activeYouthWardMemberIds.has(r.ward_member_id);
     return isCurrentYouth || h.showAgedOutYouth;
   });
+}
+
+// Hides youth interviews already "Up to date" unless toggled on, so the list defaults
+// to showing only those that need attention (Due or Scheduled).
+function applyYouthUpToDateFilter(rows: InterviewType[], h: ReturnType<typeof useInterviews>): InterviewType[] {
+  if (h.showUpToDateYouth) return rows;
+  return rows.filter(r => !YOUTH_TYPES.has(r.type_of_interview) || computeYouthState(r) !== 'Up to date');
 }
