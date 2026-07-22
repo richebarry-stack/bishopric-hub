@@ -115,8 +115,8 @@ function renderRichContent(text: string): React.ReactNode {
   return out.length ? <div className="space-y-1 px-2 py-1.5">{out}</div> : <span className="text-gray-300">—</span>;
 }
 
-function AutoTextarea({ value, onSave, readOnly, placeholder }: {
-  value: string; onSave?: (v: string) => void; readOnly?: boolean; placeholder?: string;
+function AutoTextarea({ value, onSave, readOnly, placeholder, minRows = 1 }: {
+  value: string; onSave?: (v: string) => void; readOnly?: boolean; placeholder?: string; minRows?: number;
 }) {
   const [local, setLocal] = useState(value);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -166,7 +166,7 @@ function AutoTextarea({ value, onSave, readOnly, placeholder }: {
       onBlur={() => { if (local !== value && onSave) onSave(local); }}
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
-      rows={1}
+      rows={minRows}
       className="w-full resize-none overflow-hidden bg-transparent border border-transparent hover:border-gray-200 focus:border-emerald-400 focus:bg-white focus:outline-none rounded px-2 py-1.5 text-sm placeholder-gray-300 min-h-[2rem]"
       style={{ overflow: 'hidden' }}
     />
@@ -430,6 +430,17 @@ export default function WcDiscussionTopics() {
             )}
           </div>
 
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <label className="text-sm font-semibold text-gray-600 block mb-2">General Topics</label>
+            <AutoTextarea
+              value={activeMeeting?.notes ?? ''}
+              onSave={handleSaveNotes}
+              readOnly={isPastMeeting}
+              placeholder="Anything else to note for this meeting…"
+              minRows={10}
+            />
+          </div>
+
           <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
             <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
               <colgroup>
@@ -490,16 +501,6 @@ export default function WcDiscussionTopics() {
                 })}
               </tbody>
             </table>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <label className="text-sm font-semibold text-gray-600 block mb-2">Notes</label>
-            <AutoTextarea
-              value={activeMeeting?.notes ?? ''}
-              onSave={handleSaveNotes}
-              readOnly={isPastMeeting}
-              placeholder="Anything else to note for this meeting…"
-            />
           </div>
         </>
       )}

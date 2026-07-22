@@ -559,7 +559,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Jul 21, 2026',
               items: [
-                'Ward Council Discussion Topics: added a free-form Notes box below the organization table for anything that doesn\'t fit the Status/Next Steps/Help Needed columns.',
+                'Ward Council Discussion Topics: added a General Topics box (10 rows, auto-grows) above the organization table for anything that doesn\'t fit the Status/Next Steps/Help Needed columns. Removed the old "General Topics" row from the table since it\'s now covered by this box.',
               ],
             },
             {
