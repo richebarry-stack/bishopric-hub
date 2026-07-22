@@ -251,6 +251,7 @@ export interface WcMeeting {
   opening_prayer: string;
   spiritual_thought: string;
   closing_prayer: string;
+  notes: string;
 }
 
 export interface WcWin {

@@ -557,6 +557,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 21, 2026',
+              items: [
+                'Ward Council Discussion Topics: added a free-form Notes box below the organization table for anything that doesn\'t fit the Status/Next Steps/Help Needed columns.',
+              ],
+            },
+            {
               date: 'Jul 20, 2026',
               items: [
                 'Bishop Schedule: new appointments now default to 15 minutes instead of 30, since 15-minute appointments are the more common case.',

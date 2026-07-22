@@ -275,7 +275,7 @@ export default function WcDiscussionTopics() {
     dragOrgRef.current = null;
   };
 
-  const { rows: meetings, isLoading: loadingMeetings } = useTable<WcMeeting>('wc-meetings');
+  const { rows: meetings, isLoading: loadingMeetings, update: updateMeeting } = useTable<WcMeeting>('wc-meetings');
   const { rows: topics, isLoading: loadingTopics, create, update } = useTable<WcDiscussionTopic>('wc-discussion-topics');
 
   const upcomingMeetings = useMemo(() =>
@@ -343,6 +343,15 @@ export default function WcDiscussionTopics() {
       await create({ meeting_date: activeMeetingDate, organization: org, topic: '', status: payload.status, next_steps: payload.next_steps, help_needed: payload.help_needed });
     }
   }, [activeMeetingDate, getOrgRow, create, update]);
+
+  const activeMeeting = useMemo(() =>
+    meetings.find(m => m.date.slice(0, 10) === activeMeetingDate) ?? null,
+    [meetings, activeMeetingDate]);
+
+  const handleSaveNotes = useCallback((value: string) => {
+    if (!activeMeeting) return;
+    updateMeeting(activeMeeting.id, { notes: value });
+  }, [activeMeeting, updateMeeting]);
 
   const isLoading = loadingMeetings || loadingTopics;
 
@@ -481,6 +490,16 @@ export default function WcDiscussionTopics() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <label className="text-sm font-semibold text-gray-600 block mb-2">Notes</label>
+            <AutoTextarea
+              value={activeMeeting?.notes ?? ''}
+              onSave={handleSaveNotes}
+              readOnly={isPastMeeting}
+              placeholder="Anything else to note for this meeting…"
+            />
           </div>
         </>
       )}
