@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useTable } from '../lib/useTable';
 import type { BishopricMeeting, BishopricAgendaItem } from '../lib/api';
 import { Input, Textarea } from '../components/FormFields';
@@ -11,6 +11,99 @@ function formatDate(d: string): string {
 }
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
+
+function renderLine(line: string, _key: number): React.ReactNode {
+  if (!line.trim()) return null;
+  const parts = line.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((p, i) =>
+    p.length >= 4 && p.startsWith('**') && p.endsWith('**')
+      ? <strong key={i}>{p.slice(2, -2)}</strong>
+      : <span key={i}>{p}</span>
+  );
+}
+
+function renderRichContent(text: string): React.ReactNode {
+  if (!text?.trim()) return <span className="text-gray-300">—</span>;
+  const lines = text.split('\n');
+  const out: React.ReactNode[] = [];
+  let bullets: string[] = [];
+  const flushBullets = (idx: number) => {
+    if (!bullets.length) return;
+    out.push(
+      <ul key={`ul-${idx}`} className="list-disc list-inside space-y-0.5">
+        {bullets.map((b, j) => <li key={j} className="text-sm text-gray-700">{renderLine(b, j)}</li>)}
+      </ul>
+    );
+    bullets = [];
+  };
+  lines.forEach((line, i) => {
+    if (line.startsWith('- ') || line.startsWith('* ')) {
+      bullets.push(line.slice(2));
+    } else {
+      flushBullets(i);
+      const rendered = renderLine(line, i);
+      if (rendered) out.push(<p key={`p-${i}`} className="text-sm text-gray-700">{rendered}</p>);
+    }
+  });
+  flushBullets(lines.length);
+  return out.length ? <div className="space-y-1 px-2 py-1.5">{out}</div> : <span className="text-gray-300">—</span>;
+}
+
+function AutoTextarea({ value, onSave, readOnly, placeholder, minRows = 1 }: {
+  value: string; onSave?: (v: string) => void; readOnly?: boolean; placeholder?: string; minRows?: number;
+}) {
+  const [local, setLocal] = useState(value);
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => { setLocal(value); }, [value]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }, [local]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Enter') return;
+    const el = ref.current;
+    if (!el) return;
+    const pos = el.selectionStart;
+    const lineStart = local.lastIndexOf('\n', pos - 1) + 1;
+    const line = local.slice(lineStart, pos);
+    if (line === '- ' || line === '* ') {
+      e.preventDefault();
+      const next = local.slice(0, lineStart) + '\n' + local.slice(pos);
+      setLocal(next);
+      setTimeout(() => { el.selectionStart = el.selectionEnd = lineStart + 1; }, 0);
+    } else if (line.startsWith('- ') || line.startsWith('* ')) {
+      e.preventDefault();
+      const prefix = line.startsWith('- ') ? '- ' : '* ';
+      const insert = '\n' + prefix;
+      const next = local.slice(0, pos) + insert + local.slice(pos);
+      setLocal(next);
+      setTimeout(() => { el.selectionStart = el.selectionEnd = pos + insert.length; }, 0);
+    }
+  };
+
+  if (readOnly) {
+    return <div className="min-h-[2rem]">{renderRichContent(value)}</div>;
+  }
+
+  return (
+    <textarea
+      ref={ref}
+      value={local}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={() => { if (local !== value && onSave) onSave(local); }}
+      onKeyDown={handleKeyDown}
+      placeholder={placeholder}
+      rows={minRows}
+      className="w-full resize-none overflow-hidden bg-transparent border border-transparent hover:border-gray-200 focus:border-emerald-400 focus:bg-white focus:outline-none rounded px-2 py-1.5 text-sm placeholder-gray-300 min-h-[2rem]"
+      style={{ overflow: 'hidden' }}
+    />
+  );
+}
 
 function AgendaItemText({ item, onSave }: { item: BishopricAgendaItem; onSave: (v: string) => void }) {
   const [editing, setEditing] = useState(false);
@@ -151,6 +244,17 @@ export default function CurrentBishopricMeeting() {
                 <Input label="Handbook Section" value={meeting.handbook_section || ''} onChange={v => saveMeetingField('handbook_section', v)} />
               </div>
               <Textarea label="Minutes" value={meeting.minutes || ''} onChange={v => saveMeetingField('minutes', v)} rows={4} />
+              <div>
+                <label className="text-sm font-semibold text-gray-600 block mb-1">Notes</label>
+                <div className="rounded-md border border-gray-200">
+                  <AutoTextarea
+                    value={meeting.notes ?? ''}
+                    onSave={v => saveMeetingField('notes', v)}
+                    placeholder="Anything else to note for this meeting…"
+                    minRows={6}
+                  />
+                </div>
+              </div>
             </section>
           )}
 

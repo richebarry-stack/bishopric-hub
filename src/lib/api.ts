@@ -198,6 +198,7 @@ export interface BishopricMeeting {
   handbook_training: string;
   handbook_section: string;
   minutes: string;
+  notes: string;
   no_meeting: number;
   reason_not_meeting: string;
   recurrence_id: string | null;
