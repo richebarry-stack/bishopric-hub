@@ -1,4 +1,5 @@
 import { syncConduct, runDailyJobs, syncSettingApartInterviews, syncTempleRecommendInterviews } from './jobs';
+import { matchRosterMember, type RosterMember } from './nameMatch';
 
 interface Env {
   DB: D1Database;
@@ -1261,6 +1262,42 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     ];
     if (stmts.length > 0) await db.batch(stmts);
     return json({ ok: true, updated: updates.length, created: creates.length, deactivated: deactivate.length });
+  }
+
+  // Bulk temple-recommend-status sync (e.g. from an automated LCR export). Matches rows
+  // to the roster by name using the same logic as the manual CSV import above.
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'import-recommends' && method === 'POST') {
+    const body = await request.json() as {
+      rows?: { name: string; recommend_type: string | null; recommend_expires: string | null }[];
+    };
+    const rows = (body.rows || []).slice(0, 1000);
+    const typeRe = /^(Endowed|Limited)$/;
+    const expiresRe = /^\d{4}-\d{2}$/;
+    for (const r of rows) {
+      if (!r.name || !r.name.trim()) return json({ error: 'Row missing name' }, 400);
+      if (r.recommend_type && !typeRe.test(r.recommend_type)) return json({ error: `Invalid recommend_type "${r.recommend_type}" for "${r.name}"` }, 400);
+      if (r.recommend_expires && !expiresRe.test(r.recommend_expires)) return json({ error: `Invalid recommend_expires "${r.recommend_expires}" for "${r.name}"` }, 400);
+    }
+
+    const roster = (await db.prepare(
+      'SELECT id, first_name, last_name FROM ward_members WHERE active = 1'
+    ).all<RosterMember>()).results;
+
+    const now = new Date().toISOString();
+    const stmts = [];
+    const unmatched: string[] = [];
+    let updated = 0;
+    for (const row of rows) {
+      const member = matchRosterMember(row.name, roster);
+      if (!member) { unmatched.push(row.name); continue; }
+      stmts.push(
+        db.prepare('UPDATE ward_members SET recommend_type = ?, recommend_expires = ?, updated_at = ?, updated_by = ? WHERE id = ?')
+          .bind(row.recommend_type || null, row.recommend_expires || null, now, session.name, member.id)
+      );
+      updated++;
+    }
+    if (stmts.length > 0) await db.batch(stmts);
+    return json({ ok: true, updated, unmatched });
   }
 
   // CRUD endpoints: /api/{table} and /api/{table}/{id}

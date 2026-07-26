@@ -568,6 +568,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Internal: cleaned up the app\'s lint warnings (component structure, effect usage) with no functional changes.',
                 'Current Bishopric Meeting: the Calendaring Items box now has a "+ Add" button to create a new calendar event directly from this page, defaulting to the meeting\'s date.',
                 'Babies: once a baby\'s blessing date has passed, an Action Item is now automatically created for the clerk to create the church record in LCR (skipped if "Church record created" is already checked).',
+                'Internal: added a bulk temple-recommend-status import endpoint (/api/ward-members/import-recommends) to support an automated weekly sync from LCR — no UI changes yet.',
               ],
             },
             {

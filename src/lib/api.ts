@@ -97,6 +97,10 @@ export const api = {
     }) => request<{ ok: true; updated: number; created: number; deactivated: number }>('/ward-members/import', {
       method: 'POST', body: JSON.stringify(data),
     }),
+    importRecommends: (rows: { name: string; recommend_type: string | null; recommend_expires: string | null }[]) =>
+      request<{ ok: true; updated: number; unmatched: string[] }>('/ward-members/import-recommends', {
+        method: 'POST', body: JSON.stringify({ rows }),
+      }),
   },
   automationStatus: {
     get: () => request<{ last_run: string | null; results: Record<string, { ok: boolean; error?: string; [key: string]: unknown }> }>('/automation-status'),
