@@ -566,6 +566,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Current Bishopric Meeting: added five new prep sections — Updates/Announcements (with a "copy from last week" option), a Calendaring Items box showing upcoming events, Move-ins/Move-outs and Other Items lists (move-ins can be added to the sacrament agenda in one click), and an Interviews Needed section pulling in interviews flagged from the Youth/Adult Temple/Other Interviews pages.',
                 'Interview list pages (Youth/Adult Temple/Other Interviews): added a flag toggle to mark an interview for discussion at the next bishopric meeting.',
                 'Internal: cleaned up the app\'s lint warnings (component structure, effect usage) with no functional changes.',
+                'Current Bishopric Meeting: the Calendaring Items box now has a "+ Add" button to create a new calendar event directly from this page, defaulting to the meeting\'s date.',
               ],
             },
             {

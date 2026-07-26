@@ -304,7 +304,7 @@ export default function CurrentBishopricMeeting() {
             </section>
           )}
 
-          <CalendaringBox />
+          <CalendaringBox date={date} />
 
           <MoveItemsSection kind="move_in" date={date} title="Move-ins" meetingDates={meetings}
             onAddToSacramentAgenda={handleAddToSacramentAgenda} />

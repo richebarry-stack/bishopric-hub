@@ -12,8 +12,8 @@ function formatDate(dates: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export default function CalendaringBox() {
-  const { rows, update, remove } = useTable<CalendarEvent>('calendaring');
+export default function CalendaringBox({ date }: { date?: string }) {
+  const { rows, create, update, remove } = useTable<CalendarEvent>('calendaring');
   const [editing, setEditing] = useState<Partial<CalendarEvent> | null>(null);
 
   const upcoming = useMemo(
@@ -22,16 +22,23 @@ export default function CalendaringBox() {
   );
 
   const handleSave = async () => {
-    if (!editing?.id) return;
+    if (!editing) return;
     const data = { ...editing };
     delete (data as Record<string, unknown>).id;
-    await update(editing.id, data as Record<string, unknown>);
+    if (editing.id) await update(editing.id, data as Record<string, unknown>);
+    else await create(data as Record<string, unknown>);
     setEditing(null);
   };
 
   return (
     <section>
-      <h2 className="text-sm font-semibold text-gray-700 mb-2">Calendaring Items</h2>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold text-gray-700">Calendaring Items</h2>
+        <button onClick={() => setEditing({ name: '', dates: date ?? '', notes: '', announce_in_sacrament: 0, share_with: '' })}
+          className="text-xs text-blue-500 hover:text-blue-700">
+          + Add
+        </button>
+      </div>
       {upcoming.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-3 bg-white rounded-lg border border-gray-200 border-dashed">
           No upcoming events
