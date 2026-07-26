@@ -115,7 +115,8 @@ export const api = {
   },
   syncTempleRecommends: () =>
     request<{ ok: boolean; created: number }>('/sync-temple-recommends', { method: 'POST' }),
-  list: <T>(table: string) => request<T[]>(`/${table}`),
+  list: <T>(table: string, query?: Record<string, string>) =>
+    request<T[]>(`/${table}${query ? `?${new URLSearchParams(query)}` : ''}`),
   get: <T>(table: string, id: number) => request<T>(`/${table}/${id}`),
   create: <T>(table: string, data: Record<string, unknown>) =>
     request<T>(`/${table}`, { method: 'POST', body: JSON.stringify(data) }),
@@ -482,6 +483,7 @@ export interface HubSuggestion {
   status: string;
   admin_notes: string;
   updated_at: string;
+  hub: string;
 }
 
 export interface WardMember {

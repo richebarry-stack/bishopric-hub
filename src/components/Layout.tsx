@@ -485,9 +485,7 @@ export default function Layout() {
     ? (guestType === 'sac'
         ? [{ path: '/sacrament-program', label: 'Sacrament Program', icon: '♫' }]
         : [{ path: '/youth-activities', label: 'Youth Calendar', icon: '⬡' }])
-    // Tasks/"Action Items" only has a route for real YC accounts (see App.tsx) — a
-    // bishopric account borrowing this view shouldn't get a nav link to a page that isn't there.
-    : YC_NAV_ITEMS.filter(item => item.path !== '/tasks' || user?.hub === 'yc');
+    : YC_NAV_ITEMS;
 
   const navItems = isCal
     ? CAL_NAV_ITEMS
@@ -644,34 +642,49 @@ export default function Layout() {
               ))}
             </>
           ) : (
-            navItems.map(item => (
-              <div
-                key={item.path}
-                draggable={draggable}
-                onDragStart={draggable ? e => {
-                  e.dataTransfer.setData('text/plain', item.path);
-                  e.dataTransfer.effectAllowed = 'move';
-                } : undefined}
-                onDragOver={draggable ? e => { e.preventDefault(); setDragOverPath(item.path); } : undefined}
-                onDragLeave={draggable ? () => setDragOverPath(null) : undefined}
-                onDrop={draggable ? e => handleDrop(e, item.path) : undefined}
-                onDragEnd={draggable ? () => setDragOverPath(null) : undefined}
-                className={`rounded-md transition-colors ${dragOverPath === item.path ? `ring-2 ring-inset ${isYc ? 'ring-amber-400' : isWc ? 'ring-emerald-400' : 'ring-blue-400'}` : ''}`}
-              >
+            <>
+              {isYc && !isGuest && (
                 <Link
-                  to={item.path}
+                  to="/my-actions"
                   onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                    location.pathname === item.path ? activeCls : 'text-gray-700 hover:bg-gray-100'
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors mb-1 ${
+                    location.pathname === '/my-actions' ? activeCls : 'text-gray-700 hover:bg-gray-100'
                   }`}
-                  draggable={false}
                 >
-                  {draggable && <span className="w-5 text-center text-gray-400 text-xs cursor-grab select-none" title="Drag to reorder">⠿</span>}
-                  <span className="w-4 text-center">{item.icon}</span>
-                  {getLabel(item)}
+                  <span className="w-4 text-center">⚡</span>
+                  My Actions
+                  <MyActionsBadge count={myActionsCount} />
                 </Link>
-              </div>
-            ))
+              )}
+              {navItems.map(item => (
+                <div
+                  key={item.path}
+                  draggable={draggable}
+                  onDragStart={draggable ? e => {
+                    e.dataTransfer.setData('text/plain', item.path);
+                    e.dataTransfer.effectAllowed = 'move';
+                  } : undefined}
+                  onDragOver={draggable ? e => { e.preventDefault(); setDragOverPath(item.path); } : undefined}
+                  onDragLeave={draggable ? () => setDragOverPath(null) : undefined}
+                  onDrop={draggable ? e => handleDrop(e, item.path) : undefined}
+                  onDragEnd={draggable ? () => setDragOverPath(null) : undefined}
+                  className={`rounded-md transition-colors ${dragOverPath === item.path ? `ring-2 ring-inset ${isYc ? 'ring-amber-400' : isWc ? 'ring-emerald-400' : 'ring-blue-400'}` : ''}`}
+                >
+                  <Link
+                    to={item.path}
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                      location.pathname === item.path ? activeCls : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    draggable={false}
+                  >
+                    {draggable && <span className="w-5 text-center text-gray-400 text-xs cursor-grab select-none" title="Drag to reorder">⠿</span>}
+                    <span className="w-4 text-center">{item.icon}</span>
+                    {getLabel(item)}
+                  </Link>
+                </div>
+              ))}
+            </>
           )}
         </nav>
         <PresenceOnlineList others={othersOnline} />

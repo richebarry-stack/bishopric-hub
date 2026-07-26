@@ -57,10 +57,11 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
   const effectiveHub = hub === 'both' ? selectedHub : hub;
   const canBishopric = !isGuest && effectiveHub === 'bh';
   const canWc = !isGuest && (effectiveHub === 'bh' || effectiveHub === 'wc');
-  const enabled = canBishopric || canWc;
+  const canYc = !isGuest && effectiveHub === 'yc';
+  const enabled = canBishopric || canWc || canYc;
   const isClerk = canBishopric && /clerk/i.test(user?.church_role || '');
 
-  const { rows: tasks, isLoading: l1 } = useTable<Task>('tasks', { enabled: canWc });
+  const { rows: tasks, isLoading: l1 } = useTable<Task>('tasks', { enabled: canWc || canYc });
   const { rows: callings, isLoading: l2 } = useTable<CallingPipeline>('calling-pipeline', { enabled: canBishopric });
   const { rows: interviews, isLoading: l3 } = useTable<InterviewPipeline>('interview-pipeline', { enabled: canBishopric });
   const { rows: speakers, isLoading: l6 } = useTable<SacramentSpeaker>('sacrament-speakers', { enabled: canWc });
@@ -79,7 +80,7 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
     // option alone — react-query keeps a query's last-fetched data cached even after
     // `enabled` flips to false (e.g. switching hub view), so without this a dual-access
     // account could still see stale bishopric-only items after leaving the Bishopric hub.
-    if (canWc) {
+    if (canWc || canYc) {
       for (const t of tasks) {
         if (!t.done && namesMatch(t.assigned_to, name)) {
           out.push({
@@ -189,7 +190,7 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
     }
 
     return out.sort((a, b) => (a.date || '9999-99-99').localeCompare(b.date || '9999-99-99'));
-  }, [enabled, user, isClerk, canBishopric, canWc, tasks, callings, interviews, speakers, prayers, music, rotating, babies]);
+  }, [enabled, user, isClerk, canBishopric, canWc, canYc, tasks, callings, interviews, speakers, prayers, music, rotating, babies]);
 
   const isLoading = enabled && (l1 || l2 || l3 || l6 || l7 || l8 || l9 || (isClerk && l10));
 

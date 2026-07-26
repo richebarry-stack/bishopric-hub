@@ -1022,6 +1022,30 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           return json(newRow, 201);
         }
       }
+      // hub-suggestions: WC users only see/modify suggestions submitted from Ward Council
+      if (tbl === 'hub-suggestions') {
+        if (method === 'GET' && !routeParts[1]) {
+          const results = await db.prepare(
+            "SELECT * FROM hub_suggestions WHERE hub = 'Ward Council' ORDER BY id DESC"
+          ).all();
+          return json(results.results);
+        }
+        if (routeParts[1] && (method === 'GET' || method === 'PUT' || method === 'DELETE')) {
+          const row = await db.prepare('SELECT hub FROM hub_suggestions WHERE id = ?').bind(routeParts[1]).first<{ hub: string }>();
+          if (!row || row.hub !== 'Ward Council') return json({ error: 'Forbidden' }, 403);
+        }
+        if (method === 'POST') {
+          const body = await request.json() as Record<string, unknown>;
+          body.hub = 'Ward Council';
+          delete body.id;
+          const keys = Object.keys(body);
+          const result = await db.prepare(
+            `INSERT INTO hub_suggestions (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
+          ).bind(...keys.map(k => body[k])).run();
+          const newRow = await db.prepare('SELECT * FROM hub_suggestions WHERE id = ?').bind(result.meta.last_row_id).first();
+          return json(newRow, 201);
+        }
+      }
       // fall through to generic TABLES handler — full CRUD allowed
     } else if (WC_READABLE.has(tbl)) {
       if (method !== 'GET') return json({ error: 'Forbidden' }, 403);
@@ -1107,9 +1131,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // fall through to generic TABLES handler
   }
 
-  // Bishopric hub: only show/modify tasks that aren't scoped to another hub's list
+  // Bishopric hub: only show/modify tasks that aren't scoped to another hub's list.
+  // Dual-access ('both') accounts can also be actively viewing WC or YC in the client
+  // (selectedHub) — the client tells us via ?viewHub= since the session itself only
+  // knows the account's fixed hub, not which view is currently open.
   if (session.hub === 'both' && routeParts[0] === 'tasks') {
+    const viewHub = url.searchParams.get('viewHub');
     if (method === 'GET' && !routeParts[1]) {
+      if (viewHub === 'wc') {
+        const results = await db.prepare(
+          "SELECT * FROM tasks WHERE share_with LIKE '%Ward Council%' ORDER BY done ASC, id DESC"
+        ).all();
+        return json(results.results);
+      }
+      if (viewHub === 'yc') {
+        const results = await db.prepare(
+          "SELECT * FROM tasks WHERE share_with LIKE '%Youth Council%' ORDER BY done ASC, id DESC"
+        ).all();
+        return json(results.results);
+      }
       const results = await db.prepare(
         "SELECT * FROM tasks WHERE (share_with IS NULL OR (share_with NOT LIKE '%Ward Council%' AND share_with NOT LIKE '%Youth Council%')) ORDER BY done ASC, id DESC"
       ).all();
@@ -1130,6 +1170,37 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json(newRow, 201);
     }
     // fall through to generic TABLES handler for single GET/PUT/DELETE — bishopric keeps full access to any task
+  }
+
+  // Bishopric hub: hub-suggestions scoped the same way as tasks — dual-access accounts
+  // pass ?viewHub= for whichever view is currently open, so WC and Bishopric each only
+  // see suggestions submitted from their own hub.
+  if (session.hub === 'both' && routeParts[0] === 'hub-suggestions') {
+    const viewHub = url.searchParams.get('viewHub');
+    if (method === 'GET' && !routeParts[1]) {
+      if (viewHub === 'wc') {
+        const results = await db.prepare(
+          "SELECT * FROM hub_suggestions WHERE hub = 'Ward Council' ORDER BY id DESC"
+        ).all();
+        return json(results.results);
+      }
+      const results = await db.prepare(
+        "SELECT * FROM hub_suggestions WHERE hub IS NULL OR hub != 'Ward Council' ORDER BY id DESC"
+      ).all();
+      return json(results.results);
+    }
+    if (method === 'POST') {
+      const body = await request.json() as Record<string, unknown>;
+      if (!body.hub) body.hub = viewHub === 'wc' ? 'Ward Council' : 'Bishopric';
+      delete body.id;
+      const keys = Object.keys(body);
+      const result = await db.prepare(
+        `INSERT INTO hub_suggestions (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
+      ).bind(...keys.map(k => body[k])).run();
+      const newRow = await db.prepare('SELECT * FROM hub_suggestions WHERE id = ?').bind(result.meta.last_row_id).first();
+      return json(newRow, 201);
+    }
+    // fall through to generic TABLES handler for single GET/PUT/DELETE — bishopric keeps full access to any suggestion
   }
 
   // Calendar hub: full CRUD on calendaring only

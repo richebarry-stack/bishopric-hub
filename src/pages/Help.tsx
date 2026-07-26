@@ -561,6 +561,8 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
               items: [
                 'Current Bishopric Meeting: added a free-form Notes box (auto-grows) alongside the Minutes field for anything that doesn\'t fit the standard meeting fields, stored per meeting.',
                 'Dashboard: Opening Prayer, Handbook Topic, Closing Prayer, and Spiritual Thought on the Bishopric Meeting panel can now be edited directly in place — click any value to edit it, no need to visit Bishopric Meeting Planning.',
+                'My Actions: fixed a bug where a dual-access account viewing Ward Council could see Bishopric-only action items instead of Ward Council ones. Added a scoped My Actions page (and Action Items) to the Youth Council hub as well, showing only items explicitly shared with Youth Council.',
+                'Hub Suggestions: suggestions are now scoped to the hub they were submitted from — Ward Council no longer sees Bishopric\'s suggestions and vice versa.',
               ],
             },
             {
