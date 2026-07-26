@@ -1,14 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Suspense, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, useAuth } from './lib/auth';
+import { useAuth } from './lib/auth';
+import { AuthProvider } from './lib/AuthProvider';
 import { lazyWithReload } from './lib/lazyWithReload';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import ForceResetPassword from './pages/ForceResetPassword';
 import SecurityQuestionsSetup from './pages/SecurityQuestionsSetup';
 import ToastContainer from './components/Toast';
-import { ConfirmProvider } from './components/ConfirmDialog';
+import { ConfirmProvider } from './components/ConfirmProvider';
 
 const Dashboard = lazyWithReload(() => import('./pages/Dashboard'));
 const CallingPipeline = lazyWithReload(() => import('./pages/CallingPipeline'));

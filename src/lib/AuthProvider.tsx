@@ -1,24 +1,6 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { api, type User } from './api';
-
-type Hub = 'bh' | 'wc' | 'yc' | 'cal';
-
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  selectedHub: Hub;
-  isWcReadOnly: boolean;
-  isGuest: boolean;
-  guestType: 'yc' | 'sac' | null;
-  login: (email: string, password: string) => Promise<{ needsHubChoice: boolean }>;
-  loginAsGuest: (type: 'yc' | 'sac') => Promise<void>;
-  chooseHub: (hub: Hub) => void;
-  logout: () => Promise<void>;
-  clearResetFlag: () => void;
-  markSecurityQuestionsSetup: () => void;
-}
-
-const AuthContext = createContext<AuthContextType>(null!);
+import { AuthContext, type Hub } from './auth';
 
 function resolveHub(user: User, stored: Hub | null): Hub {
   if (user.hub === 'yc') return 'yc';
@@ -91,8 +73,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  return useContext(AuthContext);
 }

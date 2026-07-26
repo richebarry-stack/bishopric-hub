@@ -14,7 +14,7 @@ import {
   loadDashboardConfig, saveDashboardConfig,
 } from '../lib/dashboardConfig';
 import { inDutyWindow, useTimeZoneNow } from '../lib/annualDuties';
-import { NAV_ITEMS, LAST_VISITED_KEY } from '../components/Layout';
+import { NAV_ITEMS, LAST_VISITED_KEY } from '../lib/navItems';
 import { responsiveGridCols } from '../lib/gridCols';
 
 const TODAY = new Date().toISOString().slice(0, 10);
