@@ -94,7 +94,7 @@ export default function CallingPipeline() {
   const toggleOrgStatus = (s: string) =>
     setOrgStatusFilter(prev => {
       const next = new Set(prev);
-      next.has(s) ? next.delete(s) : next.add(s);
+      if (next.has(s)) next.delete(s); else next.add(s);
       return next;
     });
 

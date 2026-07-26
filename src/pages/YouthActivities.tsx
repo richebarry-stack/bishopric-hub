@@ -253,7 +253,7 @@ function GroupCellModal({ row, groupKey, groupLabel, onSave, onClose }: {
   const otherGroups = GROUPS.filter(g => g.key !== groupKey);
 
   const toggleCopy = (key: GroupKey) =>
-    setCopyTo(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+    setCopyTo(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
