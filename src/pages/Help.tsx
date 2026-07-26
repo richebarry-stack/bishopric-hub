@@ -563,6 +563,9 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Adult Temple Interviews: added a "With the stake" checkbox for interviews conducted with the stake, with a toggle to hide those from the list.',
                 'Youth Council hub: removed the Action Items page from the sidebar — My Actions remains for YC-assigned items.',
                 'Bishop Schedule and Counselor Schedule: appointments can now be shared across calendars — check any combination of Bishop/First Counselor/Second Counselor on an appointment, and editing it in one place updates it everywhere it appears.',
+                'Current Bishopric Meeting: added five new prep sections — Updates/Announcements (with a "copy from last week" option), a Calendaring Items box showing upcoming events, Move-ins/Move-outs and Other Items lists (move-ins can be added to the sacrament agenda in one click), and an Interviews Needed section pulling in interviews flagged from the Youth/Adult Temple/Other Interviews pages.',
+                'Interview list pages (Youth/Adult Temple/Other Interviews): added a flag toggle to mark an interview for discussion at the next bishopric meeting.',
+                'Internal: cleaned up the app\'s lint warnings (component structure, effect usage) with no functional changes.',
               ],
             },
             {
