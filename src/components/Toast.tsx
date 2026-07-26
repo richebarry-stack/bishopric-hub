@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast, type ToastType } from '../lib/toast';
 
 interface ToastItem { id: number; msg: string; type: ToastType; }
@@ -11,10 +11,10 @@ const BG: Record<ToastType, string> = {
 
 export default function ToastContainer() {
   const [items, setItems] = useState<ToastItem[]>([]);
-  let nextId = 0;
+  const nextIdRef = useRef(0);
 
   const add = useCallback((msg: string, type: ToastType) => {
-    const id = ++nextId;
+    const id = ++nextIdRef.current;
     setItems(prev => [...prev, { id, msg, type }]);
     setTimeout(() => setItems(prev => prev.filter(t => t.id !== id)), 4000);
   }, []);

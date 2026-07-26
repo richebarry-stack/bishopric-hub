@@ -18,6 +18,7 @@ import { NAV_ITEMS, LAST_VISITED_KEY } from '../lib/navItems';
 import { responsiveGridCols } from '../lib/gridCols';
 
 const TODAY = new Date().toISOString().slice(0, 10);
+const DUE_SOON_CUTOFF = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
 const ACTION_STATUSES = new Set(['3. Approved and assigned', '7. Need to release']);
 const ACTIVE_MISSIONARY_STATUSES = new Set(['1-Considering', '2-Papers Started', '3-Papers with Stake', '4-Papers Submitted', '5-Call Accepted']);
 const FONT_SIZES: FontSize[] = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl'];
@@ -508,7 +509,7 @@ export default function Dashboard() {
                   ? <p className="text-xs text-gray-400 py-2">All done!</p>
                   : pendingTasks.map(t => {
                     const isOverdue = t.due_date && t.due_date < TODAY;
-                    const isDueSoon = !isOverdue && t.due_date && t.due_date <= new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+                    const isDueSoon = !isOverdue && t.due_date && t.due_date <= DUE_SOON_CUTOFF;
                     return (
                       <div key={t.id} className="flex items-baseline justify-between py-1 gap-2">
                         <span className={`${FONT_SIZE_CLASS[cfg.tasks.fontSize]} text-gray-800 truncate`}>{t.task}</span>

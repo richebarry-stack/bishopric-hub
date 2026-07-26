@@ -11,6 +11,7 @@ import LastEdited from '../components/LastEdited';
 import { useConfirm } from '../components/ConfirmDialog';
 
 const ASSIGNED_DATALIST = 'assigned-to-options';
+const NOW = Date.now();
 
 function AssignedToField({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
   return (
@@ -288,10 +289,9 @@ export default function CallingPipeline() {
           );
         })()
       : groupBy === 'timeline' ? (() => {
-          const now = Date.now();
           const daysAgo = (ts: string) => {
             if (!ts) return null;
-            const diff = Math.floor((now - new Date(ts).getTime()) / 86400000);
+            const diff = Math.floor((NOW - new Date(ts).getTime()) / 86400000);
             return diff;
           };
           const MAX_DAYS = 60;

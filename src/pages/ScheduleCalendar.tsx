@@ -516,7 +516,7 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
                             const isBeingMoved = dragState?.type === 'move' && dragState.entryId === entry.id;
                             const isBeingResized = dragState?.type === 'resize' && dragState.entryId === entry.id;
                             const startIdx = slotIndex(entry.start_time);
-                            const endIdx = isBeingResized ? (dragRef.current?.previewEndIdx ?? slotIndex(entry.end_time)) : slotIndex(entry.end_time);
+                            const endIdx = isBeingResized ? (dragState?.previewEndIdx ?? slotIndex(entry.end_time)) : slotIndex(entry.end_time);
                             const span = Math.max(1, endIdx - startIdx);
                             const conflict = conflictedIds.has(entry.id);
                             // Entries sharing an exact start time would otherwise stack fully on top of

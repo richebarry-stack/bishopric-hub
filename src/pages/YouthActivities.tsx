@@ -5,6 +5,9 @@ import { useAuth } from '../lib/auth';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+// Use a 24-hour grace period (rather than local midnight) before moving an activity to
+// the past list, so viewers in any time zone still see today's activity as upcoming.
+const PAST_CUTOFF = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 function formatDate(s: string) {
   const m = s?.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -495,13 +498,9 @@ export default function YouthActivities() {
   const [showPast, setShowPast] = useState(false);
   const [viewTab, setViewTab] = useState<ViewTab>('all');
 
-  // Use a 24-hour grace period (rather than local midnight) before moving an
-  // activity to the past list, so viewers in any time zone still see today's
-  // activity as upcoming.
-  const pastCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
-  const upcoming = sorted.filter(r => r.date >= pastCutoff);
-  const past     = sorted.filter(r => r.date <  pastCutoff).reverse();
+  const upcoming = sorted.filter(r => r.date >= PAST_CUTOFF);
+  const past     = sorted.filter(r => r.date <  PAST_CUTOFF).reverse();
 
   const handleSave = async (form: FormData) => {
     if (modal?.id) await update(modal.id, form);

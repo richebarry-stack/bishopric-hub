@@ -622,7 +622,9 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   };
 
   // Keep ref current so the debounced callback always calls the latest closure
-  handleSaveRef.current = handleSave;
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  });
 
   // If user navigates away while a debounced save is pending, fire it immediately
   useEffect(() => {
