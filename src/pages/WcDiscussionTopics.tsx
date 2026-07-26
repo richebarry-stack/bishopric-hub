@@ -78,7 +78,7 @@ function formatDate(iso: string): string {
   });
 }
 
-function renderLine(line: string, _key: number): React.ReactNode {
+function renderLine(line: string): React.ReactNode {
   if (!line.trim()) return null;
   const parts = line.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((p, i) =>
@@ -97,7 +97,7 @@ function renderRichContent(text: string): React.ReactNode {
     if (!bullets.length) return;
     out.push(
       <ul key={`ul-${idx}`} className="list-disc list-inside space-y-0.5">
-        {bullets.map((b, j) => <li key={j} className="text-sm text-gray-700">{renderLine(b, j)}</li>)}
+        {bullets.map((b, j) => <li key={j} className="text-sm text-gray-700">{renderLine(b)}</li>)}
       </ul>
     );
     bullets = [];
@@ -107,7 +107,7 @@ function renderRichContent(text: string): React.ReactNode {
       bullets.push(line.slice(2));
     } else {
       flushBullets(i);
-      const rendered = renderLine(line, i);
+      const rendered = renderLine(line);
       if (rendered) out.push(<p key={`p-${i}`} className="text-sm text-gray-700">{rendered}</p>);
     }
   });
