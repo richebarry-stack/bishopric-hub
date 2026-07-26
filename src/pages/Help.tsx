@@ -557,6 +557,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 26, 2026',
+              items: [
+                'Hub Suggestions: added a "Deferred" status, between Planned and Implemented, for suggestions that are on hold for later.',
+              ],
+            },
+            {
               date: 'Jul 25, 2026',
               items: [
                 'Current Bishopric Meeting: added a free-form Notes box (auto-grows) alongside the Minutes field for anything that doesn\'t fit the standard meeting fields, stored per meeting.',

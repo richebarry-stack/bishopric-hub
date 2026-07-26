@@ -12,6 +12,7 @@ const TYPES = [
 const STATUSES = [
   { value: 'open',        label: 'Open',        cls: 'bg-blue-100 text-blue-700'    },
   { value: 'planned',     label: 'Planned',     cls: 'bg-violet-100 text-violet-700' },
+  { value: 'deferred',    label: 'Deferred',    cls: 'bg-yellow-100 text-yellow-700' },
   { value: 'implemented', label: 'Implemented', cls: 'bg-emerald-100 text-emerald-700' },
   { value: 'done',        label: 'Done',        cls: 'bg-green-100 text-green-700'  },
   { value: 'declined',    label: 'Declined',    cls: 'bg-gray-100 text-gray-500'    },
@@ -217,6 +218,7 @@ export default function HubSuggestions() {
 
   const open        = rows.filter(r => r.status === 'open');
   const planned     = rows.filter(r => r.status === 'planned');
+  const deferred    = rows.filter(r => r.status === 'deferred');
   const implemented = rows.filter(r => r.status === 'implemented');
   const done        = rows.filter(r => r.status === 'done');
   const declined    = rows.filter(r => r.status === 'declined');
@@ -255,6 +257,8 @@ export default function HubSuggestions() {
           <Section title="Open" rows={open} isAdmin={isAdmin}
             onEdit={row => setModal({ row })} onDelete={id => remove(id)} />
           <Section title="Planned" rows={planned} isAdmin={isAdmin}
+            onEdit={row => setModal({ row })} onDelete={id => remove(id)} />
+          <Section title="Deferred" rows={deferred} isAdmin={isAdmin} defaultOpen={false}
             onEdit={row => setModal({ row })} onDelete={id => remove(id)} />
           <Section title="Implemented" rows={implemented} isAdmin={isAdmin} defaultOpen={false}
             onEdit={row => setModal({ row })} onDelete={id => remove(id)} />
