@@ -57,9 +57,13 @@ function AutoTextarea({ value, onSave, readOnly, placeholder, minRows = 1 }: {
   value: string; onSave?: (v: string) => void; readOnly?: boolean; placeholder?: string; minRows?: number;
 }) {
   const [local, setLocal] = useState(value);
+  const [prevValue, setPrevValue] = useState(value);
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => { setLocal(value); }, [value]);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setLocal(value);
+  }
 
   useEffect(() => {
     const el = ref.current;

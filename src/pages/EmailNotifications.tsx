@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 
@@ -30,11 +30,13 @@ function WardNameSetting() {
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ['ward-name'], queryFn: () => api.wardName.get() });
   const [wardName, setWardName] = useState('');
+  const [prevDataWardName, setPrevDataWardName] = useState(data?.wardName);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
+  if (data?.wardName !== prevDataWardName) {
+    setPrevDataWardName(data?.wardName);
     setWardName(data?.wardName ?? '');
-  }, [data?.wardName]);
+  }
 
   const mutation = useMutation({
     mutationFn: (name: string) => api.wardName.save(name),
@@ -76,11 +78,13 @@ function TimeZoneSetting() {
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ['app-timezone'], queryFn: () => api.appTimezone.get() });
   const [timeZone, setTimeZone] = useState('');
+  const [prevDataTimeZone, setPrevDataTimeZone] = useState(data?.timeZone);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
+  if (data?.timeZone !== prevDataTimeZone) {
+    setPrevDataTimeZone(data?.timeZone);
     if (data?.timeZone) setTimeZone(data.timeZone);
-  }, [data?.timeZone]);
+  }
 
   const mutation = useMutation({
     mutationFn: (tz: string) => api.appTimezone.save(tz),

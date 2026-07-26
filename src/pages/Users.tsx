@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { User, RegistrationRequest } from '../lib/api';
 import { api } from '../lib/api';
@@ -20,7 +20,11 @@ async function fetchUsers(): Promise<User[]> {
 
 function ChurchRoleCell({ userId, value, onSave }: { userId: number; value: string; onSave: (id: number, role: string) => void }) {
   const [local, setLocal] = useState(value);
-  useEffect(() => { setLocal(value); }, [value]);
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setLocal(value);
+  }
   return (
     <input
       list={DATALIST_ID}

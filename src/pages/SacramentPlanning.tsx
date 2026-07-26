@@ -48,11 +48,14 @@ export default function SacramentPlanning() {
     return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
   });
 
-  // If a ?date param is present, navigate the month view to show that date
+  // If a ?date param is present, navigate the month view to show that date. Kept as an
+  // effect (not a render-time adjustment) since it reacts to browser navigation over the
+  // component's lifetime, not just a prop/query value changing once.
   useEffect(() => {
     const d = searchParams.get('date');
     if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
       const [y, m] = d.split('-').map(Number);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setViewDate(new Date(y, m - 1, 1));
     }
   }, [searchParams]);

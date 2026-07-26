@@ -385,12 +385,17 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
     existingTheme?.recognize ? existingTheme.recognize.split('\n').filter(Boolean) : defaultRecognizeRows);
 
   // The user list loads asynchronously — backfill the current High Councilor's name once it's
-  // ready, if this date has no saved value yet (a genuinely new/unedited future agenda).
-  useEffect(() => {
-    if (usersLoading || existingTheme?.high_councilor || !currentHighCouncilor) return;
-    setHighCouncilorName(name => name || currentHighCouncilor.name);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usersLoading, currentHighCouncilor?.name]);
+  // ready, if this date has no saved value yet (a genuinely new/unedited future agenda). Tracked
+  // by a "ready" key so this only fires on the loading→ready transition, not on every render
+  // (which would otherwise re-fill the field after the user manually clears it).
+  const highCouncilorReadyKey = `${usersLoading}:${currentHighCouncilor?.name ?? ''}`;
+  const [prevHighCouncilorReadyKey, setPrevHighCouncilorReadyKey] = useState(highCouncilorReadyKey);
+  if (highCouncilorReadyKey !== prevHighCouncilorReadyKey) {
+    setPrevHighCouncilorReadyKey(highCouncilorReadyKey);
+    if (!usersLoading && !existingTheme?.high_councilor && currentHighCouncilor) {
+      setHighCouncilorName(name => name || currentHighCouncilor.name);
+    }
+  }
 
   // Always reflects the High Councilor field above, rather than being frozen into the saved Recognize text
   const highCouncilorLastName = highCouncilorName.trim().split(/\s+/).pop();

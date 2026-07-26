@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../../lib/useTable';
 import type { InterviewPipeline as InterviewType, WardMember, User, CallingPipeline } from '../../lib/api';
@@ -212,11 +212,15 @@ export function useInterviews() {
     rows.filter(r => TEMPLE_TYPES.has(r.type_of_interview) && r.with_stake).length,
     [rows]);
 
-  useEffect(() => {
+  // Resets the preferred-name draft whenever the editing target (or the ward member
+  // it's linked to) changes, without a useEffect round-trip render.
+  const editingIdentity = `${editing?.id ?? ''}:${editing?.ward_member_id ?? ''}`;
+  const [prevEditingIdentity, setPrevEditingIdentity] = useState(editingIdentity);
+  if (editingIdentity !== prevEditingIdentity) {
+    setPrevEditingIdentity(editingIdentity);
     const editingLinkedMember = editing?.ward_member_id ? wardMembersById.get(editing.ward_member_id) : undefined;
     setPreferredNameDraft(editingLinkedMember?.preferred_first_name || '');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing?.id, editing?.ward_member_id]);
+  }
 
   const quickAssignSetup = (id: number, name: string) => update(id, { setup_assigned_to: name }, { silent: true });
   const toggleFlag = (id: number) => {
