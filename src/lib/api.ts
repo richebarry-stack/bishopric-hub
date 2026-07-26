@@ -443,27 +443,18 @@ export interface RegistrationRequest {
   requested_at: string;
 }
 
-export interface BishopScheduleEntry {
-  id: number;
-  date: string;
-  start_time: string;
-  end_time: string;
-  title: string;
-  notes: string;
-  recurrence_id?: string | null;
-  recurrence_frequency?: 'daily' | 'weekly' | 'monthly_nth_weekday' | null;
-  recurrence_interval?: number | null;
-  recurrence_end_date?: string | null;
-}
+export type ScheduleCalendar = 'Bishop' | 'First Counselor' | 'Second Counselor';
 
-export interface CounselorScheduleEntry {
+export interface ScheduleEntry {
   id: number;
-  owner: string;
+  calendars: string; // JSON-stringified ScheduleCalendar[]
   date: string;
   start_time: string;
   end_time: string;
   title: string;
   notes: string;
+  updated_at?: string;
+  updated_by?: string;
   recurrence_id?: string | null;
   recurrence_frequency?: 'daily' | 'weekly' | 'monthly_nth_weekday' | null;
   recurrence_interval?: number | null;
