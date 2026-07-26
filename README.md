@@ -77,21 +77,11 @@ Edit `wrangler.jsonc` and fill in your `database_name` and `database_id`.
 
 ### 4. Run migrations
 
-Apply all migration files in order:
-
 ```bash
-for f in migrations/*.sql; do
-  npx wrangler d1 execute bishopric-hub-db --remote --file="$f"
-done
+npm run migrate
 ```
 
-Or run them one at a time:
-
-```bash
-npx wrangler d1 execute bishopric-hub-db --remote --file=migrations/0001_schema.sql
-npx wrangler d1 execute bishopric-hub-db --remote --file=migrations/0002_sessions.sql
-# ... continue through all migration files in order
-```
+This runs `wrangler d1 migrations apply bishopric-hub-db --remote`, which applies every committed migration in `migrations/` in order and records each one in D1's own `d1_migrations` tracking table. Always use this (not `wrangler d1 execute --file=`) for schema migrations, so the tracking table can't drift from what's actually applied. It's safe to re-run — it only applies files that haven't been recorded yet.
 
 ### 5. Create the first admin user
 
@@ -194,17 +184,25 @@ Claude can read and edit source files, run migrations against your remote D1 dat
 
 ## Database Migrations
 
-Migrations live in `migrations/` and are numbered sequentially (`0001_schema.sql`, `0002_sessions.sql`, …). Run them in order. There is no auto-migration runner — apply each file explicitly:
+Migrations live in `migrations/` and are numbered sequentially (`0001_schema.sql`, `0002_sessions.sql`, …). Apply pending ones with:
 
 ```bash
-npx wrangler d1 execute bishopric-hub-db --remote --file=migrations/XXXX_name.sql
+npm run migrate
 ```
+
+Wrangler tracks which migrations have already run in D1's own `d1_migrations` table, so this command is always safe to re-run — it only applies files that haven't been recorded yet. Run it before `npm run deploy` whenever a new migration file was added, not as part of deploy itself (a remote schema change shouldn't run unattended as a deploy side effect).
 
 ### Schema vs. data migrations
 
-**Schema migrations** (`*_schema.sql`, `*_add_*.sql`, etc.) define tables and columns and are committed to the repo.
+**Schema migrations** live directly in `migrations/` and are committed to the repo — this is exactly the set of files `npm run migrate` will ever see.
 
-**Data import migrations** (files ending in `_import.sql` or `_seed.sql`) contain ward-specific data — member names, events, callings — and are **gitignored**. These are generated locally (or by Claude) when importing from external sources and are not shared. Run them against your own database but do not commit them.
+**Data import/seed migrations** (ward-specific data — member names, events, callings) live in `migrations/data/` instead, are **gitignored**, and are never tracked by `d1_migrations`. Apply them manually, after any schema migrations they depend on:
+
+```bash
+npx wrangler d1 execute bishopric-hub-db --remote --file=migrations/data/XXXX_name.sql
+```
+
+These are generated locally (or by Claude) when importing from external sources and are not shared. Run them against your own database but do not commit them.
 
 ---
 
@@ -214,7 +212,7 @@ npx wrangler d1 execute bishopric-hub-db --remote --file=migrations/XXXX_name.sq
 - Cloudflare D1 encrypts data at rest and in transit (TLS) by default
 - Sessions use HTTP-only cookies with a 30-day expiry
 - `wrangler.jsonc` is gitignored — it contains your database ID and must not be committed
-- Data import/seed migrations (`*_import.sql`, `*_seed.sql`) are gitignored — they may contain member names and ward-specific event details
+- Data import/seed migrations (`migrations/data/*.sql`) are gitignored — they may contain member names and ward-specific event details
 - The `scripts/` directory is gitignored for the same reason
 - `.env` and `.env.*` files are gitignored — never commit API keys or secrets
 - Data exports (`*.csv`, `exports/`, `data-export/`) are gitignored — CSV/JSON dumps may contain member data
