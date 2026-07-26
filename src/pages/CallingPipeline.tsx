@@ -434,6 +434,18 @@ export default function CallingPipeline() {
 
 type MwcSortKey = 'name' | 'potential_calling' | 'notes';
 
+function MwcTh({ col, label, sortKey, sortAsc, onSort }: {
+  col: MwcSortKey; label: string; sortKey: MwcSortKey; sortAsc: boolean; onSort: (col: MwcSortKey) => void;
+}) {
+  return (
+    <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap"
+      onClick={() => onSort(col)}>
+      {label}
+      <span className="ml-1 text-gray-400">{sortKey === col ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+    </th>
+  );
+}
+
 function MwcTable({ rows, onEdit, onDelete }: { rows: MemberWithoutCalling[]; onEdit: (r: MemberWithoutCalling) => void; onDelete: (id: number) => void }) {
   const confirm = useConfirm();
   const [sortKey, setSortKey] = useState<MwcSortKey>('name');
@@ -450,22 +462,14 @@ function MwcTable({ rows, onEdit, onDelete }: { rows: MemberWithoutCalling[]; on
     return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
   }), [rows, sortKey, sortAsc]);
 
-  const Th = ({ col, label }: { col: MwcSortKey; label: string }) => (
-    <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap"
-      onClick={() => handleSort(col)}>
-      {label}
-      <span className="ml-1 text-gray-400">{sortKey === col ? (sortAsc ? '↑' : '↓') : '↕'}</span>
-    </th>
-  );
-
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100 bg-gray-50">
-            <Th col="name" label="Name" />
-            <Th col="potential_calling" label="Potential Calling" />
-            <Th col="notes" label="Notes" />
+            <MwcTh col="name" label="Name" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <MwcTh col="potential_calling" label="Potential Calling" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <MwcTh col="notes" label="Notes" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <th className="px-3 py-2"></th>
           </tr>
         </thead>
@@ -488,6 +492,18 @@ function MwcTable({ rows, onEdit, onDelete }: { rows: MemberWithoutCalling[]; on
 
 type SortKey = 'member' | 'calling' | 'status' | 'assigned_to' | 'organization';
 
+function Th({ col, label, sortKey, sortAsc, onSort }: {
+  col: SortKey; label: string; sortKey: SortKey; sortAsc: boolean; onSort: (col: SortKey) => void;
+}) {
+  return (
+    <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap"
+      onClick={() => onSort(col)}>
+      {label}
+      <span className="ml-1 text-gray-400">{sortKey === col ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+    </th>
+  );
+}
+
 function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: CallingType) => void; onDelete: (id: number) => void }) {
   const confirm = useConfirm();
   const [sortKey, setSortKey] = useState<SortKey>('member');
@@ -499,7 +515,7 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
   };
 
   const sorted = useMemo(() => [...rows].sort((a, b) => {
-    let av = '', bv = '';
+    let av: string, bv: string;
     if (sortKey === 'status') {
       av = String(CALLING_STATUSES.indexOf(a.status ?? ''));
       bv = String(CALLING_STATUSES.indexOf(b.status ?? ''));
@@ -511,24 +527,16 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
     return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
   }), [rows, sortKey, sortAsc]);
 
-  const Th = ({ col, label }: { col: SortKey; label: string }) => (
-    <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap"
-      onClick={() => handleSort(col)}>
-      {label}
-      <span className="ml-1 text-gray-400">{sortKey === col ? (sortAsc ? '↑' : '↓') : '↕'}</span>
-    </th>
-  );
-
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100 bg-gray-50">
-            <Th col="member" label="Member" />
-            <Th col="calling" label="Calling" />
-            <Th col="status" label="Status" />
-            <Th col="assigned_to" label="Assigned To" />
-            <Th col="organization" label="Org" />
+            <Th col="member" label="Member" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="calling" label="Calling" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="status" label="Status" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="assigned_to" label="Assigned To" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="organization" label="Org" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <th className="text-left px-3 py-2 font-medium text-gray-600">LCR</th>
             <th className="px-3 py-2"></th>
           </tr>

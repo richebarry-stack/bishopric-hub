@@ -23,6 +23,38 @@ function formatDate(iso: string): string {
   return `${months[parseInt(m[2],10)-1]} ${parseInt(m[3],10)}, ${m[1]}`;
 }
 
+function WinsTable({ items, onEdit, onDelete, confirm }: {
+  items: WcWin[];
+  onEdit: (w: WcWin) => void;
+  onDelete: (id: number) => void;
+  confirm: (message: string) => Promise<boolean>;
+}) {
+  return (
+    <table className="w-full border-collapse bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <thead>
+        <tr className="bg-gray-50 border-b border-gray-200">
+          <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-2 w-32">Date</th>
+          <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-2">Description</th>
+          <th className="w-20"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map(w => (
+          <tr key={w.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+            <td className="px-4 py-2 text-xs text-gray-400 whitespace-nowrap align-top">{formatDate(w.date)}</td>
+            <td className="px-4 py-2 text-sm text-gray-800">{w.description}</td>
+            <td className="px-4 py-2 text-right whitespace-nowrap align-top">
+              <button onClick={() => onEdit(w)} className="text-blue-500 hover:text-blue-700 text-xs mr-2">Edit</button>
+              <button onClick={async () => { if (await confirm('Delete this win?')) onDelete(w.id); }}
+                className="text-red-400 hover:text-red-600 text-xs">Del</button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export default function WcWins() {
   const { rows, isLoading, create, update, remove } = useTable<WcWin>('wc-wins');
   const [editing, setEditing] = useState<WcWin | null>(null);
@@ -55,31 +87,6 @@ export default function WcWins() {
     setEditing(null);
   };
 
-  const WinsTable = ({ items }: { items: WcWin[] }) => (
-    <table className="w-full border-collapse bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <thead>
-        <tr className="bg-gray-50 border-b border-gray-200">
-          <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-2 w-32">Date</th>
-          <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-2">Description</th>
-          <th className="w-20"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.map(w => (
-          <tr key={w.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-            <td className="px-4 py-2 text-xs text-gray-400 whitespace-nowrap align-top">{formatDate(w.date)}</td>
-            <td className="px-4 py-2 text-sm text-gray-800">{w.description}</td>
-            <td className="px-4 py-2 text-right whitespace-nowrap align-top">
-              <button onClick={() => setEditing(w)} className="text-blue-500 hover:text-blue-700 text-xs mr-2">Edit</button>
-              <button onClick={async () => { if (await confirm('Delete this win?')) remove(w.id); }}
-                className="text-red-400 hover:text-red-600 text-xs">Del</button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -97,7 +104,7 @@ export default function WcWins() {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">This week</p>
             {current.length === 0
               ? <p className="text-sm text-gray-400 text-center py-6">No wins yet this week. Add one!</p>
-              : <WinsTable items={current} />}
+              : <WinsTable items={current} onEdit={setEditing} onDelete={remove} confirm={confirm} />}
           </div>
 
           {older.length > 0 && (
@@ -106,7 +113,7 @@ export default function WcWins() {
                 className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 mb-2">
                 {showOld ? '▼' : '▶'} Older wins ({older.length})
               </button>
-              {showOld && <WinsTable items={older} />}
+              {showOld && <WinsTable items={older} onEdit={setEditing} onDelete={remove} confirm={confirm} />}
             </div>
           )}
         </>

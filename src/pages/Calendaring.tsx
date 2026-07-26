@@ -17,6 +17,20 @@ type SortKey = 'name' | 'dates' | 'notes' | 'announce_in_sacrament';
 
 const EMPTY: Partial<CalendarEvent> = { name: '', dates: '', notes: '', announce_in_sacrament: 0, share_with: '' };
 
+function Th({ col, label, className, sortKey, sortAsc, onSort }: {
+  col: SortKey; label: string; className?: string; sortKey: SortKey; sortAsc: boolean; onSort: (col: SortKey) => void;
+}) {
+  return (
+    <th
+      className={`text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap ${className ?? ''}`}
+      onClick={() => onSort(col)}
+    >
+      {label}
+      <span className="ml-1 text-gray-400 text-xs">{sortKey === col ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+    </th>
+  );
+}
+
 function EventTable({ rows, onEdit, onDelete, defaultSortKey, defaultAsc, readOnly }: {
   rows: CalendarEvent[];
   onEdit: (r: CalendarEvent) => void;
@@ -45,16 +59,6 @@ function EventTable({ rows, onEdit, onDelete, defaultSortKey, defaultAsc, readOn
     return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
   }), [rows, sortKey, sortAsc]);
 
-  const Th = ({ col, label, className }: { col: SortKey; label: string; className?: string }) => (
-    <th
-      className={`text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap ${className ?? ''}`}
-      onClick={() => handleSort(col)}
-    >
-      {label}
-      <span className="ml-1 text-gray-400 text-xs">{sortKey === col ? (sortAsc ? '↑' : '↓') : '↕'}</span>
-    </th>
-  );
-
   if (sorted.length === 0) {
     return <p className="text-gray-400 text-sm italic py-2">None</p>;
   }
@@ -64,10 +68,10 @@ function EventTable({ rows, onEdit, onDelete, defaultSortKey, defaultAsc, readOn
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100 bg-gray-50">
-            <Th col="name" label="Event" />
-            <Th col="dates" label="Date" />
-            <Th col="notes" label="Notes" />
-            <Th col="announce_in_sacrament" label="Announce" className="text-center" />
+            <Th col="name" label="Event" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="dates" label="Date" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="notes" label="Notes" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="announce_in_sacrament" label="Announce" className="text-center" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <th className="px-3 py-2"></th>
           </tr>
         </thead>

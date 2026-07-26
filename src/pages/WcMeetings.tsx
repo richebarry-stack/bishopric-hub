@@ -30,6 +30,61 @@ function InlineText({ value, onSave, placeholder }: { value: string; onSave: (v:
 
 const EMPTY = { date: '', opening_prayer: '', spiritual_thought: '', closing_prayer: '' };
 
+function MeetingTable({ meetings, readOnly, onUpdate, onDelete, confirm }: {
+  meetings: WcMeeting[];
+  readOnly?: boolean;
+  onUpdate: (id: number, field: string, value: string) => void;
+  onDelete: (id: number) => void;
+  confirm: (message: string) => Promise<boolean>;
+}) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-100 bg-gray-50">
+            <th className="text-left px-3 py-2 font-medium text-gray-600 w-44">Date</th>
+            <th className="text-left px-3 py-2 font-medium text-gray-600">Opening Prayer</th>
+            <th className="text-left px-3 py-2 font-medium text-gray-600">Spiritual Thought</th>
+            <th className="text-left px-3 py-2 font-medium text-gray-600">Closing Prayer</th>
+            <th className="px-3 py-2 w-10" />
+          </tr>
+        </thead>
+        <tbody>
+          {meetings.length === 0 && (
+            <tr><td colSpan={5} className="px-3 py-6 text-center text-sm text-gray-400">None</td></tr>
+          )}
+          {meetings.map(m => (
+            <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50">
+              <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{formatDate(m.date)}</td>
+              <td className="px-1 py-1">
+                {readOnly
+                  ? <span className="px-2 py-1 text-sm text-gray-600">{m.opening_prayer || '—'}</span>
+                  : <InlineText value={m.opening_prayer || ''} onSave={v => onUpdate(m.id, 'opening_prayer', v)} placeholder="—" />}
+              </td>
+              <td className="px-1 py-1">
+                {readOnly
+                  ? <span className="px-2 py-1 text-sm text-gray-600">{m.spiritual_thought || '—'}</span>
+                  : <InlineText value={m.spiritual_thought || ''} onSave={v => onUpdate(m.id, 'spiritual_thought', v)} placeholder="—" />}
+              </td>
+              <td className="px-1 py-1">
+                {readOnly
+                  ? <span className="px-2 py-1 text-sm text-gray-600">{m.closing_prayer || '—'}</span>
+                  : <InlineText value={m.closing_prayer || ''} onSave={v => onUpdate(m.id, 'closing_prayer', v)} placeholder="—" />}
+              </td>
+              <td className="px-3 py-2">
+                {!readOnly && (
+                  <button onClick={async () => { if (await confirm('Delete this meeting?')) onDelete(m.id); }}
+                    className="text-red-400 hover:text-red-600 text-xs">Del</button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function WcMeetings() {
   const { user } = useAuth();
   const canEdit = user?.hub === 'both';
@@ -53,53 +108,6 @@ export default function WcMeetings() {
     update(id, { [field]: value });
   };
 
-  const MeetingTable = ({ meetings, readOnly }: { meetings: WcMeeting[]; readOnly?: boolean }) => (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 bg-gray-50">
-            <th className="text-left px-3 py-2 font-medium text-gray-600 w-44">Date</th>
-            <th className="text-left px-3 py-2 font-medium text-gray-600">Opening Prayer</th>
-            <th className="text-left px-3 py-2 font-medium text-gray-600">Spiritual Thought</th>
-            <th className="text-left px-3 py-2 font-medium text-gray-600">Closing Prayer</th>
-            <th className="px-3 py-2 w-10" />
-          </tr>
-        </thead>
-        <tbody>
-          {meetings.length === 0 && (
-            <tr><td colSpan={5} className="px-3 py-6 text-center text-sm text-gray-400">None</td></tr>
-          )}
-          {meetings.map(m => (
-            <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50">
-              <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{formatDate(m.date)}</td>
-              <td className="px-1 py-1">
-                {readOnly
-                  ? <span className="px-2 py-1 text-sm text-gray-600">{m.opening_prayer || '—'}</span>
-                  : <InlineText value={m.opening_prayer || ''} onSave={v => handleUpdate(m.id, 'opening_prayer', v)} placeholder="—" />}
-              </td>
-              <td className="px-1 py-1">
-                {readOnly
-                  ? <span className="px-2 py-1 text-sm text-gray-600">{m.spiritual_thought || '—'}</span>
-                  : <InlineText value={m.spiritual_thought || ''} onSave={v => handleUpdate(m.id, 'spiritual_thought', v)} placeholder="—" />}
-              </td>
-              <td className="px-1 py-1">
-                {readOnly
-                  ? <span className="px-2 py-1 text-sm text-gray-600">{m.closing_prayer || '—'}</span>
-                  : <InlineText value={m.closing_prayer || ''} onSave={v => handleUpdate(m.id, 'closing_prayer', v)} placeholder="—" />}
-              </td>
-              <td className="px-3 py-2">
-                {!readOnly && (
-                  <button onClick={async () => { if (await confirm('Delete this meeting?')) remove(m.id); }}
-                    className="text-red-400 hover:text-red-600 text-xs">Del</button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -115,14 +123,14 @@ export default function WcMeetings() {
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading…</p> : (
         <>
-          <MeetingTable meetings={upcoming} readOnly={!canEdit} />
+          <MeetingTable meetings={upcoming} readOnly={!canEdit} onUpdate={handleUpdate} onDelete={remove} confirm={confirm} />
 
           <div>
             <button onClick={() => setShowPast(p => !p)}
               className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 mb-2">
               {showPast ? '▼' : '▶'} Past meetings ({past.length})
             </button>
-            {showPast && <MeetingTable meetings={past} readOnly />}
+            {showPast && <MeetingTable meetings={past} readOnly onUpdate={handleUpdate} onDelete={remove} confirm={confirm} />}
           </div>
         </>
       )}
