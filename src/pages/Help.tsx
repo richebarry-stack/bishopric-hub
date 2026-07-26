@@ -567,6 +567,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Interview list pages (Youth/Adult Temple/Other Interviews): added a flag toggle to mark an interview for discussion at the next bishopric meeting.',
                 'Internal: cleaned up the app\'s lint warnings (component structure, effect usage) with no functional changes.',
                 'Current Bishopric Meeting: the Calendaring Items box now has a "+ Add" button to create a new calendar event directly from this page, defaulting to the meeting\'s date.',
+                'Babies: once a baby\'s blessing date has passed, an Action Item is now automatically created for the clerk to create the church record in LCR (skipped if "Church record created" is already checked).',
               ],
             },
             {
