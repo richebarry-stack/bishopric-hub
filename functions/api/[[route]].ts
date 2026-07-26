@@ -23,6 +23,7 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'rotating-assignments': { name: 'rotating_assignments', orderBy: 'id ASC' },
   'bishopric-meetings': { name: 'bishopric_meetings', orderBy: 'date DESC' },
   'bishopric-agenda-items': { name: 'bishopric_agenda_items', orderBy: 'meeting_date ASC, position ASC, id ASC' },
+  'bishopric-move-items': { name: 'bishopric_move_items', orderBy: 'meeting_date ASC, kind ASC, position ASC, id ASC' },
   'out-of-town': { name: 'out_of_town', orderBy: 'start_date ASC' },
   'sacrament-speakers': { name: 'sacrament_speakers', orderBy: 'meeting_date DESC, speaking_order ASC' },
   'prayers': { name: 'prayers', orderBy: 'meeting_date DESC' },

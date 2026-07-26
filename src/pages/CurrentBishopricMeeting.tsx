@@ -1,8 +1,12 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useTable } from '../lib/useTable';
-import type { BishopricMeeting, BishopricAgendaItem } from '../lib/api';
+import type { BishopricMeeting, BishopricAgendaItem, SacramentTheme } from '../lib/api';
 import { Input, Textarea } from '../components/FormFields';
 import { useConfirm } from '../components/ConfirmDialog';
+import { priorMeetingDate } from '../lib/priorWeek';
+import MoveItemsSection from './bishopricMeeting/MoveItemsSection';
+import CalendaringBox from './bishopricMeeting/CalendaringBox';
+import InterviewsNeededSection from './bishopricMeeting/InterviewsNeededSection';
 
 function formatDate(d: string): string {
   return new Date(d.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', {
@@ -126,6 +130,7 @@ function AgendaItemText({ item, onSave }: { item: BishopricAgendaItem; onSave: (
 export default function CurrentBishopricMeeting() {
   const { rows: meetings, isLoading: meetingsLoading, update: updateMeeting } = useTable<BishopricMeeting>('bishopric-meetings');
   const { rows: items, isLoading: itemsLoading, create: createItem, update: updateItem, remove: removeItem } = useTable<BishopricAgendaItem>('bishopric-agenda-items');
+  const themes = useTable<SacramentTheme>('sacrament-themes');
   const confirm = useConfirm();
 
   const sortedMeetingDates = useMemo(
@@ -200,6 +205,25 @@ export default function CurrentBishopricMeeting() {
     updateMeeting(meeting.id, { [field]: v }, { silent: true });
   };
 
+  const priorDate = useMemo(() => priorMeetingDate(date, meetings), [date, meetings]);
+  const priorMeeting = priorDate ? meetings.find(m => m.date.slice(0, 10) === priorDate) : undefined;
+
+  const handleCopyUpdatesFromLastWeek = async () => {
+    if (!meeting || !priorMeeting) return;
+    if (!await confirm({ message: "Replace this week's Updates/Announcements with last week's? This week's current text will be lost." })) return;
+    saveMeetingField('updates_announcements', priorMeeting.updates_announcements || '');
+  };
+
+  const handleAddToSacramentAgenda = async (text: string) => {
+    const existing = themes.rows.find(t => t.meeting_date.slice(0, 10) === date);
+    if (existing) {
+      const next = (existing.ward_business || '') + (existing.ward_business ? '\n' : '') + text;
+      await themes.update(existing.id, { ward_business: next }, { silent: true });
+    } else {
+      await themes.create({ meeting_date: date, ward_business: text }, { silent: true });
+    }
+  };
+
   const isLoading = meetingsLoading || itemsLoading;
 
   return (
@@ -255,8 +279,35 @@ export default function CurrentBishopricMeeting() {
                   />
                 </div>
               </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-semibold text-gray-600">Updates / Announcements</label>
+                  {priorMeeting?.updates_announcements && (
+                    <button onClick={handleCopyUpdatesFromLastWeek} className="text-xs text-gray-400 hover:text-gray-600">
+                      Copy from last week
+                    </button>
+                  )}
+                </div>
+                <div className="rounded-md border border-gray-200">
+                  <AutoTextarea
+                    value={meeting.updates_announcements ?? ''}
+                    onSave={v => saveMeetingField('updates_announcements', v)}
+                    placeholder="Updates or church announcements to cover…"
+                    minRows={4}
+                  />
+                </div>
+              </div>
             </section>
           )}
+
+          <CalendaringBox />
+
+          <MoveItemsSection kind="move_in" date={date} title="Move-ins" meetingDates={meetings}
+            onAddToSacramentAgenda={handleAddToSacramentAgenda} />
+          <MoveItemsSection kind="move_out" date={date} title="Move-outs" meetingDates={meetings} />
+          <MoveItemsSection kind="other" date={date} title="Other Items" meetingDates={meetings} />
+
+          <InterviewsNeededSection />
 
           <section>
             <h2 className="text-sm font-semibold text-gray-700 mb-2">Agenda</h2>

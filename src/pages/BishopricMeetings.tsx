@@ -8,7 +8,8 @@ import { toast } from '../lib/toast';
 
 const EMPTY: Partial<BishopricMeeting> = {
   date: '', spiritual_thought: '', opening_prayer: '', closing_prayer: '',
-  handbook_training: '', handbook_section: '', minutes: '', no_meeting: 0, reason_not_meeting: '',
+  handbook_training: '', handbook_section: '', minutes: '', notes: '', updates_announcements: '',
+  no_meeting: 0, reason_not_meeting: '',
 };
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -248,6 +249,8 @@ export default function BishopricMeetings() {
                 <Input label="Handbook Training" value={editing.handbook_training || ''} onChange={v => setEditing({ ...editing, handbook_training: v })} />
                 <Input label="Handbook Section" value={editing.handbook_section || ''} onChange={v => setEditing({ ...editing, handbook_section: v })} />
                 <Textarea label="Minutes" value={editing.minutes || ''} onChange={v => setEditing({ ...editing, minutes: v })} rows={6} />
+                <Textarea label="Updates / Announcements" value={editing.updates_announcements || ''} onChange={v => setEditing({ ...editing, updates_announcements: v })} rows={4} />
+                <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} rows={4} />
               </>
             )}
             <div className="flex justify-end gap-2 pt-2">

@@ -170,6 +170,7 @@ export interface InterviewPipeline {
   comments: string;
   notes: string;
   with_stake?: number;
+  flagged_for_meeting?: number;
 }
 
 export interface Task {
@@ -201,6 +202,7 @@ export interface BishopricMeeting {
   handbook_section: string;
   minutes: string;
   notes: string;
+  updates_announcements: string;
   no_meeting: number;
   reason_not_meeting: string;
   recurrence_id: string | null;
@@ -216,6 +218,17 @@ export interface BishopricAgendaItem {
   position: number;
   updated_at: string;
   updated_by: string | null;
+}
+
+export interface BishopricMoveItem {
+  id: number;
+  meeting_date: string;
+  kind: 'move_in' | 'move_out' | 'other';
+  item: string;
+  done: number;
+  position: number;
+  updated_at?: string;
+  updated_by?: string | null;
 }
 
 export interface OutOfTown {

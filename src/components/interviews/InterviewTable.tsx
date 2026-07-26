@@ -26,7 +26,7 @@ function SetupAssignedCell({ row, setupOptions, onAssign }: {
   );
 }
 
-export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRecExpires = true, showCalling = false, showLastInterview = true, nextInterviewLabel = 'Next Interview', rowMetaById, selected, onToggleSelect, setupOptions, onQuickAssignSetup }: {
+export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRecExpires = true, showCalling = false, showLastInterview = true, nextInterviewLabel = 'Next Interview', rowMetaById, selected, onToggleSelect, setupOptions, onQuickAssignSetup, onToggleFlag }: {
   rows: InterviewType[];
   onEdit: (r: InterviewType) => void;
   onDelete: (id: number) => void;
@@ -40,6 +40,7 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
   onToggleSelect: (id: number) => void;
   setupOptions: string[];
   onQuickAssignSetup: (id: number, name: string) => void;
+  onToggleFlag: (id: number) => void;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('member');
   const [sortAsc, setSortAsc] = useState(true);
@@ -95,6 +96,7 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
               <th className="px-3 py-2 w-8"></th>
+              <th className="px-1 py-2 w-6" title="Flag for bishopric meeting"></th>
               <Th col="member" label="Member" />
               {showAge && <Th col="age" label="Age" />}
               {showCalling && <th className="text-left px-3 py-2 font-medium text-gray-600 whitespace-nowrap">Calling</th>}
@@ -117,6 +119,13 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
                 <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                   <input type="checkbox" checked={selected.has(r.id)} onChange={() => onToggleSelect(r.id)}
                     className="rounded border-gray-300 text-blue-600" />
+                </td>
+                <td className="px-1 py-2" onClick={e => e.stopPropagation()}>
+                  <button type="button" onClick={() => onToggleFlag(r.id)}
+                    title={r.flagged_for_meeting ? 'Unflag from bishopric meeting' : 'Flag for bishopric meeting'}
+                    className={`text-sm ${r.flagged_for_meeting ? 'text-amber-500' : 'text-gray-300 hover:text-gray-400'}`}>
+                    🚩
+                  </button>
                 </td>
                 <td className="px-3 py-2 font-medium text-gray-900">
                   {meta?.displayName ?? r.member}
@@ -184,8 +193,15 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
                         <span className="ml-1.5 text-xs font-normal text-gray-400">(Stake)</span>
                       )}
                     </p>
-                    <button onClick={e => { e.stopPropagation(); onDelete(r.id); }}
-                      className="text-red-400 hover:text-red-600 text-xs shrink-0">Del</button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={e => { e.stopPropagation(); onToggleFlag(r.id); }}
+                        title={r.flagged_for_meeting ? 'Unflag from bishopric meeting' : 'Flag for bishopric meeting'}
+                        className={`text-sm ${r.flagged_for_meeting ? 'text-amber-500' : 'text-gray-300 hover:text-gray-400'}`}>
+                        🚩
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); onDelete(r.id); }}
+                        className="text-red-400 hover:text-red-600 text-xs">Del</button>
+                    </div>
                   </div>
                   {showCalling && meta?.calling && <p className="text-xs text-gray-500 mt-0.5">{meta.calling}</p>}
                   <div className="mt-1 flex flex-wrap gap-1.5 items-center">

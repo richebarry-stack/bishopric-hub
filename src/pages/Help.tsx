@@ -562,6 +562,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Hub Suggestions: added a "Deferred" status, between Planned and Implemented, for suggestions that are on hold for later.',
                 'Adult Temple Interviews: added a "With the stake" checkbox for interviews conducted with the stake, with a toggle to hide those from the list.',
                 'Youth Council hub: removed the Action Items page from the sidebar — My Actions remains for YC-assigned items.',
+                'Bishop Schedule and Counselor Schedule: appointments can now be shared across calendars — check any combination of Bishop/First Counselor/Second Counselor on an appointment, and editing it in one place updates it everywhere it appears.',
               ],
             },
             {

@@ -1,14 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useTable } from '../lib/useTable';
 import type { CalendarEvent } from '../lib/api';
-import Modal from '../components/Modal';
-import { Input, Select, Textarea, Checkbox } from '../components/FormFields';
-import { SHARE_WITH_OPTIONS } from '../lib/constants';
+import CalendarEventModal from '../components/CalendarEventModal';
 import { useAuth } from '../lib/auth';
-import LastEdited from '../components/LastEdited';
-
-const TODAY_PREFIX = new Date().toISOString().slice(0, 10);
-
+import { isUpcoming } from '../lib/calendaring';
 
 // Use local noon to avoid UTC timezone shift from new Date('YYYY-MM-DD')
 function formatDate(dates: string): string {
@@ -16,16 +11,6 @@ function formatDate(dates: string): string {
   const d = new Date(dates.slice(0, 10) + 'T12:00:00');
   if (isNaN(d.getTime())) return dates;
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-// Extract YYYY-MM-DD for a date input — slicing avoids any timezone conversion
-function toDateInput(dates: string): string {
-  return dates ? dates.slice(0, 10) : '';
-}
-
-function isUpcoming(dates: string): boolean {
-  if (!dates) return true;
-  return dates.slice(0, 10) >= TODAY_PREFIX;
 }
 
 type SortKey = 'name' | 'dates' | 'notes' | 'announce_in_sacrament';
@@ -152,29 +137,13 @@ export default function Calendaring() {
         </div>
       )}
 
-      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit Event' : 'New Event'}>
-        {editing && (
-          <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
-            <Input label="Event Name" value={editing.name || ''} onChange={v => setEditing({ ...editing, name: v })} required />
-            <Input label="Date" value={toDateInput(editing.dates || '')} onChange={v => setEditing({ ...editing, dates: v })} type="date" />
-            <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} />
-            <Select label="Share With" value={editing.share_with || ''} onChange={v => setEditing({ ...editing, share_with: v })} options={SHARE_WITH_OPTIONS} />
-            <Checkbox label="Announce in sacrament meeting" checked={!!editing.announce_in_sacrament} onChange={v => setEditing({ ...editing, announce_in_sacrament: v ? 1 : 0 })} />
-            <LastEdited updatedBy={editing.updated_by} updatedAt={editing.updated_at} />
-            <div className="flex justify-between pt-2">
-              <div>
-                {editing.id && (
-                  <button type="button" onClick={() => { remove(editing.id!); setEditing(null); }} className="px-4 py-2 text-sm text-red-600 hover:text-red-800">Delete</button>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">Save</button>
-              </div>
-            </div>
-          </form>
-        )}
-      </Modal>
+      <CalendarEventModal
+        editing={editing}
+        onClose={() => setEditing(null)}
+        onChange={next => setEditing(prev => (prev ? { ...prev, ...next } : prev))}
+        onSave={handleSave}
+        onDelete={remove}
+      />
     </div>
   );
 }

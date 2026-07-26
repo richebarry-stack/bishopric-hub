@@ -10,6 +10,7 @@ export const EMPTY_INTERVIEW: Partial<InterviewType> = {
   member: '', date_recommend_expires: '', type_of_interview: '', status: 'Unassigned',
   assigned_to: '', setup_assigned_to: '', setup_status: 'Not started',
   last_interview_datetime: '', next_interview_date: '', comments: '', notes: '',
+  flagged_for_meeting: 0,
 };
 
 export function useInterviews() {
@@ -218,9 +219,13 @@ export function useInterviews() {
   }, [editing?.id, editing?.ward_member_id]);
 
   const quickAssignSetup = (id: number, name: string) => update(id, { setup_assigned_to: name }, { silent: true });
+  const toggleFlag = (id: number) => {
+    const row = rows.find(r => r.id === id);
+    return update(id, { flagged_for_meeting: row?.flagged_for_meeting ? 0 : 1 }, { silent: true });
+  };
 
   return {
-    rows, isLoading, filtered, remove, quickAssignSetup,
+    rows, isLoading, filtered, remove, quickAssignSetup, toggleFlag,
     wardMembers, wardMembersById, wardMembersLoading, ageByName, activeYouthWardMemberIds, callingsById,
     bishopricOptions, setupOptions, assignedOptions,
     rowMetaById, agedOutYouthCount, upToDateYouthCount, stakeInterviewCount,

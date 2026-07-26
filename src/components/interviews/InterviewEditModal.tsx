@@ -1,6 +1,6 @@
 import Modal from '../Modal';
 import StatusBadge from '../StatusBadge';
-import { Input, Select, Textarea } from '../FormFields';
+import { Input, Select, Textarea, Checkbox } from '../FormFields';
 import type { InterviewPipeline as InterviewType, WardMember, CallingPipeline } from '../../lib/api';
 import { INTERVIEW_STATUSES, SETUP_STATUSES, SETTING_APART_STATUSES } from '../../lib/constants';
 import { YOUTH_TYPES, TEMPLE_TYPES, NO_REC_TYPES, YOUTH_STATE_COLORS, computeYouthAge, computeYouthState } from './shared';
@@ -192,6 +192,8 @@ export default function InterviewEditModal({
         <Input label={isSettingApart ? 'Scheduled Date' : 'Next Interview Date'} value={(editing.next_interview_date || '').slice(0, 10)} onChange={v => onChange({ next_interview_date: v })} type="date" />
         <Input label="Comments" value={editing.comments || ''} onChange={v => onChange({ comments: v })} />
         <Textarea label="Notes" value={editing.notes || ''} onChange={v => onChange({ notes: v })} />
+        <Checkbox label="Flag for bishopric meeting" checked={!!editing.flagged_for_meeting}
+          onChange={v => onChange({ flagged_for_meeting: v ? 1 : 0 })} />
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
           <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">Save</button>
