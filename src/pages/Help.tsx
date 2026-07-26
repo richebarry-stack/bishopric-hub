@@ -570,6 +570,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Babies: once a baby\'s blessing date has passed, an Action Item is now automatically created for the clerk to create the church record in LCR (skipped if "Church record created" is already checked).',
                 'Internal: added a bulk temple-recommend-status import endpoint (/api/ward-members/import-recommends) to support an automated weekly sync from LCR — no UI changes yet.',
                 'Ward Members: fixed a bug where clicking between the two fields of an inline edit (Name, Preferred Name, or Recommend status/expiration) would close the edit before you could finish — editing now only closes when you click fully away from the pair.',
+                'Internal: extended the LCR sync with a full roster reconciliation (new members, filling in missing birth date/gender, reporting members absent from the LCR export) and a "with the stake" sync from LCR\'s Recommend Activations report — no UI changes yet.',
               ],
             },
             {

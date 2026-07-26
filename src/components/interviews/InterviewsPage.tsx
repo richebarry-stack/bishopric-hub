@@ -6,7 +6,7 @@ import { toast } from '../../lib/toast';
 import InterviewTable from './InterviewTable';
 import InterviewEditModal from './InterviewEditModal';
 import { useInterviews, EMPTY_INTERVIEW } from './useInterviews';
-import { YOUTH_TYPES, computeYouthState } from './shared';
+import { YOUTH_TYPES, TEMPLE_TYPES, computeYouthState } from './shared';
 
 export default function InterviewsPage({ title, description, types, showAge, showRecExpires = true, showCalling = false, mergedSectionLabel, showSyncNow = false }: {
   title: string;
@@ -39,9 +39,16 @@ export default function InterviewsPage({ title, description, types, showAge, sho
 
   const pageRows = applyYouthUpToDateFilter(applyYouthAgedOutFilter(h.filtered.filter(r => types.includes(r.type_of_interview)), h), h);
 
+  // Temple-recommend interviews already with the stake get their own table
+  // below, always shown, rather than being mixed into (or hidden from) the
+  // regular type sections.
+  const stakeRows = pageRows.filter(r => TEMPLE_TYPES.has(r.type_of_interview) && r.with_stake);
+  const nonStakeRows = pageRows.filter(r => !(TEMPLE_TYPES.has(r.type_of_interview) && r.with_stake));
+
   const grouped: [string, InterviewType[]][] = mergedSectionLabel
-    ? [[mergedSectionLabel, pageRows.filter(r => YOUTH_TYPES.has(r.type_of_interview))]]
-    : types.map(t => [t, pageRows.filter(r => r.type_of_interview === t)]);
+    ? [[mergedSectionLabel, nonStakeRows.filter(r => YOUTH_TYPES.has(r.type_of_interview))]]
+    : types.map(t => [t, nonStakeRows.filter(r => r.type_of_interview === t)]);
+  if (stakeRows.length > 0) grouped.push(['With the Stake', stakeRows]);
 
   const allowedTypes = h.editing?.id ? types : types.filter(t => !YOUTH_TYPES.has(t));
 
@@ -84,15 +91,6 @@ export default function InterviewsPage({ title, description, types, showAge, sho
           {h.assignedOptions.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
       </div>
-
-      {h.stakeInterviewCount > 0 && (
-        <div className="mb-2">
-          <button onClick={() => h.setShowStakeInterviews(s => !s)}
-            className="text-xs text-gray-400 hover:text-gray-600">
-            {h.showStakeInterviews ? 'Hide' : 'Show'} interviews with the stake ({h.stakeInterviewCount})
-          </button>
-        </div>
-      )}
 
       {h.selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-md px-3 py-2 text-sm">

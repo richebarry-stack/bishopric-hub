@@ -101,6 +101,14 @@ export const api = {
       request<{ ok: true; updated: number; unmatched: string[] }>('/ward-members/import-recommends', {
         method: 'POST', body: JSON.stringify({ rows }),
       }),
+    fullSync: (rows: { name: string; gender: string | null; birth_date: string | null }[]) =>
+      request<{ ok: true; created: number; filledDetails: number; missingFromRoster: string[] }>('/ward-members/full-sync', {
+        method: 'POST', body: JSON.stringify({ rows }),
+      }),
+    syncStakeActivations: (names: string[]) =>
+      request<{ ok: true; flagged: number; cleared: number; unmatched: string[] }>('/ward-members/sync-stake-activations', {
+        method: 'POST', body: JSON.stringify({ names }),
+      }),
   },
   automationStatus: {
     get: () => request<{ last_run: string | null; results: Record<string, { ok: boolean; error?: string; [key: string]: unknown }> }>('/automation-status'),

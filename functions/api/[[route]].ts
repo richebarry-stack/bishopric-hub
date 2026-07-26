@@ -1,5 +1,5 @@
 import { syncConduct, runDailyJobs, syncSettingApartInterviews, syncTempleRecommendInterviews } from './jobs';
-import { matchRosterMember, type RosterMember } from './nameMatch';
+import { matchRosterMember, splitLastFirstCased, toLastFirst, type RosterMember } from './nameMatch';
 
 interface Env {
   DB: D1Database;
@@ -1262,6 +1262,136 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     ];
     if (stmts.length > 0) await db.batch(stmts);
     return json({ ok: true, updated: updates.length, created: creates.length, deactivated: deactivate.length });
+  }
+
+  // Bulk roster reconciliation against a full LCR member-directory export: creates
+  // ward_members rows for people not yet tracked, fills in birth_date/gender for
+  // existing members whose record is incomplete (never overwrites a value that's
+  // already set), and reports active members absent from the export so the clerk
+  // can investigate (move-outs, name mismatches, etc.) rather than auto-deactivating.
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'full-sync' && method === 'POST') {
+    const body = await request.json() as {
+      rows?: { name: string; gender: string | null; birth_date: string | null }[];
+    };
+    const rows = (body.rows || []).slice(0, 2000);
+    const genderRe = /^[MF]$/;
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    for (const r of rows) {
+      if (!r.name || !r.name.trim()) return json({ error: 'Row missing name' }, 400);
+      if (r.gender && !genderRe.test(r.gender)) return json({ error: `Invalid gender "${r.gender}" for "${r.name}"` }, 400);
+      if (r.birth_date && !dateRe.test(r.birth_date)) return json({ error: `Invalid birth_date "${r.birth_date}" for "${r.name}"` }, 400);
+    }
+
+    const roster = (await db.prepare(
+      'SELECT id, first_name, last_name, birth_date, gender, active FROM ward_members'
+    ).all<RosterMember & { birth_date: string | null; gender: string | null; active: number }>()).results;
+
+    const now = new Date().toISOString();
+    const stmts = [];
+    const matchedIds = new Set<number>();
+    let created = 0;
+    let filledDetails = 0;
+
+    for (const row of rows) {
+      const member = matchRosterMember(row.name, roster);
+      if (member) {
+        matchedIds.add(member.id);
+        const fillBirthDate = !member.birth_date && row.birth_date;
+        const fillGender = !member.gender && row.gender;
+        if (fillBirthDate || fillGender) {
+          // ward_members stores "missing" as '' rather than NULL for these columns,
+          // so SQL COALESCE (which only treats NULL as empty) can't be used here —
+          // compute the final value in JS instead.
+          stmts.push(
+            db.prepare('UPDATE ward_members SET birth_date = ?, gender = ?, updated_at = ?, updated_by = ? WHERE id = ?')
+              .bind(
+                fillBirthDate ? row.birth_date : member.birth_date,
+                fillGender ? row.gender : member.gender,
+                now, session.name, member.id
+              )
+          );
+          filledDetails++;
+        }
+        continue;
+      }
+
+      const { last, first } = splitLastFirstCased(toLastFirst(row.name));
+      if (!last) continue;
+      stmts.push(
+        db.prepare('INSERT INTO ward_members (last_name, first_name, active, birth_date, gender, updated_at, updated_by) VALUES (?, ?, 1, ?, ?, ?, ?)')
+          .bind(last, first, row.birth_date || null, row.gender || null, now, session.name)
+      );
+      created++;
+    }
+    if (stmts.length > 0) await db.batch(stmts);
+
+    const missingFromRoster = roster
+      .filter(m => m.active && !matchedIds.has(m.id))
+      .map(m => `${m.last_name}, ${m.first_name}`);
+
+    return json({ ok: true, created, filledDetails, missingFromRoster });
+  }
+
+  // Syncs the "with the stake" flag on temple-recommend interviews from LCR's
+  // Recommend Activations > Awaiting Stake Activation list: flags matching
+  // interviews (creating one with sensible defaults if none exists yet), and
+  // clears the flag on any temple-recommend interview previously flagged whose
+  // member is no longer on the list (i.e. their recommend was activated).
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'sync-stake-activations' && method === 'POST') {
+    const body = await request.json() as { names?: string[] };
+    const names = (body.names || []).slice(0, 500);
+    const RECOMMEND_TYPE_TO_INTERVIEW_TYPE: Record<string, string> = { Endowed: 'Endowed Temple Rec', Limited: 'Limited' };
+
+    const roster = (await db.prepare(
+      'SELECT id, first_name, last_name, recommend_type, recommend_expires FROM ward_members WHERE active = 1'
+    ).all<RosterMember & { recommend_type: string | null; recommend_expires: string | null }>()).results;
+
+    const now = new Date().toISOString();
+    const stmts = [];
+    const matchedMemberIds = new Set<number>();
+    const unmatched: string[] = [];
+    let flagged = 0;
+
+    for (const name of names) {
+      const member = matchRosterMember(name, roster);
+      const interviewType = member?.recommend_type ? RECOMMEND_TYPE_TO_INTERVIEW_TYPE[member.recommend_type] : undefined;
+      if (!member || !interviewType) { unmatched.push(name); continue; }
+      matchedMemberIds.add(member.id);
+
+      const existing = await db.prepare(
+        'SELECT id, with_stake FROM interview_pipeline WHERE ward_member_id = ? AND type_of_interview = ?'
+      ).bind(member.id, interviewType).first<{ id: number; with_stake: number }>();
+
+      if (existing) {
+        if (!existing.with_stake) {
+          stmts.push(db.prepare('UPDATE interview_pipeline SET with_stake = 1, updated_at = ? WHERE id = ?').bind(now, existing.id));
+          flagged++;
+        }
+      } else {
+        const legalName = member.first_name ? `${member.last_name}, ${member.first_name}` : member.last_name;
+        stmts.push(db.prepare(
+          'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, date_recommend_expires, ward_member_id, with_stake, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)'
+        ).bind(legalName, interviewType, 'Unassigned', '', member.recommend_expires || '', member.id, now, now));
+        flagged++;
+      }
+    }
+
+    // Only reconcile rows we could plausibly have set ourselves (linked to a
+    // ward member) — a with_stake flag on an unlinked row was set some other
+    // way and isn't ours to touch.
+    const currentlyFlagged = (await db.prepare(
+      "SELECT id, ward_member_id FROM interview_pipeline WHERE with_stake = 1 AND type_of_interview IN ('Endowed Temple Rec', 'Limited') AND ward_member_id IS NOT NULL"
+    ).all<{ id: number; ward_member_id: number }>()).results;
+    let cleared = 0;
+    for (const row of currentlyFlagged) {
+      if (!matchedMemberIds.has(row.ward_member_id)) {
+        stmts.push(db.prepare('UPDATE interview_pipeline SET with_stake = 0, updated_at = ? WHERE id = ?').bind(now, row.id));
+        cleared++;
+      }
+    }
+
+    if (stmts.length > 0) await db.batch(stmts);
+    return json({ ok: true, flagged, cleared, unmatched });
   }
 
   // Bulk temple-recommend-status sync (e.g. from an automated LCR export). Matches rows

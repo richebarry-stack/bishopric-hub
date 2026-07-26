@@ -27,6 +27,12 @@ function splitLastFirst(name: string): { last: string; first: string } {
   return { last: last.toLowerCase(), first: first.toLowerCase() };
 }
 
+/** Same split as splitLastFirst but preserving case, for actual creates. */
+export function splitLastFirstCased(name: string): { last: string; first: string } {
+  const [last = '', first = ''] = name.split(',').map(p => p.trim());
+  return { last, first };
+}
+
 function firstToken(s: string): string {
   return s.split(/\s+/)[0] || '';
 }
