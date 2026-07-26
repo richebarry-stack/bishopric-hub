@@ -68,12 +68,13 @@ function NameCell({ member, onSave }: { member: WardMember; onSave: (fields: { f
       else { setFirst(member.first_name); setLast(member.last_name); }
     };
     return (
-      <div className="flex gap-1">
+      <div className="flex gap-1"
+        onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) commit(); }}>
         <input autoFocus value={last} onChange={e => setLast(e.target.value)} placeholder="Last"
-          onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
+          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
           className="text-sm rounded border border-gray-300 px-1.5 py-0.5 w-24" />
         <input value={first} onChange={e => setFirst(e.target.value)} placeholder="First"
-          onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
+          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
           className="text-sm rounded border border-gray-300 px-1.5 py-0.5 w-24" />
       </div>
     );
@@ -99,12 +100,13 @@ function PreferredNameCell({ member, onSave }: { member: WardMember; onSave: (fi
       }
     };
     return (
-      <div className="flex gap-1">
+      <div className="flex gap-1"
+        onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) commit(); }}>
         <input autoFocus value={last} onChange={e => setLast(e.target.value)} placeholder="Last"
-          onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
+          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
           className="text-xs rounded border border-gray-300 px-1.5 py-0.5 w-20" />
         <input value={first} onChange={e => setFirst(e.target.value)} placeholder="First"
-          onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
+          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
           className="text-xs rounded border border-gray-300 px-1.5 py-0.5 w-20" />
       </div>
     );
@@ -133,14 +135,15 @@ function RecommendCell({ member, onSave }: { member: WardMember; onSave: (fields
       }
     };
     return (
-      <div className="flex gap-1">
-        <select value={type} onChange={e => setType(e.target.value)} onBlur={commit}
+      <div className="flex gap-1"
+        onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) commit(); }}>
+        <select value={type} onChange={e => setType(e.target.value)}
           className="text-xs rounded border border-gray-300 px-1 py-0.5">
           <option value="">—</option>
           <option value="Endowed">Endowed</option>
           <option value="Limited">Limited</option>
         </select>
-        <input type="month" value={expires} onChange={e => setExpires(e.target.value)} onBlur={commit}
+        <input type="month" value={expires} onChange={e => setExpires(e.target.value)}
           className="text-xs rounded border border-gray-300 px-1 py-0.5" />
       </div>
     );
