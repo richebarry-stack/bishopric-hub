@@ -3,7 +3,7 @@ import type { InterviewPipeline as InterviewType } from '../../lib/api';
 import StatusBadge from '../StatusBadge';
 import { INTERVIEW_STATUS_COLORS, SETUP_STATUS_COLORS, SETTING_APART_STATUS_COLORS } from '../../lib/constants';
 import {
-  type RowMeta, type SortKey, YOUTH_STATE_RANK, YOUTH_STATE_COLORS,
+  type RowMeta, type SortKey, YOUTH_STATE_RANK, YOUTH_STATE_COLORS, TEMPLE_TYPES,
   recommendRowClass, formatRecommendDate, isPast,
 } from './shared';
 
@@ -118,7 +118,12 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
                   <input type="checkbox" checked={selected.has(r.id)} onChange={() => onToggleSelect(r.id)}
                     className="rounded border-gray-300 text-blue-600" />
                 </td>
-                <td className="px-3 py-2 font-medium text-gray-900">{meta?.displayName ?? r.member}</td>
+                <td className="px-3 py-2 font-medium text-gray-900">
+                  {meta?.displayName ?? r.member}
+                  {TEMPLE_TYPES.has(r.type_of_interview) && !!r.with_stake && (
+                    <span className="ml-1.5 text-xs font-normal text-gray-400">(Stake)</span>
+                  )}
+                </td>
                 {showAge && <td className="px-3 py-2 text-gray-600 text-center">{meta?.age ?? '—'}</td>}
                 {showCalling && <td className="px-3 py-2 text-gray-600">{meta?.calling ?? ''}</td>}
                 <td className="px-3 py-2">
@@ -175,6 +180,9 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium text-gray-900 truncate">
                       {meta?.displayName ?? r.member}{showAge && meta?.age !== undefined && <span className="text-gray-500 font-normal"> (age {meta.age})</span>}
+                      {TEMPLE_TYPES.has(r.type_of_interview) && !!r.with_stake && (
+                        <span className="ml-1.5 text-xs font-normal text-gray-400">(Stake)</span>
+                      )}
                     </p>
                     <button onClick={e => { e.stopPropagation(); onDelete(r.id); }}
                       className="text-red-400 hover:text-red-600 text-xs shrink-0">Del</button>

@@ -31,6 +31,7 @@ export function useInterviews() {
   const [bulkSetupAssignedTo, setBulkSetupAssignedTo] = useState('');
   const [showAgedOutYouth, setShowAgedOutYouth] = useState(false);
   const [showUpToDateYouth, setShowUpToDateYouth] = useState(true);
+  const [showStakeInterviews, setShowStakeInterviews] = useState(true);
 
   const bishopricOptions = useMemo(() =>
     allUsers.filter(u => u.church_role && /bishop|counselor/i.test(u.church_role)).map(u => u.name),
@@ -104,6 +105,7 @@ export function useInterviews() {
     if (statusFilter && r.status !== statusFilter) return false;
     if (assignedFilter && r.assigned_to !== assignedFilter) return false;
     if (typeFilter && r.type_of_interview !== typeFilter) return false;
+    if (!showStakeInterviews && TEMPLE_TYPES.has(r.type_of_interview) && r.with_stake) return false;
     if (filter) {
       const q = filter.toLowerCase();
       const name = rowMetaById.get(r.id)?.displayName ?? r.member;
@@ -205,6 +207,10 @@ export function useInterviews() {
     rows.filter(r => YOUTH_TYPES.has(r.type_of_interview) && rowMetaById.get(r.id)?.youthState === 'Up to date').length,
     [rows, rowMetaById]);
 
+  const stakeInterviewCount = useMemo(() =>
+    rows.filter(r => TEMPLE_TYPES.has(r.type_of_interview) && r.with_stake).length,
+    [rows]);
+
   useEffect(() => {
     const editingLinkedMember = editing?.ward_member_id ? wardMembersById.get(editing.ward_member_id) : undefined;
     setPreferredNameDraft(editingLinkedMember?.preferred_first_name || '');
@@ -217,7 +223,7 @@ export function useInterviews() {
     rows, isLoading, filtered, remove, quickAssignSetup,
     wardMembers, wardMembersById, wardMembersLoading, ageByName, activeYouthWardMemberIds, callingsById,
     bishopricOptions, setupOptions, assignedOptions,
-    rowMetaById, agedOutYouthCount, upToDateYouthCount,
+    rowMetaById, agedOutYouthCount, upToDateYouthCount, stakeInterviewCount,
     editing, setEditing,
     preferredNameDraft, setPreferredNameDraft,
     filter, setFilter, statusFilter, setStatusFilter, assignedFilter, setAssignedFilter, typeFilter, setTypeFilter,
@@ -228,5 +234,6 @@ export function useInterviews() {
     handleSave,
     showAgedOutYouth, setShowAgedOutYouth,
     showUpToDateYouth, setShowUpToDateYouth,
+    showStakeInterviews, setShowStakeInterviews,
   };
 }

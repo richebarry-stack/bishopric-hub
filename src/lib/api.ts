@@ -169,6 +169,7 @@ export interface InterviewPipeline {
   next_interview_date: string;
   comments: string;
   notes: string;
+  with_stake?: number;
 }
 
 export interface Task {

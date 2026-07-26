@@ -85,6 +85,15 @@ export default function InterviewsPage({ title, description, types, showAge, sho
         </select>
       </div>
 
+      {h.stakeInterviewCount > 0 && (
+        <div className="mb-2">
+          <button onClick={() => h.setShowStakeInterviews(s => !s)}
+            className="text-xs text-gray-400 hover:text-gray-600">
+            {h.showStakeInterviews ? 'Hide' : 'Show'} interviews with the stake ({h.stakeInterviewCount})
+          </button>
+        </div>
+      )}
+
       {h.selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-md px-3 py-2 text-sm">
           <span className="text-blue-700 font-medium">{h.selected.size} selected</span>

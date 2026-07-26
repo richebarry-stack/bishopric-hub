@@ -128,11 +128,7 @@ function AppRoutes() {
         <Route element={<Layout />}>
           <Route path="/youth-activities" element={<YouthActivities />} />
           {!isYcGuest && <Route path="/yc-meetings" element={<YcMeetings />} />}
-          {/* Tasks are scoped server-side by the ?viewHub= param for dual-access accounts
-              (see functions/api/[[route]].ts), so both genuine YC accounts and a 'both'
-              account currently viewing this hub only ever see Youth Council-tagged tasks. */}
           {!isYcGuest && <Route path="/my-actions" element={<MyActions />} />}
-          {!isYcGuest && <Route path="/tasks" element={<Tasks />} />}
           {!isYcGuest && <Route path="/help" element={<Help />} />}
           <Route path="*" element={<Navigate to="/youth-activities" replace />} />
         </Route>
