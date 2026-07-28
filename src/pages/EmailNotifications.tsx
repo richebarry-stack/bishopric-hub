@@ -31,6 +31,14 @@ function parseNames(json: string | null): string[] {
   try { return JSON.parse(json); } catch { return []; }
 }
 
+function parseChanged(json: string | null, secondKey: 'calling' | 'section'): string[] {
+  if (!json) return [];
+  try {
+    const items = JSON.parse(json) as Record<string, string>[];
+    return items.map(it => `${it.name} — ${it[secondKey]} (${it.action})`);
+  } catch { return []; }
+}
+
 function NameList({ label, names }: { label: string; names: string[] }) {
   if (names.length === 0) return null;
   return (
@@ -50,7 +58,7 @@ function LcrSyncHistory() {
     <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
       <div>
         <h2 className="font-semibold text-gray-800 text-sm">LCR Sync History</h2>
-        <p className="text-xs text-gray-400 mt-0.5">Weekly roster/recommend/stake-activation sync run from your computer (scripts/lcr-sync) — not automatic on the server.</p>
+        <p className="text-xs text-gray-400 mt-0.5">Weekly roster/recommend/stake-activation/callings/missionary sync run from your computer (scripts/lcr-sync) — not automatic on the server.</p>
       </div>
       {isLoading ? (
         <p className="text-sm text-gray-400">Loading…</p>
@@ -76,6 +84,12 @@ function LcrSyncHistory() {
                   <NameList label="Unmatched recommends" names={parseNames(run.recommend_unmatched)} />
                   <p>Stake activations: {run.stake_flagged ?? 0} flagged, {run.stake_cleared ?? 0} cleared{parseNames(run.stake_unmatched).length > 0 ? `, ${parseNames(run.stake_unmatched).length} unmatched` : ''}</p>
                   <NameList label="Unmatched stake activations" names={parseNames(run.stake_unmatched)} />
+                  <p>Callings: {run.callings_created ?? 0} created, {run.callings_updated ?? 0} updated, {run.callings_released ?? 0} released{parseNames(run.callings_unmatched).length > 0 ? `, ${parseNames(run.callings_unmatched).length} unmatched` : ''}</p>
+                  <NameList label="Callings changed" names={parseChanged(run.callings_changed, 'calling')} />
+                  <NameList label="Unmatched callings" names={parseNames(run.callings_unmatched)} />
+                  <p>Missionary status: {run.missionary_created ?? 0} created, {run.missionary_updated ?? 0} updated{parseNames(run.missionary_unmatched).length > 0 ? `, ${parseNames(run.missionary_unmatched).length} unmatched` : ''}</p>
+                  <NameList label="Missionary status changed" names={parseChanged(run.missionary_changed, 'section')} />
+                  <NameList label="Unmatched missionaries" names={parseNames(run.missionary_unmatched)} />
                 </div>
               )}
             </div>

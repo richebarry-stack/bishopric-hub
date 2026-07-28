@@ -109,6 +109,14 @@ export const api = {
       request<{ ok: true; flagged: number; cleared: number; unmatched: string[] }>('/ward-members/sync-stake-activations', {
         method: 'POST', body: JSON.stringify({ names }),
       }),
+    syncCallings: (rows: { organization: string | null; calling: string; person: string; sustained_date: string | null; set_apart: boolean }[]) =>
+      request<{ ok: true; created: number; updated: number; released: number; changed: { name: string; calling: string; action: string }[]; unmatched: string[] }>('/ward-members/sync-callings', {
+        method: 'POST', body: JSON.stringify({ rows }),
+      }),
+    syncMissionaryStatus: (rows: { name: string; section: string; mission: string | null; mission_start: string | null; mission_end: string | null; received_date: string | null; assignment_made_date: string | null }[]) =>
+      request<{ ok: true; created: number; updated: number; changed: { name: string; section: string; action: string }[]; unmatched: string[] }>('/ward-members/sync-missionary-status', {
+        method: 'POST', body: JSON.stringify({ rows }),
+      }),
   },
   automationStatus: {
     get: () => request<{ last_run: string | null; results: Record<string, { ok: boolean; error?: string; [key: string]: unknown }> }>('/automation-status'),
@@ -162,6 +170,8 @@ export interface CallingPipeline {
   release_recorded: number;
   organization: string;
   type: string; // 'Calling' | 'Release'
+  ward_member_id: number | null;
+  sustained_date: string | null;
   updated_at: string;
   updated_by?: string;
 }
@@ -385,6 +395,8 @@ export interface MissionaryPipeline {
   report_date: string;
   release_date: string;
   status: string;
+  ward_member_id: number | null;
+  mission_end_estimated: string | null;
 }
 
 export interface Baby {
@@ -533,6 +545,15 @@ export interface LcrSyncRun {
   stake_flagged: number | null;
   stake_cleared: number | null;
   stake_unmatched: string | null; // JSON-stringified string[]
+  callings_created: number | null;
+  callings_updated: number | null;
+  callings_released: number | null;
+  callings_changed: string | null; // JSON-stringified {name, calling, action}[]
+  callings_unmatched: string | null; // JSON-stringified string[]
+  missionary_created: number | null;
+  missionary_updated: number | null;
+  missionary_changed: string | null; // JSON-stringified {name, section, action}[]
+  missionary_unmatched: string | null; // JSON-stringified string[]
   updated_by: string | null;
 }
 

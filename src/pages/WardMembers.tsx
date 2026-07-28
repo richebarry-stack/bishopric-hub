@@ -4,9 +4,11 @@ import { toast } from '../lib/toast';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useAuth } from '../lib/auth';
 import { legalName } from '../lib/displayName';
-import type { WardMember, InterviewPipeline } from '../lib/api';
+import type { WardMember, InterviewPipeline, CallingPipeline } from '../lib/api';
 import WardMemberImport from '../components/WardMemberImport';
 import { YOUTH_TYPES, formatRecommendDate } from '../components/interviews/shared';
+import { CALLING_STATUSES, CALLING_STATUS_COLORS } from '../lib/constants';
+import StatusBadge from '../components/StatusBadge';
 
 function currentAge(birthDate: string | null): number | null {
   if (!birthDate) return null;
@@ -174,6 +176,45 @@ function GenderCell({ member, onSave }: { member: WardMember; onSave: (v: string
   );
 }
 
+function CallingsCell({ callings, expanded, onToggle }: { callings: CallingPipeline[]; expanded: boolean; onToggle: () => void }) {
+  const names = callings.map(c => c.calling).join(', ');
+  return (
+    <button type="button" onClick={onToggle}
+      className="text-left text-xs text-gray-600 hover:text-blue-600 hover:underline max-w-[180px] truncate block"
+      title={names || undefined}>
+      {names || <span className="text-gray-300">—</span>}
+      {callings.length > 0 && <span className="ml-1 text-gray-400">{expanded ? '▲' : '▼'}</span>}
+    </button>
+  );
+}
+
+function CallingEditRow({ calling, onUpdate }: { calling: CallingPipeline; onUpdate: (fields: Record<string, unknown>) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 py-1.5 border-b border-gray-100 last:border-0 text-sm">
+      <span className="flex-1 min-w-[120px] text-gray-800">{calling.calling}</span>
+      <StatusBadge status={calling.status} colors={CALLING_STATUS_COLORS} />
+      <select value={calling.status} onChange={e => onUpdate({ status: e.target.value })}
+        aria-label={`Status for ${calling.calling}`}
+        className="text-xs rounded border border-gray-300 px-1.5 py-0.5">
+        {CALLING_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+      </select>
+      <label className="flex items-center gap-1 text-xs text-gray-500">
+        Sustained
+        <input type="date" value={(calling.sustained_date || '').slice(0, 10)}
+          onChange={e => onUpdate({ sustained_date: e.target.value })}
+          aria-label={`Sustained date for ${calling.calling}`}
+          className="text-xs rounded border border-gray-300 px-1.5 py-0.5" />
+      </label>
+      <label className="flex items-center gap-1 text-xs text-gray-600">
+        <input type="checkbox" checked={!!calling.set_apart_recorded}
+          onChange={e => onUpdate({ set_apart_recorded: e.target.checked ? 1 : 0 })}
+          className="rounded border-gray-300" />
+        Set apart
+      </label>
+    </div>
+  );
+}
+
 interface GroupedRows {
   adults: WardMember[];
   youth: WardMember[];
@@ -181,7 +222,7 @@ interface GroupedRows {
   unknown: WardMember[];
 }
 
-function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, showRecommend = true }: {
+function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, callingsByMember, expandedId, onToggleExpand, onUpdateCalling, showRecommend = true }: {
   title: string;
   members: WardMember[];
   onToggleActive: (m: WardMember) => void;
@@ -193,6 +234,10 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
   onSavePreferredName: (m: WardMember, fields: { preferred_first_name: string; preferred_last_name: string }) => void;
   onToggleOutOfWard: (m: WardMember) => void;
   onSaveRecommend: (m: WardMember, fields: { recommend_type: string; recommend_expires: string }) => void;
+  callingsByMember: Map<number, CallingPipeline[]>;
+  expandedId: number | null;
+  onToggleExpand: (id: number) => void;
+  onUpdateCalling: (callingId: number, fields: Record<string, unknown>) => void;
   showRecommend?: boolean;
 }) {
   if (members.length === 0) return null;
@@ -213,11 +258,13 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-24">Status</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Speakers</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Prayers</th>
+              <th className="text-left px-4 py-2 font-medium text-gray-600 w-44">Callings</th>
               <th className="text-right px-4 py-2 font-medium text-gray-600 w-32">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {members.map(m => (
+            {members.map(m => { const memberCallings = callingsByMember.get(m.id) || []; return (
+              <>
               <tr key={m.id} className={`border-b border-gray-50 hover:bg-gray-50 ${!m.active ? 'opacity-60' : ''}`}>
                 <td className="px-4 py-2 font-medium text-gray-900">
                   <NameCell member={m} onSave={fields => onSaveName(m, fields)} />
@@ -262,6 +309,9 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                     {m.exclude_prayers ? 'Excluded' : 'Included'}
                   </button>
                 </td>
+                <td className="px-4 py-2">
+                  <CallingsCell callings={memberCallings} expanded={expandedId === m.id} onToggle={() => onToggleExpand(m.id)} />
+                </td>
                 <td className="px-4 py-2 text-right space-x-2">
                   <button onClick={() => onToggleOutOfWard(m)}
                     title="Informational flag only — does not remove them from ward lists or affect Speakers/Prayers eligibility."
@@ -283,7 +333,21 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                   )}
                 </td>
               </tr>
-            ))}
+              {expandedId === m.id && (
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <td colSpan={showRecommend ? 10 : 9} className="px-4 py-2">
+                    {memberCallings.length === 0 ? (
+                      <p className="text-xs text-gray-400">No current callings.</p>
+                    ) : (
+                      memberCallings.map(c => (
+                        <CallingEditRow key={c.id} calling={c} onUpdate={fields => onUpdateCalling(c.id, fields)} />
+                      ))
+                    )}
+                  </td>
+                </tr>
+              )}
+              </>
+            );})}
           </tbody>
         </table>
       </div>
@@ -296,6 +360,7 @@ export default function WardMembers() {
   const isAdmin = user?.role === 'admin';
   const { rows, create, update, remove, refetch } = useTable<WardMember>('ward-members');
   const { rows: interviews, update: updateInterview } = useTable<InterviewPipeline>('interview-pipeline');
+  const { rows: callings, update: updateCalling } = useTable<CallingPipeline>('calling-pipeline');
   const [filter, setFilter] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -303,6 +368,22 @@ export default function WardMembers() {
   const [newLast, setNewLast] = useState('');
   const [newFirst, setNewFirst] = useState('');
   const [saving, setSaving] = useState(false);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const callingsByMember = useMemo(() => {
+    const m = new Map<number, CallingPipeline[]>();
+    for (const c of callings) {
+      if (c.type !== 'Calling' || c.ward_member_id === null || c.status === '9. Released' || c.status === '10. Declined') continue;
+      const list = m.get(c.ward_member_id) || [];
+      list.push(c);
+      m.set(c.ward_member_id, list);
+    }
+    return m;
+  }, [callings]);
+
+  const toggleExpand = useCallback((id: number) => {
+    setExpandedId(prev => (prev === id ? null : id));
+  }, []);
 
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
@@ -387,7 +468,16 @@ export default function WardMembers() {
     if (await confirm({ message: `Permanently delete ${legalName(m)}? This cannot be undone.` })) remove(m.id);
   }, [remove, confirm]);
 
-  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude, onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSaveName: saveName, onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard, onSaveRecommend: saveRecommend };
+  const updateCallingFields = useCallback((callingId: number, fields: Record<string, unknown>) => {
+    updateCalling(callingId, fields);
+  }, [updateCalling]);
+
+  const sectionProps = {
+    onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude,
+    onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSaveName: saveName,
+    onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard, onSaveRecommend: saveRecommend,
+    callingsByMember, expandedId, onToggleExpand: toggleExpand, onUpdateCalling: updateCallingFields,
+  };
 
   return (
     <div>

@@ -7,6 +7,12 @@ export interface RosterMember {
   last_name: string;
 }
 
+/** Strips **bold** markdown markers (src/lib/richText.tsx's client-side twin) so
+ * free-text fields like calling_pipeline.member can be matched against a roster name. */
+export function stripBold(text: string): string {
+  return (text || '').replace(/\*\*/g, '');
+}
+
 /** Normalizes "First Last" or "First Middle Last" into "Last, First". */
 export function toLastFirst(raw: string): string {
   const s = raw.trim().replace(/\s+/g, ' ');

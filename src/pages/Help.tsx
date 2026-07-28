@@ -577,6 +577,9 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
               date: 'Jul 27, 2026',
               items: [
                 'Automation & Notifications: added an "LCR Sync History" panel showing every run of the weekly LCR sync script — new members created, details filled in, members missing from the LCR roster, recommends updated, and stake activations flagged/cleared, with unmatched names listed for review.',
+                'Ward Members: added a Callings column — click a row to expand it and see/edit each of that member\'s current callings (status, sustained date, set apart) inline.',
+                'Missionary Pipeline: replaced the generic mid/late-stage statuses with ones that match the church\'s own missionary tracking stages (Candidate Completing Forms, With the Stake President, With Church Headquarters, Assignment Made, Entered the MTC, Entered the Mission Field, On Leave, Released from Mission Field, Canceled).',
+                'Internal: extended the LCR sync with callings (sustained date, set-apart status, auto-recorded releases) and missionary status, matched to ward members by roster link rather than name text so near-miss spellings don\'t create duplicates.',
               ],
             },
             {

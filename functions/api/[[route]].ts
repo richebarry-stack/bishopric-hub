@@ -1,5 +1,5 @@
 import { syncConduct, runDailyJobs, syncSettingApartInterviews, syncTempleRecommendInterviews } from './jobs';
-import { matchRosterMember, splitLastFirstCased, toLastFirst, type RosterMember } from './nameMatch';
+import { matchRosterMember, splitLastFirstCased, toLastFirst, stripBold, type RosterMember } from './nameMatch';
 
 interface Env {
   DB: D1Database;
@@ -1394,6 +1394,240 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     if (stmts.length > 0) await db.batch(stmts);
     return json({ ok: true, flagged, cleared, unmatched });
+  }
+
+  // Bulk callings sync from LCR's Organizations page. Matches by ward_member_id
+  // (backfilling it from calling_pipeline's free-text member name where missing)
+  // rather than raw name strings, since LCR names and locally-typed names can
+  // differ slightly. Creates/advances Calling rows for what LCR shows active,
+  // and auto-records a release (via a companion Release row) for anything this
+  // sync previously linked that's no longer on LCR's list.
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'sync-callings' && method === 'POST') {
+    const body = await request.json() as {
+      rows?: { organization: string | null; calling: string; person: string; sustained_date: string | null; set_apart: boolean }[];
+    };
+    const rows = (body.rows || []).slice(0, 2000);
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    for (const r of rows) {
+      if (!r.person || !r.person.trim()) return json({ error: 'Row missing person' }, 400);
+      if (!r.calling || !r.calling.trim()) return json({ error: `Row missing calling for "${r.person}"` }, 400);
+      if (r.sustained_date && !dateRe.test(r.sustained_date)) return json({ error: `Invalid sustained_date "${r.sustained_date}" for "${r.person}"` }, 400);
+    }
+
+    const CALLING_STATUS_ORDER = [
+      '1. Discussion', '2. Pray about', '3. Approved and assigned', '4. Called & accepted',
+      '4.5 Call & accepted, handle in class/quorum', '5. Sustained', '6. Set apart',
+      '7. Need to release', '8. Need to thank at pulpit', '9. Released', '10. Declined',
+    ];
+    const statusIdx = (s: string) => { const i = CALLING_STATUS_ORDER.indexOf(s); return i === -1 ? 0 : i; };
+    const normCalling = (s: string) => stripBold(s).trim().toLowerCase();
+
+    const roster = (await db.prepare('SELECT id, first_name, last_name FROM ward_members WHERE active = 1').all<RosterMember>()).results;
+
+    interface CallingRow {
+      id: number; member: string; calling: string; organization: string | null; status: string;
+      ward_member_id: number | null; sustain_recorded: number; set_apart_recorded: number;
+      sustained_date: string | null; type: string;
+    }
+    const allCallings = (await db.prepare(
+      'SELECT id, member, calling, organization, status, ward_member_id, sustain_recorded, set_apart_recorded, sustained_date, type FROM calling_pipeline'
+    ).all<CallingRow>()).results;
+
+    const now = new Date().toISOString();
+    const backfillStmts = [];
+    for (const c of allCallings) {
+      if (c.type === 'Calling' && c.ward_member_id === null) {
+        const m = matchRosterMember(stripBold(c.member), roster);
+        if (m) {
+          backfillStmts.push(db.prepare('UPDATE calling_pipeline SET ward_member_id = ? WHERE id = ?').bind(m.id, c.id));
+          c.ward_member_id = m.id;
+        }
+      }
+    }
+    if (backfillStmts.length > 0) await db.batch(backfillStmts);
+
+    // A Calling row counts as "superseded" once a Release row for the same
+    // (member, calling) at status='9. Released' was created after it — id order
+    // is used as a chronology proxy since rows aren't otherwise linked.
+    const isSuperseded = (c: { id: number; ward_member_id: number | null; calling: string }) =>
+      allCallings.some(r => r.type === 'Release' && r.ward_member_id === c.ward_member_id &&
+        normCalling(r.calling) === normCalling(c.calling) && r.status === '9. Released' && r.id > c.id);
+
+    const stmts = [];
+    const changed: { name: string; calling: string; action: string }[] = [];
+    const unmatched: string[] = [];
+    let created = 0, updated = 0, released = 0;
+    const seenPairs = new Set<string>();
+
+    for (const row of rows) {
+      const member = matchRosterMember(row.person, roster);
+      if (!member) { unmatched.push(row.person); continue; }
+      seenPairs.add(`${member.id}|${normCalling(row.calling)}`);
+      const legalName = `${member.last_name}, ${member.first_name}`;
+      const targetStatus = row.set_apart ? '6. Set apart' : '5. Sustained';
+
+      const existing = allCallings
+        .filter(c => c.type === 'Calling' && c.ward_member_id === member.id && normCalling(c.calling) === normCalling(row.calling) && !isSuperseded(c))
+        .sort((a, b) => b.id - a.id)[0];
+
+      if (existing) {
+        const updates: Record<string, unknown> = {};
+        if (statusIdx(targetStatus) > statusIdx(existing.status)) updates.status = targetStatus;
+        if (!existing.sustain_recorded) updates.sustain_recorded = 1;
+        if (row.set_apart && !existing.set_apart_recorded) updates.set_apart_recorded = 1;
+        if (row.sustained_date && row.sustained_date !== existing.sustained_date) updates.sustained_date = row.sustained_date;
+        if ((row.organization || '') !== (existing.organization || '')) updates.organization = row.organization;
+        if (Object.keys(updates).length > 0) {
+          const setClause = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+          stmts.push(db.prepare(`UPDATE calling_pipeline SET ${setClause}, updated_at = ? WHERE id = ?`)
+            .bind(...Object.values(updates), now, existing.id));
+          updated++;
+          changed.push({ name: legalName, calling: row.calling, action: updates.status === '6. Set apart' ? 'set apart' : updates.status === '5. Sustained' ? 'sustained' : 'updated' });
+        }
+      } else {
+        stmts.push(db.prepare(
+          'INSERT INTO calling_pipeline (member, calling, organization, status, sustain_recorded, set_apart_recorded, sustained_date, type, ward_member_id, assigned_to, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)'
+        ).bind(legalName, row.calling, row.organization || '', targetStatus, row.set_apart ? 1 : 0, row.sustained_date, 'Calling', member.id, '', now, now));
+        created++;
+        changed.push({ name: legalName, calling: row.calling, action: 'created' });
+      }
+    }
+
+    // Release reconciliation: any active, linked Calling row not seen in this
+    // week's LCR dump means the person was released from it.
+    const activeCallings = allCallings.filter(c =>
+      c.type === 'Calling' && c.ward_member_id !== null &&
+      !['9. Released', '10. Declined'].includes(c.status) && !isSuperseded(c));
+    for (const c of activeCallings) {
+      if (seenPairs.has(`${c.ward_member_id}|${normCalling(c.calling)}`)) continue;
+
+      const inProgressRelease = allCallings.find(r =>
+        r.type === 'Release' && r.ward_member_id === c.ward_member_id &&
+        normCalling(r.calling) === normCalling(c.calling) && r.status !== '9. Released' && r.id > c.id);
+
+      if (inProgressRelease) {
+        stmts.push(db.prepare('UPDATE calling_pipeline SET status = ?, release_recorded = 1, updated_at = ? WHERE id = ?').bind('9. Released', now, inProgressRelease.id));
+      } else {
+        stmts.push(db.prepare(
+          'INSERT INTO calling_pipeline (member, calling, organization, status, release_recorded, type, ward_member_id, assigned_to, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?)'
+        ).bind(c.member, c.calling, c.organization || '', '9. Released', 'Release', c.ward_member_id, '', now, now));
+      }
+      released++;
+      changed.push({ name: c.member, calling: c.calling, action: 'released' });
+    }
+
+    if (stmts.length > 0) await db.batch(stmts);
+    return json({ ok: true, created, updated, released, changed, unmatched });
+  }
+
+  // Bulk missionary-status sync from missionaryrecommendations.churchofjesuschrist.org.
+  // Section names map 1:1 onto MISSIONARY_STATUSES (src/lib/constants.ts) — status is
+  // only ever advanced forward, never regressed, and disappearing from a section
+  // doesn't undo anything (unlike callings/stake-activations, there's no "gone means
+  // reverted" signal here — a released missionary just stops appearing next week).
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'sync-missionary-status' && method === 'POST') {
+    const body = await request.json() as {
+      rows?: {
+        name: string; section: string; mission: string | null; mission_start: string | null;
+        mission_end: string | null; received_date: string | null; assignment_made_date: string | null;
+      }[];
+    };
+    const rows = (body.rows || []).slice(0, 500);
+
+    const SECTION_TO_STATUS: Record<string, string> = {
+      'Candidate(s) Completing Forms': 'Candidate Completing Forms',
+      "Ready for Bishop's Action": "Ready for Bishop's Action",
+      'With the Stake President': 'With the Stake President',
+      'With Church Headquarters': 'With Church Headquarters',
+      'Assignment Made': 'Assignment Made',
+      'Postponed Mission Start Date': 'Postponed Mission Start Date',
+      'Entered the MTC': 'Entered the MTC',
+      'Entered the Mission Field': 'Entered the Mission Field',
+      'On Leave': 'On Leave',
+      'Released from Mission Field': 'Released from Mission Field',
+      'Canceled': 'Canceled',
+    };
+    const STATUS_ORDER = [
+      '0-Not at this time', '1-Considering', '2-Papers Started', 'Candidate Completing Forms',
+      "Ready for Bishop's Action", 'With the Stake President', 'With Church Headquarters',
+      'Assignment Made', 'Postponed Mission Start Date', 'Entered the MTC',
+      'Entered the Mission Field', 'On Leave', 'Released from Mission Field', 'Canceled',
+    ];
+    const statusIdx = (s: string) => { const i = STATUS_ORDER.indexOf(s); return i === -1 ? 0 : i; };
+
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    for (const r of rows) {
+      if (!r.name || !r.name.trim()) return json({ error: 'Row missing name' }, 400);
+      if (!SECTION_TO_STATUS[r.section]) return json({ error: `Unknown section "${r.section}" for "${r.name}"` }, 400);
+      for (const d of [r.mission_start, r.mission_end, r.received_date, r.assignment_made_date]) {
+        if (d && !dateRe.test(d)) return json({ error: `Invalid date "${d}" for "${r.name}"` }, 400);
+      }
+    }
+
+    const roster = (await db.prepare('SELECT id, first_name, last_name FROM ward_members WHERE active = 1').all<RosterMember>()).results;
+
+    interface MissionaryRow {
+      id: number; who: string; status: string; ward_member_id: number | null;
+      report_date: string | null; release_date: string | null; mission_call: string | null;
+      mission_end_estimated: string | null;
+    }
+    const allMissionaries = (await db.prepare(
+      'SELECT id, who, status, ward_member_id, report_date, release_date, mission_call, mission_end_estimated FROM missionary_pipeline'
+    ).all<MissionaryRow>()).results;
+
+    const now = new Date().toISOString();
+    const backfillStmts = [];
+    for (const m of allMissionaries) {
+      if (m.ward_member_id === null) {
+        const match = matchRosterMember(m.who, roster);
+        if (match) {
+          backfillStmts.push(db.prepare('UPDATE missionary_pipeline SET ward_member_id = ? WHERE id = ?').bind(match.id, m.id));
+          m.ward_member_id = match.id;
+        }
+      }
+    }
+    if (backfillStmts.length > 0) await db.batch(backfillStmts);
+
+    const stmts = [];
+    const changed: { name: string; section: string; action: string }[] = [];
+    const unmatched: string[] = [];
+    let created = 0, updated = 0;
+
+    for (const row of rows) {
+      const member = matchRosterMember(row.name, roster);
+      if (!member) { unmatched.push(row.name); continue; }
+      const targetStatus = SECTION_TO_STATUS[row.section];
+      const legalName = `${member.last_name}, ${member.first_name}`;
+      const reportDate = row.mission_start || row.received_date || row.assignment_made_date || null;
+
+      const existing = allMissionaries.find(m => m.ward_member_id === member.id && m.status !== 'Released from Mission Field')
+        || allMissionaries.filter(m => m.ward_member_id === member.id).sort((a, b) => b.id - a.id)[0];
+
+      if (existing) {
+        const updates: Record<string, unknown> = {};
+        if (statusIdx(targetStatus) > statusIdx(existing.status)) updates.status = targetStatus;
+        if (row.mission && row.mission !== existing.mission_call) updates.mission_call = row.mission;
+        if (reportDate && reportDate !== existing.report_date) updates.report_date = reportDate;
+        if (row.mission_end && row.mission_end !== existing.mission_end_estimated) updates.mission_end_estimated = row.mission_end;
+        if (targetStatus === 'Released from Mission Field' && !existing.release_date) updates.release_date = reportDate || now.slice(0, 10);
+        if (Object.keys(updates).length > 0) {
+          const setClause = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+          stmts.push(db.prepare(`UPDATE missionary_pipeline SET ${setClause}, updated_at = ? WHERE id = ?`)
+            .bind(...Object.values(updates), now, existing.id));
+          updated++;
+          changed.push({ name: legalName, section: row.section, action: 'updated' });
+        }
+      } else {
+        stmts.push(db.prepare(
+          'INSERT INTO missionary_pipeline (who, status, ward_member_id, mission_call, report_date, mission_end_estimated, release_date, notes, next_steps, temple_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        ).bind(legalName, targetStatus, member.id, row.mission, reportDate, row.mission_end, targetStatus === 'Released from Mission Field' ? reportDate : null, '', '', '', now, now));
+        created++;
+        changed.push({ name: legalName, section: row.section, action: 'created' });
+      }
+    }
+
+    if (stmts.length > 0) await db.batch(stmts);
+    return json({ ok: true, created, updated, changed, unmatched });
   }
 
   // Bulk temple-recommend-status sync (e.g. from an automated LCR export). Matches rows
