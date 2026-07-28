@@ -176,6 +176,22 @@ export interface CallingPipeline {
   updated_by?: string;
 }
 
+export interface MemberCalling {
+  id: number;
+  ward_member_id: number;
+  calling: string;
+  organization: string;
+  sustained_date: string | null;
+  set_apart: number;
+  synced_at: string;
+}
+
+export interface RosterReviewFlag {
+  id: number;
+  ward_member_id: number;
+  flagged_at: string;
+}
+
 export interface InterviewPipeline {
   id: number;
   member: string;

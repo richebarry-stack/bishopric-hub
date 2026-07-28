@@ -4,11 +4,15 @@ import { toast } from '../lib/toast';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useAuth } from '../lib/auth';
 import { legalName } from '../lib/displayName';
-import type { WardMember, InterviewPipeline, CallingPipeline } from '../lib/api';
+import type { WardMember, InterviewPipeline, CallingPipeline, MemberCalling, RosterReviewFlag } from '../lib/api';
 import WardMemberImport from '../components/WardMemberImport';
 import { YOUTH_TYPES, formatRecommendDate } from '../components/interviews/shared';
 import { CALLING_STATUSES, CALLING_STATUS_COLORS } from '../lib/constants';
 import StatusBadge from '../components/StatusBadge';
+
+function normCalling(s: string): string {
+  return s.trim().toLowerCase();
+}
 
 function currentAge(birthDate: string | null): number | null {
   if (!birthDate) return null;
@@ -176,14 +180,15 @@ function GenderCell({ member, onSave }: { member: WardMember; onSave: (v: string
   );
 }
 
-function CallingsCell({ callings, expanded, onToggle }: { callings: CallingPipeline[]; expanded: boolean; onToggle: () => void }) {
-  const names = callings.map(c => c.calling).join(', ');
+function CallingsCell({ tracked, lcrOnly, expanded, onToggle }: { tracked: CallingPipeline[]; lcrOnly: MemberCalling[]; expanded: boolean; onToggle: () => void }) {
+  const names = [...tracked.map(c => c.calling), ...lcrOnly.map(c => c.calling)].join(', ');
+  const count = tracked.length + lcrOnly.length;
   return (
     <button type="button" onClick={onToggle}
       className="text-left text-xs text-gray-600 hover:text-blue-600 hover:underline max-w-[180px] truncate block"
       title={names || undefined}>
       {names || <span className="text-gray-300">—</span>}
-      {callings.length > 0 && <span className="ml-1 text-gray-400">{expanded ? '▲' : '▼'}</span>}
+      {count > 0 && <span className="ml-1 text-gray-400">{expanded ? '▲' : '▼'}</span>}
     </button>
   );
 }
@@ -215,6 +220,22 @@ function CallingEditRow({ calling, onUpdate }: { calling: CallingPipeline; onUpd
   );
 }
 
+function LcrCallingRow({ calling, onConsiderForRelease }: { calling: MemberCalling; onConsiderForRelease: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 py-1.5 border-b border-gray-100 last:border-0 text-sm">
+      <span className="flex-1 min-w-[120px] text-gray-800">{calling.calling}</span>
+      <span className="text-xs text-gray-400">{calling.organization}</span>
+      {calling.sustained_date && <span className="text-xs text-gray-400">Sustained {calling.sustained_date}</span>}
+      {!!calling.set_apart && <span className="text-xs text-gray-400">Set apart</span>}
+      <button type="button" onClick={onConsiderForRelease}
+        title="Start tracking this calling in the Calling Pipeline, flagged as needing release"
+        className="text-xs px-2 py-0.5 rounded text-orange-600 hover:bg-orange-50">
+        Consider for release
+      </button>
+    </div>
+  );
+}
+
 interface GroupedRows {
   adults: WardMember[];
   youth: WardMember[];
@@ -222,7 +243,7 @@ interface GroupedRows {
   unknown: WardMember[];
 }
 
-function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, callingsByMember, expandedId, onToggleExpand, onUpdateCalling, showRecommend = true }: {
+function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, callingsByMember, lcrCallingsByMember, expandedId, onToggleExpand, onUpdateCalling, onConsiderForRelease, sortByCallingDate, callingSortAsc, onToggleCallingSort, showRecommend = true }: {
   title: string;
   members: WardMember[];
   onToggleActive: (m: WardMember) => void;
@@ -235,9 +256,14 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
   onToggleOutOfWard: (m: WardMember) => void;
   onSaveRecommend: (m: WardMember, fields: { recommend_type: string; recommend_expires: string }) => void;
   callingsByMember: Map<number, CallingPipeline[]>;
+  lcrCallingsByMember: Map<number, MemberCalling[]>;
   expandedId: number | null;
   onToggleExpand: (id: number) => void;
   onUpdateCalling: (callingId: number, fields: Record<string, unknown>) => void;
+  onConsiderForRelease: (m: WardMember, calling: MemberCalling) => void;
+  sortByCallingDate: boolean;
+  callingSortAsc: boolean;
+  onToggleCallingSort: () => void;
   showRecommend?: boolean;
 }) {
   if (members.length === 0) return null;
@@ -258,12 +284,22 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-24">Status</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Speakers</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Prayers</th>
-              <th className="text-left px-4 py-2 font-medium text-gray-600 w-44">Callings</th>
+              <th className="text-left px-4 py-2 font-medium text-gray-600 w-44">
+                <button type="button" onClick={onToggleCallingSort} className="hover:text-gray-900 inline-flex items-center gap-1"
+                  title="Sort by most recent calling (sustained) date">
+                  Callings
+                  {sortByCallingDate && <span className="text-gray-400">{callingSortAsc ? '▲' : '▼'}</span>}
+                </button>
+              </th>
               <th className="text-right px-4 py-2 font-medium text-gray-600 w-32">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {members.map(m => { const memberCallings = callingsByMember.get(m.id) || []; return (
+            {members.map(m => {
+              const memberCallings = callingsByMember.get(m.id) || [];
+              const trackedNorm = new Set(memberCallings.map(c => normCalling(c.calling)));
+              const lcrOnly = (lcrCallingsByMember.get(m.id) || []).filter(c => !trackedNorm.has(normCalling(c.calling)));
+              return (
               <>
               <tr key={m.id} className={`border-b border-gray-50 hover:bg-gray-50 ${!m.active ? 'opacity-60' : ''}`}>
                 <td className="px-4 py-2 font-medium text-gray-900">
@@ -310,7 +346,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                   </button>
                 </td>
                 <td className="px-4 py-2">
-                  <CallingsCell callings={memberCallings} expanded={expandedId === m.id} onToggle={() => onToggleExpand(m.id)} />
+                  <CallingsCell tracked={memberCallings} lcrOnly={lcrOnly} expanded={expandedId === m.id} onToggle={() => onToggleExpand(m.id)} />
                 </td>
                 <td className="px-4 py-2 text-right space-x-2">
                   <button onClick={() => onToggleOutOfWard(m)}
@@ -336,12 +372,17 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
               {expandedId === m.id && (
                 <tr className="border-b border-gray-100 bg-gray-50">
                   <td colSpan={showRecommend ? 10 : 9} className="px-4 py-2">
-                    {memberCallings.length === 0 ? (
+                    {memberCallings.length === 0 && lcrOnly.length === 0 ? (
                       <p className="text-xs text-gray-400">No current callings.</p>
                     ) : (
-                      memberCallings.map(c => (
-                        <CallingEditRow key={c.id} calling={c} onUpdate={fields => onUpdateCalling(c.id, fields)} />
-                      ))
+                      <>
+                        {memberCallings.map(c => (
+                          <CallingEditRow key={c.id} calling={c} onUpdate={fields => onUpdateCalling(c.id, fields)} />
+                        ))}
+                        {lcrOnly.map(c => (
+                          <LcrCallingRow key={c.id} calling={c} onConsiderForRelease={() => onConsiderForRelease(m, c)} />
+                        ))}
+                      </>
                     )}
                   </td>
                 </tr>
@@ -360,7 +401,9 @@ export default function WardMembers() {
   const isAdmin = user?.role === 'admin';
   const { rows, create, update, remove, refetch } = useTable<WardMember>('ward-members');
   const { rows: interviews, update: updateInterview } = useTable<InterviewPipeline>('interview-pipeline');
-  const { rows: callings, update: updateCalling } = useTable<CallingPipeline>('calling-pipeline');
+  const { rows: callings, create: createCalling, update: updateCalling } = useTable<CallingPipeline>('calling-pipeline');
+  const { rows: lcrCallings } = useTable<MemberCalling>('member-callings');
+  const { rows: reviewFlags, remove: removeReviewFlag } = useTable<RosterReviewFlag>('roster-review-flags');
   const [filter, setFilter] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -381,9 +424,55 @@ export default function WardMembers() {
     return m;
   }, [callings]);
 
+  const lcrCallingsByMember = useMemo(() => {
+    const m = new Map<number, MemberCalling[]>();
+    for (const c of lcrCallings) {
+      const list = m.get(c.ward_member_id) || [];
+      list.push(c);
+      m.set(c.ward_member_id, list);
+    }
+    return m;
+  }, [lcrCallings]);
+
   const toggleExpand = useCallback((id: number) => {
     setExpandedId(prev => (prev === id ? null : id));
   }, []);
+
+  const considerForRelease = useCallback((m: WardMember, calling: MemberCalling) => {
+    createCalling({
+      member: legalName(m),
+      calling: calling.calling,
+      organization: calling.organization,
+      status: '7. Need to release',
+      assigned_to: '',
+      sustain_recorded: 1,
+      set_apart_recorded: calling.set_apart ? 1 : 0,
+      release_recorded: 0,
+      type: 'Calling',
+      ward_member_id: m.id,
+      sustained_date: calling.sustained_date,
+    } as unknown as Record<string, unknown>);
+  }, [createCalling]);
+
+  // Click "Callings" header: off -> newest first -> oldest first -> off.
+  const [sortByCallingDate, setSortByCallingDate] = useState(false);
+  const [callingSortAsc, setCallingSortAsc] = useState(false);
+  const toggleCallingSort = useCallback(() => {
+    if (!sortByCallingDate) { setSortByCallingDate(true); setCallingSortAsc(false); }
+    else if (!callingSortAsc) { setCallingSortAsc(true); }
+    else { setSortByCallingDate(false); }
+  }, [sortByCallingDate, callingSortAsc]);
+
+  // Most recent sustained date among a member's callings (tracked + full LCR list), or null if none.
+  const mostRecentSustainedDate = useCallback((memberId: number): string | null => {
+    const tracked = callingsByMember.get(memberId) || [];
+    const lcr = lcrCallingsByMember.get(memberId) || [];
+    let max: string | null = null;
+    for (const c of [...tracked, ...lcr]) {
+      if (c.sustained_date && (!max || c.sustained_date > max)) max = c.sustained_date;
+    }
+    return max;
+  }, [callingsByMember, lcrCallingsByMember]);
 
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
@@ -392,9 +481,18 @@ export default function WardMembers() {
       .filter(r => !q || legalName(r).toLowerCase().includes(q))
       .sort((a, b) => {
         if (a.active !== b.active) return b.active - a.active;
+        if (sortByCallingDate) {
+          const da = mostRecentSustainedDate(a.id);
+          const db = mostRecentSustainedDate(b.id);
+          if (da !== db) {
+            if (!da) return 1;
+            if (!db) return -1;
+            return callingSortAsc ? da.localeCompare(db) : db.localeCompare(da);
+          }
+        }
         return legalName(a).localeCompare(legalName(b));
       });
-  }, [rows, filter, showInactive]);
+  }, [rows, filter, showInactive, sortByCallingDate, callingSortAsc, mostRecentSustainedDate]);
 
   const grouped = useMemo<GroupedRows>(() => {
     const groups: GroupedRows = { adults: [], youth: [], children: [], unknown: [] };
@@ -472,11 +570,33 @@ export default function WardMembers() {
     updateCalling(callingId, fields);
   }, [updateCalling]);
 
+  const reviewFlagMembers = useMemo(() => {
+    return reviewFlags
+      .map(f => ({ flag: f, member: rows.find(r => r.id === f.ward_member_id) }))
+      .filter((x): x is { flag: RosterReviewFlag; member: WardMember } => !!x.member);
+  }, [reviewFlags, rows]);
+
+  const handleFlagOutOfWard = useCallback((flag: RosterReviewFlag, m: WardMember) => {
+    toggleOutOfWard(m);
+    removeReviewFlag(flag.id);
+  }, [toggleOutOfWard, removeReviewFlag]);
+
+  const handleRemoveFromWardReview = useCallback((flag: RosterReviewFlag, m: WardMember) => {
+    toggleActive(m);
+    removeReviewFlag(flag.id);
+  }, [toggleActive, removeReviewFlag]);
+
+  const handleDismissFlag = useCallback((flag: RosterReviewFlag) => {
+    removeReviewFlag(flag.id);
+  }, [removeReviewFlag]);
+
   const sectionProps = {
     onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude,
     onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSaveName: saveName,
     onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard, onSaveRecommend: saveRecommend,
-    callingsByMember, expandedId, onToggleExpand: toggleExpand, onUpdateCalling: updateCallingFields,
+    callingsByMember, lcrCallingsByMember, expandedId, onToggleExpand: toggleExpand, onUpdateCalling: updateCallingFields,
+    onConsiderForRelease: considerForRelease,
+    sortByCallingDate, callingSortAsc, onToggleCallingSort: toggleCallingSort,
   };
 
   return (
@@ -504,6 +624,33 @@ export default function WardMembers() {
           </button>
         </div>
       </div>
+
+      {reviewFlagMembers.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+          <p className="text-sm font-medium text-amber-800 mb-2">
+            Not found in LCR's Member Directory ({reviewFlagMembers.length}) — records elsewhere, moved, or a name mismatch?
+          </p>
+          <div className="space-y-1.5">
+            {reviewFlagMembers.map(({ flag, member }) => (
+              <div key={flag.id} className="flex items-center gap-3 text-sm">
+                <span className="flex-1 text-gray-800">{legalName(member)}</span>
+                <button type="button" onClick={() => handleFlagOutOfWard(flag, member)}
+                  className="text-xs px-2 py-1 rounded text-amber-700 hover:bg-amber-100">
+                  Flag: records elsewhere
+                </button>
+                <button type="button" onClick={() => handleRemoveFromWardReview(flag, member)}
+                  className="text-xs px-2 py-1 rounded text-orange-600 hover:bg-orange-100">
+                  Remove from ward
+                </button>
+                <button type="button" onClick={() => handleDismissFlag(flag)}
+                  className="text-xs px-2 py-1 rounded text-gray-500 hover:bg-gray-100">
+                  Dismiss
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-3 mb-4">
         <input value={filter} onChange={e => setFilter(e.target.value)}

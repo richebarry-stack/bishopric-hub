@@ -19,6 +19,8 @@ interface Session {
 
 const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'calling-pipeline': { name: 'calling_pipeline', orderBy: 'id DESC' },
+  'member-callings': { name: 'member_callings', orderBy: 'ward_member_id ASC' },
+  'roster-review-flags': { name: 'roster_review_flags', orderBy: 'flagged_at ASC' },
   'interview-pipeline': { name: 'interview_pipeline', orderBy: 'id DESC' },
   'tasks': { name: 'tasks', orderBy: 'done ASC, created_date DESC' },
   'rotating-assignments': { name: 'rotating_assignments', orderBy: 'id ASC' },
@@ -1285,8 +1287,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     const roster = (await db.prepare(
-      'SELECT id, first_name, last_name, birth_date, gender, active FROM ward_members'
-    ).all<RosterMember & { birth_date: string | null; gender: string | null; active: number }>()).results;
+      'SELECT id, first_name, last_name, birth_date, gender, active, out_of_ward FROM ward_members'
+    ).all<RosterMember & { birth_date: string | null; gender: string | null; active: number; out_of_ward: number }>()).results;
 
     const now = new Date().toISOString();
     const stmts = [];
@@ -1327,9 +1329,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
     if (stmts.length > 0) await db.batch(stmts);
 
-    const missingFromRoster = roster
-      .filter(m => m.active && !matchedIds.has(m.id))
-      .map(m => `${m.last_name}, ${m.first_name}`);
+    // Members flagged "records elsewhere" (out_of_ward) legitimately won't
+    // appear in this ward's LCR Member Directory — their membership record
+    // lives in another unit, so absence here isn't a real discrepancy.
+    const missing = roster.filter(m => m.active && !m.out_of_ward && !matchedIds.has(m.id));
+    const missingFromRoster = missing.map(m => `${m.last_name}, ${m.first_name}`);
+
+    // Surface newly-missing members for the user to review on Ward Members
+    // (flag "records elsewhere", remove from ward, or dismiss) rather than
+    // silently reporting it in the sync log only. Anyone who reappeared in
+    // this run's LCR dump is cleared automatically.
+    const flagStmts = [
+      ...missing.map(m => db.prepare(
+        'INSERT OR IGNORE INTO roster_review_flags (ward_member_id, flagged_at) VALUES (?, ?)'
+      ).bind(m.id, now)),
+      ...[...matchedIds].map(id => db.prepare('DELETE FROM roster_review_flags WHERE ward_member_id = ?').bind(id)),
+    ];
+    if (flagStmts.length > 0) await db.batch(flagStmts);
 
     return json({ ok: true, created, filledDetails, missingFromRoster });
   }
@@ -1434,6 +1450,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     ).all<CallingRow>()).results;
 
     const now = new Date().toISOString();
+    // Rows linked to a ward member BEFORE this run — i.e. confirmed by some
+    // earlier sync using LCR's own calling text. Release-reconciliation below
+    // only auto-releases from this set: a row we're linking for the very
+    // first time (backfilled from old free-text data, possibly using
+    // informal wording like "Nursery" vs LCR's "Nursery Worker") hasn't been
+    // confirmed against LCR's actual wording yet, so a calling-text mismatch
+    // there just means "we don't know," not "they were released."
+    const preExistingLinkedIds = new Set(allCallings.filter(c => c.ward_member_id !== null).map(c => c.id));
     const backfillStmts = [];
     for (const c of allCallings) {
       if (c.type === 'Calling' && c.ward_member_id === null) {
@@ -1456,7 +1480,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const stmts = [];
     const changed: { name: string; calling: string; action: string }[] = [];
     const unmatched: string[] = [];
-    let created = 0, updated = 0, released = 0;
+    // Deliberately never creates new calling_pipeline rows — see comment
+    // below — kept in the response shape for schema/UI consistency.
+    const created = 0;
+    let updated = 0, released = 0;
     const seenPairs = new Set<string>();
 
     for (const row of rows) {
@@ -1484,19 +1511,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           updated++;
           changed.push({ name: legalName, calling: row.calling, action: updates.status === '6. Set apart' ? 'set apart' : updates.status === '5. Sustained' ? 'sustained' : 'updated' });
         }
-      } else {
-        stmts.push(db.prepare(
-          'INSERT INTO calling_pipeline (member, calling, organization, status, sustain_recorded, set_apart_recorded, sustained_date, type, ward_member_id, assigned_to, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)'
-        ).bind(legalName, row.calling, row.organization || '', targetStatus, row.set_apart ? 1 : 0, row.sustained_date, 'Calling', member.id, '', now, now));
-        created++;
-        changed.push({ name: legalName, calling: row.calling, action: 'created' });
       }
+      // No `else` — deliberately never creates a new calling_pipeline row.
+      // Only callings the bishopric already tracks get synced; LCR has ~150+
+      // filled callings ward-wide and most (Sunday School teachers, Primary
+      // workers, etc.) aren't meant to be tracked here.
     }
 
-    // Release reconciliation: any active, linked Calling row not seen in this
-    // week's LCR dump means the person was released from it.
+    // Release reconciliation: any active Calling row that was ALREADY linked
+    // before this run (see preExistingLinkedIds above) and isn't seen in this
+    // week's LCR dump means the person was released from it. Newly-backfilled
+    // rows are excluded — see comment above.
     const activeCallings = allCallings.filter(c =>
-      c.type === 'Calling' && c.ward_member_id !== null &&
+      c.type === 'Calling' && c.ward_member_id !== null && preExistingLinkedIds.has(c.id) &&
       !['9. Released', '10. Declined'].includes(c.status) && !isSuperseded(c));
     for (const c of activeCallings) {
       if (seenPairs.has(`${c.ward_member_id}|${normCalling(c.calling)}`)) continue;
@@ -1517,6 +1544,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     if (stmts.length > 0) await db.batch(stmts);
+
+    // Full read-only mirror of every filled calling LCR reports (not just
+    // tracked ones) for the Ward Members "all callings" display — wholesale
+    // replace each run since LCR's dump is always the full current picture.
+    const memberCallingStmts = [db.prepare('DELETE FROM member_callings')];
+    for (const row of rows) {
+      const member = matchRosterMember(row.person, roster);
+      if (!member) continue;
+      memberCallingStmts.push(db.prepare(
+        'INSERT INTO member_callings (ward_member_id, calling, organization, sustained_date, set_apart, synced_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(member.id, row.calling, row.organization || '', row.sustained_date, row.set_apart ? 1 : 0, now));
+    }
+    await db.batch(memberCallingStmts);
+
     return json({ ok: true, created, updated, released, changed, unmatched });
   }
 

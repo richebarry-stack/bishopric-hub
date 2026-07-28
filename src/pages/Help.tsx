@@ -557,6 +557,16 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 28, 2026',
+              items: [
+                'Ward Members: the Callings column header can now be clicked to sort by most recent calling (sustained) date — newest first, then oldest first, then back to name order.',
+                'Ward Members: the Callings column and expandable row now show every calling LCR reports for that person, not just the ones tracked in Calling Pipeline. Untracked callings show read-only with a "Consider for release" button that starts tracking them, flagged as needing release.',
+                'Ward Members: added a review list for members the LCR roster sync could no longer find — flag them "records elsewhere", remove them from the ward, or dismiss as a false alarm, right from the page.',
+                'Internal: LCR sync now only ever updates callings the bishopric already tracks in Calling Pipeline — it no longer auto-creates a row for every filled calling ward-wide (~150+ of them). Also fixed a bug where backfilling a newly-linked calling from old free-text data could falsely mark it "released" if the wording didn\'t exactly match LCR\'s.',
+                'Ward Members: members flagged "records elsewhere" are no longer listed as missing from the roster during an LCR sync, since their membership record legitimately lives in another unit.',
+              ],
+            },
+            {
               date: 'Jul 26, 2026',
               items: [
                 'Hub Suggestions: added a "Deferred" status, between Planned and Implemented, for suggestions that are on hold for later.',
