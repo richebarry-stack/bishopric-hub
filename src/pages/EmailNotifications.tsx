@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
+import { api, type LcrSyncRun } from '../lib/api';
 
 const JOB_LABELS: Record<string, string> = {
   syncConduct: 'Sacrament conducting sync',
@@ -24,6 +24,66 @@ const COMMON_TIME_ZONES = [
 function formatWhen(iso: string | null): string {
   if (!iso) return 'Never';
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function parseNames(json: string | null): string[] {
+  if (!json) return [];
+  try { return JSON.parse(json); } catch { return []; }
+}
+
+function NameList({ label, names }: { label: string; names: string[] }) {
+  if (names.length === 0) return null;
+  return (
+    <p className="text-xs text-gray-500 mt-1">
+      <span className="text-gray-400">{label}:</span> {names.join(', ')}
+    </p>
+  );
+}
+
+function LcrSyncHistory() {
+  const { data: runs, isLoading } = useQuery({
+    queryKey: ['lcr-sync-runs'],
+    queryFn: () => api.list<LcrSyncRun>('lcr-sync-runs'),
+  });
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+      <div>
+        <h2 className="font-semibold text-gray-800 text-sm">LCR Sync History</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Weekly roster/recommend/stake-activation sync run from your computer (scripts/lcr-sync) — not automatic on the server.</p>
+      </div>
+      {isLoading ? (
+        <p className="text-sm text-gray-400">Loading…</p>
+      ) : !runs || runs.length === 0 ? (
+        <p className="text-sm text-gray-400 py-2">No sync runs yet.</p>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {runs.slice(0, 15).map(run => (
+            <div key={run.id} className="py-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-700 font-medium">{formatWhen(run.ran_at)}</span>
+                {run.success ? (
+                  <span className="text-green-600 text-xs">✓ OK</span>
+                ) : (
+                  <span className="text-red-600 text-xs" title={run.error || undefined}>✗ Failed{run.error ? `: ${run.error}` : ''}</span>
+                )}
+              </div>
+              {!!run.success && (
+                <div className="mt-1 text-xs text-gray-500 space-y-0.5">
+                  <p>Roster: {run.roster_created ?? 0} created, {run.roster_filled ?? 0} filled in{parseNames(run.roster_missing).length > 0 ? `, ${parseNames(run.roster_missing).length} missing from LCR` : ''}</p>
+                  <NameList label="Missing from LCR roster" names={parseNames(run.roster_missing)} />
+                  <p>Recommends: {run.recommend_updated ?? 0} updated{parseNames(run.recommend_unmatched).length > 0 ? `, ${parseNames(run.recommend_unmatched).length} unmatched` : ''}</p>
+                  <NameList label="Unmatched recommends" names={parseNames(run.recommend_unmatched)} />
+                  <p>Stake activations: {run.stake_flagged ?? 0} flagged, {run.stake_cleared ?? 0} cleared{parseNames(run.stake_unmatched).length > 0 ? `, ${parseNames(run.stake_unmatched).length} unmatched` : ''}</p>
+                  <NameList label="Unmatched stake activations" names={parseNames(run.stake_unmatched)} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function WardNameSetting() {
@@ -162,6 +222,8 @@ export default function EmailNotifications() {
           </>
         )}
       </div>
+
+      <LcrSyncHistory />
 
       <WardNameSetting />
 

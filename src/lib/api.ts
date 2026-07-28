@@ -520,6 +520,22 @@ export interface WardMember {
   updated_at: string;
 }
 
+export interface LcrSyncRun {
+  id: number;
+  ran_at: string;
+  success: number;
+  error: string | null;
+  roster_created: number | null;
+  roster_filled: number | null;
+  roster_missing: string | null; // JSON-stringified string[]
+  recommend_updated: number | null;
+  recommend_unmatched: string | null; // JSON-stringified string[]
+  stake_flagged: number | null;
+  stake_cleared: number | null;
+  stake_unmatched: string | null; // JSON-stringified string[]
+  updated_by: string | null;
+}
+
 export interface Ordinance {
   id: number;
   member_name: string;

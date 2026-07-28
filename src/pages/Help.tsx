@@ -574,6 +574,12 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
               ],
             },
             {
+              date: 'Jul 27, 2026',
+              items: [
+                'Automation & Notifications: added an "LCR Sync History" panel showing every run of the weekly LCR sync script — new members created, details filled in, members missing from the LCR roster, recommends updated, and stake activations flagged/cleared, with unmatched names listed for review.',
+              ],
+            },
+            {
               date: 'Jul 25, 2026',
               items: [
                 'Current Bishopric Meeting: added a free-form Notes box (auto-grows) alongside the Minutes field for anything that doesn\'t fit the standard meeting fields, stored per meeting.',

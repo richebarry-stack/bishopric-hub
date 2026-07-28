@@ -43,6 +43,7 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'sacrament-agenda-exclusions': { name: 'sacrament_agenda_exclusions', orderBy: 'id ASC' },
   'important-links': { name: 'important_links', orderBy: 'id ASC' },
   'ward-members': { name: 'ward_members', orderBy: 'last_name ASC, first_name ASC' },
+  'lcr-sync-runs': { name: 'lcr_sync_runs', orderBy: 'id DESC' },
   'youth-activities': { name: 'youth_activities', orderBy: 'date ASC' },
   'wc-meetings': { name: 'wc_meetings', orderBy: 'date ASC' },
   'wc-wins': { name: 'wc_wins', orderBy: 'date DESC' },
@@ -1232,6 +1233,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const row = await db.prepare("SELECT value FROM ui_settings WHERE key = 'daily_jobs'").first<{ value: string }>();
     return json(row ? JSON.parse(row.value) : { last_run: null, results: {} });
   }
+
 
   // Bulk ward-roster import from a CSV upload (admin only). Must be matched before the
   // generic TABLES dispatch below, or "import" would be parsed as a record id.
