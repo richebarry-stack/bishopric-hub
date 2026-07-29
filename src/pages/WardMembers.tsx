@@ -4,29 +4,14 @@ import { toast } from '../lib/toast';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useAuth } from '../lib/auth';
 import { legalName } from '../lib/displayName';
-import type { WardMember, InterviewPipeline, CallingPipeline, MemberCalling, RosterReviewFlag } from '../lib/api';
+import type { WardMember, InterviewPipeline, MemberCalling, RosterReviewFlag } from '../lib/api';
 import WardMemberImport from '../components/WardMemberImport';
 import { YOUTH_TYPES, formatRecommendDate } from '../components/interviews/shared';
-import { CALLING_STATUSES, CALLING_STATUS_COLORS } from '../lib/constants';
-import StatusBadge from '../components/StatusBadge';
 
-function normCalling(s: string): string {
-  return s.trim().toLowerCase();
-}
-
-function computeLcrOnly(tracked: CallingPipeline[], lcr: MemberCalling[]): MemberCalling[] {
-  const trackedNorm = new Set(tracked.map(c => normCalling(c.calling)));
-  return lcr.filter(c => !trackedNorm.has(normCalling(c.calling)));
-}
-
-function callingDisplayNames(tracked: CallingPipeline[], lcrOnly: MemberCalling[]): string {
-  return [...tracked.map(c => c.calling), ...lcrOnly.map(c => c.calling)].join(', ');
-}
-
-// Most recent sustained date among a member's callings (tracked + full LCR list), or null if none.
-function maxSustainedDate(tracked: CallingPipeline[], lcr: MemberCalling[]): string | null {
+// Most recent sustained date among a member's LCR-sourced callings, or null if none.
+function maxSustainedDate(lcr: MemberCalling[]): string | null {
   let max: string | null = null;
-  for (const c of [...tracked, ...lcr]) {
+  for (const c of lcr) {
     if (c.sustained_date && (!max || c.sustained_date > max)) max = c.sustained_date;
   }
   return max;
@@ -198,59 +183,12 @@ function GenderCell({ member, onSave }: { member: WardMember; onSave: (v: string
   );
 }
 
-function CallingsCell({ tracked, lcrOnly, expanded, onToggle }: { tracked: CallingPipeline[]; lcrOnly: MemberCalling[]; expanded: boolean; onToggle: () => void }) {
-  const names = [...tracked.map(c => c.calling), ...lcrOnly.map(c => c.calling)].join(', ');
-  const count = tracked.length + lcrOnly.length;
+function CallingsCell({ callings }: { callings: MemberCalling[] }) {
+  const names = callings.map(c => c.calling).join(', ');
   return (
-    <button type="button" onClick={onToggle}
-      className="text-left text-xs text-gray-600 hover:text-blue-600 hover:underline max-w-[180px] truncate block"
-      title={names || undefined}>
+    <span className="text-xs text-gray-600 max-w-[180px] truncate block" title={names || undefined}>
       {names || <span className="text-gray-300">—</span>}
-      {count > 0 && <span className="ml-1 text-gray-400">{expanded ? '▲' : '▼'}</span>}
-    </button>
-  );
-}
-
-function CallingEditRow({ calling, onUpdate }: { calling: CallingPipeline; onUpdate: (fields: Record<string, unknown>) => void }) {
-  return (
-    <div className="flex flex-wrap items-center gap-3 py-1.5 border-b border-gray-100 last:border-0 text-sm">
-      <span className="flex-1 min-w-[120px] text-gray-800">{calling.calling}</span>
-      <StatusBadge status={calling.status} colors={CALLING_STATUS_COLORS} />
-      <select value={calling.status} onChange={e => onUpdate({ status: e.target.value })}
-        aria-label={`Status for ${calling.calling}`}
-        className="text-xs rounded border border-gray-300 px-1.5 py-0.5">
-        {CALLING_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-      </select>
-      <label className="flex items-center gap-1 text-xs text-gray-500">
-        Sustained
-        <input type="date" value={(calling.sustained_date || '').slice(0, 10)}
-          onChange={e => onUpdate({ sustained_date: e.target.value })}
-          aria-label={`Sustained date for ${calling.calling}`}
-          className="text-xs rounded border border-gray-300 px-1.5 py-0.5" />
-      </label>
-      <label className="flex items-center gap-1 text-xs text-gray-600">
-        <input type="checkbox" checked={!!calling.set_apart_recorded}
-          onChange={e => onUpdate({ set_apart_recorded: e.target.checked ? 1 : 0 })}
-          className="rounded border-gray-300" />
-        Set apart
-      </label>
-    </div>
-  );
-}
-
-function LcrCallingRow({ calling, onConsiderForRelease }: { calling: MemberCalling; onConsiderForRelease: () => void }) {
-  return (
-    <div className="flex flex-wrap items-center gap-3 py-1.5 border-b border-gray-100 last:border-0 text-sm">
-      <span className="flex-1 min-w-[120px] text-gray-800">{calling.calling}</span>
-      <span className="text-xs text-gray-400">{calling.organization}</span>
-      {calling.sustained_date && <span className="text-xs text-gray-400">Sustained {calling.sustained_date}</span>}
-      {!!calling.set_apart && <span className="text-xs text-gray-400">Set apart</span>}
-      <button type="button" onClick={onConsiderForRelease}
-        title="Start tracking this calling in the Calling Pipeline, flagged as needing release"
-        className="text-xs px-2 py-0.5 rounded text-orange-600 hover:bg-orange-50">
-        Consider for release
-      </button>
-    </div>
+    </span>
   );
 }
 
@@ -278,7 +216,7 @@ function SortHeader({ label, sortKey, current, asc, onSort, align = 'left', clas
   );
 }
 
-function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, callingsByMember, lcrCallingsByMember, expandedId, onToggleExpand, onUpdateCalling, onConsiderForRelease, sortKey, sortAsc, onSort, showRecommend = true }: {
+function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, lcrCallingsByMember, sortKey, sortAsc, onSort, showRecommend = true }: {
   title: string;
   members: WardMember[];
   onToggleActive: (m: WardMember) => void;
@@ -290,12 +228,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
   onSavePreferredName: (m: WardMember, fields: { preferred_first_name: string; preferred_last_name: string }) => void;
   onToggleOutOfWard: (m: WardMember) => void;
   onSaveRecommend: (m: WardMember, fields: { recommend_type: string; recommend_expires: string }) => void;
-  callingsByMember: Map<number, CallingPipeline[]>;
   lcrCallingsByMember: Map<number, MemberCalling[]>;
-  expandedId: number | null;
-  onToggleExpand: (id: number) => void;
-  onUpdateCalling: (callingId: number, fields: Record<string, unknown>) => void;
-  onConsiderForRelease: (m: WardMember, calling: MemberCalling) => void;
   sortKey: SortKey;
   sortAsc: boolean;
   onSort: (k: SortKey) => void;
@@ -326,12 +259,9 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
           </thead>
           <tbody>
             {members.map(m => {
-              const memberCallings = callingsByMember.get(m.id) || [];
               const memberLcrCallings = lcrCallingsByMember.get(m.id) || [];
-              const lcrOnly = computeLcrOnly(memberCallings, memberLcrCallings);
-              const sustained = maxSustainedDate(memberCallings, memberLcrCallings);
+              const sustained = maxSustainedDate(memberLcrCallings);
               return (
-              <>
               <tr key={m.id} className={`border-b border-gray-50 hover:bg-gray-50 ${!m.active ? 'opacity-60' : ''}`}>
                 <td className="px-4 py-2 font-medium text-gray-900">
                   <NameCell member={m} onSave={fields => onSaveName(m, fields)} />
@@ -377,7 +307,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                   </button>
                 </td>
                 <td className="px-4 py-2">
-                  <CallingsCell tracked={memberCallings} lcrOnly={lcrOnly} expanded={expandedId === m.id} onToggle={() => onToggleExpand(m.id)} />
+                  <CallingsCell callings={memberLcrCallings} />
                 </td>
                 <td className="px-4 py-2 text-xs text-gray-500">
                   {sustained || <span className="text-gray-300">—</span>}
@@ -403,25 +333,6 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                   )}
                 </td>
               </tr>
-              {expandedId === m.id && (
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <td colSpan={showRecommend ? 11 : 10} className="px-4 py-2">
-                    {memberCallings.length === 0 && lcrOnly.length === 0 ? (
-                      <p className="text-xs text-gray-400">No current callings.</p>
-                    ) : (
-                      <>
-                        {memberCallings.map(c => (
-                          <CallingEditRow key={c.id} calling={c} onUpdate={fields => onUpdateCalling(c.id, fields)} />
-                        ))}
-                        {lcrOnly.map(c => (
-                          <LcrCallingRow key={c.id} calling={c} onConsiderForRelease={() => onConsiderForRelease(m, c)} />
-                        ))}
-                      </>
-                    )}
-                  </td>
-                </tr>
-              )}
-              </>
             );})}
           </tbody>
         </table>
@@ -435,7 +346,6 @@ export default function WardMembers() {
   const isAdmin = user?.role === 'admin';
   const { rows, create, update, remove, refetch } = useTable<WardMember>('ward-members');
   const { rows: interviews, update: updateInterview } = useTable<InterviewPipeline>('interview-pipeline');
-  const { rows: callings, create: createCalling, update: updateCalling } = useTable<CallingPipeline>('calling-pipeline');
   const { rows: lcrCallings } = useTable<MemberCalling>('member-callings');
   const { rows: reviewFlags, remove: removeReviewFlag } = useTable<RosterReviewFlag>('roster-review-flags');
   const [filter, setFilter] = useState('');
@@ -445,18 +355,6 @@ export default function WardMembers() {
   const [newLast, setNewLast] = useState('');
   const [newFirst, setNewFirst] = useState('');
   const [saving, setSaving] = useState(false);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-
-  const callingsByMember = useMemo(() => {
-    const m = new Map<number, CallingPipeline[]>();
-    for (const c of callings) {
-      if (c.type !== 'Calling' || c.ward_member_id === null || c.status === '9. Released' || c.status === '10. Declined') continue;
-      const list = m.get(c.ward_member_id) || [];
-      list.push(c);
-      m.set(c.ward_member_id, list);
-    }
-    return m;
-  }, [callings]);
 
   const lcrCallingsByMember = useMemo(() => {
     const m = new Map<number, MemberCalling[]>();
@@ -468,26 +366,6 @@ export default function WardMembers() {
     return m;
   }, [lcrCallings]);
 
-  const toggleExpand = useCallback((id: number) => {
-    setExpandedId(prev => (prev === id ? null : id));
-  }, []);
-
-  const considerForRelease = useCallback((m: WardMember, calling: MemberCalling) => {
-    createCalling({
-      member: legalName(m),
-      calling: calling.calling,
-      organization: calling.organization,
-      status: '7. Need to release',
-      assigned_to: '',
-      sustain_recorded: 1,
-      set_apart_recorded: calling.set_apart ? 1 : 0,
-      release_recorded: 0,
-      type: 'Calling',
-      ward_member_id: m.id,
-      sustained_date: calling.sustained_date,
-    } as unknown as Record<string, unknown>);
-  }, [createCalling]);
-
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortAsc, setSortAsc] = useState(true);
   const handleSort = useCallback((key: SortKey) => {
@@ -497,17 +375,16 @@ export default function WardMembers() {
 
   // Value used to sort by the given key — null sorts to the bottom regardless of direction.
   const sortValue = useCallback((m: WardMember, key: SortKey): string | null => {
-    const tracked = callingsByMember.get(m.id) || [];
     const lcr = lcrCallingsByMember.get(m.id) || [];
     switch (key) {
       case 'name': return legalName(m);
       case 'birth_date': return m.birth_date || null;
       case 'recommend': return m.recommend_expires || null;
       case 'gender': return m.gender || null;
-      case 'calling': return callingDisplayNames(tracked, computeLcrOnly(tracked, lcr)) || null;
-      case 'sustained': return maxSustainedDate(tracked, lcr);
+      case 'calling': return lcr.map(c => c.calling).join(', ') || null;
+      case 'sustained': return maxSustainedDate(lcr);
     }
-  }, [callingsByMember, lcrCallingsByMember]);
+  }, [lcrCallingsByMember]);
 
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
@@ -600,10 +477,6 @@ export default function WardMembers() {
     if (await confirm({ message: `Permanently delete ${legalName(m)}? This cannot be undone.` })) remove(m.id);
   }, [remove, confirm]);
 
-  const updateCallingFields = useCallback((callingId: number, fields: Record<string, unknown>) => {
-    updateCalling(callingId, fields);
-  }, [updateCalling]);
-
   const reviewFlagMembers = useMemo(() => {
     return reviewFlags
       .map(f => ({ flag: f, member: rows.find(r => r.id === f.ward_member_id) }))
@@ -628,8 +501,7 @@ export default function WardMembers() {
     onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude,
     onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSaveName: saveName,
     onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard, onSaveRecommend: saveRecommend,
-    callingsByMember, lcrCallingsByMember, expandedId, onToggleExpand: toggleExpand, onUpdateCalling: updateCallingFields,
-    onConsiderForRelease: considerForRelease,
+    lcrCallingsByMember,
     sortKey, sortAsc, onSort: handleSort,
   };
 
@@ -726,6 +598,7 @@ export default function WardMembers() {
         "Remove from ward" takes them off the active roster — hides them from Speakers &amp; Prayers, but preserves their history.
         "Flag: records elsewhere" is unrelated — it just marks someone who attends here but whose membership record is in another ward. It's informational only and doesn't remove them from anything.
         Age groups: children (&lt;12 this year), youth (12–17 this year), adults (18+ this year).
+        Callings shown here are LCR's own record — for the bishopric's tracked calling workflow (discussion, release, etc.), see Calling Pipeline and All Callings.
       </p>
     </div>
   );

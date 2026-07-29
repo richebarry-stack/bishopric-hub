@@ -3,6 +3,7 @@ export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?:
   { path: '/current-sacrament', label: 'Current Sacrament Meeting', icon: '♫' },
   { path: '/calendaring', label: 'Calendar Events', icon: '▣' },
   { path: '/calling-pipeline', label: 'Calling Pipeline', icon: '◉' },
+  { path: '/all-callings', label: 'All Callings', icon: '◍' },
   { path: '/youth-activities', label: 'Youth Activities', icon: '⬡' },
   { path: '/sacrament-planning', label: 'Sacrament Planning', icon: '♪' },
   { path: '/tasks', label: 'Action Items', icon: '☑' },
@@ -106,6 +107,7 @@ export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: s
     label: 'Ward Care',
     items: [
       { path: '/calling-pipeline',     label: 'Calling Pipeline',    icon: 'ti-user-check'      },
+      { path: '/all-callings',         label: 'All Callings',        icon: 'ti-list-details'    },
       { path: '/youth-interviews',     label: 'Youth Interviews',        icon: 'ti-clipboard-list' },
       { path: '/temple-interviews',    label: 'Adult Temple Interviews', icon: 'ti-building-church' },
       { path: '/other-interviews',     label: 'Other Interviews',        icon: 'ti-clipboard-text'  },

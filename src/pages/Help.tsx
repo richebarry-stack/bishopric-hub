@@ -563,6 +563,8 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Dashboard and Ward Council Dashboard: fixed the Missionaries panel showing empty — it was still filtering on the old missionary status names from before the LCR status vocabulary update. Now shows anyone not yet serving, in the MTC, released, or canceled.',
                 'Missionary Pipeline: removed the "Papers Started" status (unused) and fixed the status color legend, which still referenced the old status names.',
                 'Internal: fixed a recurring bug where the LCR callings sync could falsely mark someone "released" from a calling they still actively hold, whenever the tracked calling\'s wording didn\'t exactly match LCR\'s own text (e.g. "Nursery" vs LCR\'s "Nursery Worker") — this could happen on every sync run for affected callings, not just once. Cleaned up 16 more falsely-released callings this caused.',
+                'Added a new All Callings page: one row per calling LCR reports for the ward (sortable by calling, sustain date, or member name), with a "Consider for release" button on each; and a Members Without a Calling table below it, sortable by name, age, or whether they\'re already in the Calling Pipeline, with an "Add for calling consideration" button that starts a Discussion-stage entry for them.',
+                'Ward Members: the Callings and Sustained columns now show only LCR\'s own record for that person, not callings tracked in the Calling Pipeline that haven\'t (yet) shown up in an LCR sync — see the new All Callings page for the pipeline-tracked view.',
               ],
             },
             {
