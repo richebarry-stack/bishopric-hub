@@ -20,6 +20,7 @@ interface Session {
 const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'calling-pipeline': { name: 'calling_pipeline', orderBy: 'id DESC' },
   'member-callings': { name: 'member_callings', orderBy: 'ward_member_id ASC' },
+  'unfilled-callings': { name: 'unfilled_callings', orderBy: 'organization ASC, calling ASC' },
   'roster-review-flags': { name: 'roster_review_flags', orderBy: 'flagged_at ASC' },
   'interview-pipeline': { name: 'interview_pipeline', orderBy: 'id DESC' },
   'tasks': { name: 'tasks', orderBy: 'done ASC, created_date DESC' },
@@ -1420,8 +1421,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (routeParts[0] === 'ward-members' && routeParts[1] === 'sync-callings' && method === 'POST') {
     const body = await request.json() as {
       rows?: { organization: string | null; calling: string; person: string; sustained_date: string | null; set_apart: boolean }[];
+      unfilled?: { organization: string | null; calling: string }[];
     };
     const rows = (body.rows || []).slice(0, 2000);
+    const unfilledRows = (body.unfilled || []).slice(0, 2000).filter(r => r.calling && r.calling.trim());
     const dateRe = /^\d{4}-\d{2}-\d{2}$/;
     for (const r of rows) {
       if (!r.person || !r.person.trim()) return json({ error: 'Row missing person' }, 400);
@@ -1559,6 +1562,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       ).bind(member.id, row.calling, row.organization || '', row.sustained_date, row.set_apart ? 1 : 0, now));
     }
     await db.batch(memberCallingStmts);
+
+    // Full read-only mirror of every vacant, non-custom calling — same
+    // wholesale-replace pattern as member_callings above.
+    const unfilledStmts = [db.prepare('DELETE FROM unfilled_callings')];
+    for (const row of unfilledRows) {
+      unfilledStmts.push(db.prepare(
+        'INSERT INTO unfilled_callings (calling, organization, synced_at) VALUES (?, ?, ?)'
+      ).bind(row.calling, row.organization || '', now));
+    }
+    await db.batch(unfilledStmts);
 
     return json({ ok: true, created, updated, released, changed, unmatched });
   }

@@ -568,6 +568,10 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'All Callings: added a Time in Calling column to the LCR Callings table (e.g. "2 yrs 3 mos"), sortable like the rest.',
                 'Removed the old manually-maintained "Members Without Callings" list from Calling Pipeline — superseded by All Callings\' auto-derived version.',
                 'All Callings: the "In Calling Pipeline?" flag on Members Without a Calling now only reflects being considered for a new calling, not being tracked for release from an existing one.',
+                'All Callings: LCR Callings, Members Without a Calling, and Unfilled Callings are now separate tabs on the same page instead of stacked sections.',
+                'All Callings: added an Unfilled Callings tab — vacant, non-custom callings LCR reports for the ward, with an "Add to Calling Pipeline" button on each that starts a Discussion-stage entry with no one assigned yet.',
+                'Internal: extended the LCR callings sync to also report vacant (non-custom) callings — no UI changes to the sync script beyond what feeds the new Unfilled Callings tab.',
+                'All Callings: clicking "Consider for release" on an LCR calling now also starts a second Calling Pipeline entry, "Replacement for {name}", for finding whoever will take over that calling.',
               ],
             },
             {

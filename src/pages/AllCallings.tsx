@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTable } from '../lib/useTable';
 import { legalName } from '../lib/displayName';
-import type { WardMember, CallingPipeline, MemberCalling } from '../lib/api';
+import type { WardMember, CallingPipeline, MemberCalling, UnfilledCalling } from '../lib/api';
 
 function normCalling(s: string): string {
   return s.trim().toLowerCase();
@@ -54,8 +54,10 @@ function SortHeader<K extends string>({ label, sortKey, current, asc, onSort, al
   );
 }
 
+type Tab = 'lcr' | 'mwc' | 'unfilled';
 type CallingSortKey = 'calling' | 'sustained_date' | 'member' | 'time_in_calling';
 type MwcSortKey = 'name' | 'age' | 'pipeline';
+type UnfilledSortKey = 'calling' | 'organization';
 
 interface CallingRow extends MemberCalling {
   memberName: string;
@@ -65,6 +67,9 @@ export default function AllCallings() {
   const { rows: members } = useTable<WardMember>('ward-members');
   const { rows: lcrCallings } = useTable<MemberCalling>('member-callings');
   const { rows: callings, create: createCalling } = useTable<CallingPipeline>('calling-pipeline');
+  const { rows: unfilledCallings } = useTable<UnfilledCalling>('unfilled-callings');
+
+  const [tab, setTab] = useState<Tab>('lcr');
 
   const memberById = useMemo(() => {
     const m = new Map<number, WardMember>();
@@ -95,6 +100,17 @@ export default function AllCallings() {
     return s;
   }, [callings]);
 
+  // Vacant callings already added to the pipeline (unassigned, still active).
+  const addedUnfilledKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of callings) {
+      if (c.type !== 'Calling' || c.ward_member_id !== null) continue;
+      if (['9. Released', '10. Declined'].includes(c.status)) continue;
+      s.add(`${normCalling(c.calling)}|${c.organization || ''}`);
+    }
+    return s;
+  }, [callings]);
+
   const membersWithCallingIds = useMemo(() => new Set(lcrCallings.map(c => c.ward_member_id)), [lcrCallings]);
 
   const considerForRelease = useCallback((c: MemberCalling, memberName: string) => {
@@ -111,6 +127,19 @@ export default function AllCallings() {
       ward_member_id: c.ward_member_id,
       sustained_date: c.sustained_date,
     } as unknown as Record<string, unknown>);
+    // Also start a placeholder entry for finding this person's replacement.
+    createCalling({
+      member: `Replacement for ${memberName}`,
+      calling: c.calling,
+      organization: c.organization,
+      status: '1. Discussion',
+      assigned_to: '',
+      sustain_recorded: 0,
+      set_apart_recorded: 0,
+      release_recorded: 0,
+      type: 'Calling',
+      ward_member_id: null,
+    } as unknown as Record<string, unknown>);
   }, [createCalling]);
 
   const addForConsideration = useCallback((m: WardMember) => {
@@ -125,6 +154,21 @@ export default function AllCallings() {
       release_recorded: 0,
       type: 'Calling',
       ward_member_id: m.id,
+    } as unknown as Record<string, unknown>);
+  }, [createCalling]);
+
+  const addUnfilledToPipeline = useCallback((c: UnfilledCalling) => {
+    createCalling({
+      member: '',
+      calling: c.calling,
+      organization: c.organization,
+      status: '1. Discussion',
+      assigned_to: '',
+      sustain_recorded: 0,
+      set_apart_recorded: 0,
+      release_recorded: 0,
+      type: 'Calling',
+      ward_member_id: null,
     } as unknown as Record<string, unknown>);
   }, [createCalling]);
 
@@ -192,97 +236,166 @@ export default function AllCallings() {
     });
   }, [membersWithoutCalling, mwcSortKey, mwcSortAsc, consideredMemberIds]);
 
+  const [unfilledSortKey, setUnfilledSortKey] = useState<UnfilledSortKey>('organization');
+  const [unfilledSortAsc, setUnfilledSortAsc] = useState(true);
+  const handleUnfilledSort = useCallback((key: UnfilledSortKey) => {
+    if (unfilledSortKey === key) setUnfilledSortAsc(a => !a);
+    else { setUnfilledSortKey(key); setUnfilledSortAsc(true); }
+  }, [unfilledSortKey]);
+
+  const sortedUnfilled = useMemo(() => {
+    return [...unfilledCallings].sort((a, b) => {
+      const va = a[unfilledSortKey], vb = b[unfilledSortKey];
+      const cmp = va.localeCompare(vb);
+      if (cmp !== 0) return unfilledSortAsc ? cmp : -cmp;
+      return a.calling.localeCompare(b.calling);
+    });
+  }, [unfilledCallings, unfilledSortKey, unfilledSortAsc]);
+
+  const TABS: { key: Tab; label: string; count: number }[] = [
+    { key: 'lcr', label: 'LCR Callings', count: sortedCallingRows.length },
+    { key: 'mwc', label: 'Members Without a Calling', count: sortedMwc.length },
+    { key: 'unfilled', label: 'Unfilled Callings', count: sortedUnfilled.length },
+  ];
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-1">All Callings</h1>
-      <p className="text-sm text-gray-500 mb-6">Every calling LCR reports for the ward, one row per calling — and members with no calling on record.</p>
+      <p className="text-sm text-gray-500 mb-4">Every calling LCR reports for the ward, members with no calling on record, and vacant callings needing to be filled.</p>
 
-      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide px-1 mb-2">
-        LCR Callings <span className="font-normal normal-case text-gray-400">({sortedCallingRows.length})</span>
-      </h2>
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-8">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50">
-              <SortHeader label="Calling" sortKey="calling" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} />
-              <SortHeader label="Sustain Date" sortKey="sustained_date" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-32" />
-              <SortHeader label="Time in Calling" sortKey="time_in_calling" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-36" />
-              <SortHeader label="Member Name" sortKey="member" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-56" />
-              <th className="text-right px-4 py-2 font-medium text-gray-600 w-40">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedCallingRows.map(c => {
-              const tracked = trackedPairs.has(`${c.ward_member_id}|${normCalling(c.calling)}`);
-              return (
-                <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="px-4 py-2 text-gray-900">{c.calling}{!!c.set_apart && <span className="ml-1.5 text-xs text-gray-400">Set apart</span>}</td>
-                  <td className="px-4 py-2 text-gray-600">{c.sustained_date || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-2 text-gray-600">{timeInCalling(c.sustained_date) || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-2 text-gray-700">{c.memberName}</td>
-                  <td className="px-4 py-2 text-right">
-                    {tracked ? (
-                      <span className="text-xs text-gray-400">Tracked</span>
-                    ) : (
-                      <button type="button" onClick={() => considerForRelease(c, c.memberName)}
-                        title="Start tracking this calling in the Calling Pipeline, flagged as needing release"
-                        className="text-xs px-2 py-1 rounded text-orange-600 hover:bg-orange-50">
-                        Consider for release
+      <div className="flex items-center gap-1 border-b border-gray-200 mb-4">
+        {TABS.map(t => (
+          <button key={t.key} type="button" onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+              tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            {t.label} <span className="text-gray-400">({t.count})</span>
+          </button>
+        ))}
+      </div>
+
+      {tab === 'lcr' && (
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <SortHeader label="Calling" sortKey="calling" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} />
+                <SortHeader label="Sustain Date" sortKey="sustained_date" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-32" />
+                <SortHeader label="Time in Calling" sortKey="time_in_calling" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-36" />
+                <SortHeader label="Member Name" sortKey="member" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-56" />
+                <th className="text-right px-4 py-2 font-medium text-gray-600 w-40">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedCallingRows.map(c => {
+                const tracked = trackedPairs.has(`${c.ward_member_id}|${normCalling(c.calling)}`);
+                return (
+                  <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-4 py-2 text-gray-900">{c.calling}{!!c.set_apart && <span className="ml-1.5 text-xs text-gray-400">Set apart</span>}</td>
+                    <td className="px-4 py-2 text-gray-600">{c.sustained_date || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-2 text-gray-600">{timeInCalling(c.sustained_date) || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-2 text-gray-700">{c.memberName}</td>
+                    <td className="px-4 py-2 text-right">
+                      {tracked ? (
+                        <span className="text-xs text-gray-400">Tracked</span>
+                      ) : (
+                        <button type="button" onClick={() => considerForRelease(c, c.memberName)}
+                          title="Start tracking this calling in the Calling Pipeline, flagged as needing release"
+                          className="text-xs px-2 py-1 rounded text-orange-600 hover:bg-orange-50">
+                          Consider for release
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {sortedCallingRows.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400 text-sm">No callings yet — run the LCR sync to populate this list.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'mwc' && (
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <SortHeader label="Name" sortKey="name" current={mwcSortKey} asc={mwcSortAsc} onSort={handleMwcSort} />
+                <SortHeader label="Age" sortKey="age" current={mwcSortKey} asc={mwcSortAsc} onSort={handleMwcSort} align="center" className="w-20" />
+                <SortHeader label="In Calling Pipeline?" sortKey="pipeline" current={mwcSortKey} asc={mwcSortAsc} onSort={handleMwcSort} align="center" className="w-40" />
+                <th className="text-right px-4 py-2 font-medium text-gray-600 w-52">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedMwc.map(m => {
+                const inPipeline = consideredMemberIds.has(m.id);
+                const age = currentAge(m.birth_date);
+                return (
+                  <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-4 py-2 font-medium text-gray-900">{legalName(m)}</td>
+                    <td className="px-4 py-2 text-center text-gray-600">{age === null ? <span className="text-gray-300">—</span> : age}</td>
+                    <td className="px-4 py-2 text-center">
+                      {inPipeline
+                        ? <span className="text-xs bg-blue-100 text-blue-700 rounded-full px-2 py-0.5">Yes</span>
+                        : <span className="text-xs text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <button type="button" onClick={() => addForConsideration(m)} disabled={inPipeline}
+                        title={inPipeline ? 'Already being considered for a calling' : 'Add to the Calling Pipeline, in Discussion'}
+                        className="text-xs px-2 py-1 rounded text-blue-600 hover:bg-blue-50 disabled:opacity-40 disabled:hover:bg-transparent">
+                        Add for calling consideration
                       </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-            {sortedCallingRows.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400 text-sm">No callings yet — run the LCR sync to populate this list.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {sortedMwc.length === 0 && (
+                <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400 text-sm">Everyone active (excluding children) has a calling on record.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide px-1 mb-2">
-        Members Without a Calling <span className="font-normal normal-case text-gray-400">({sortedMwc.length})</span>
-      </h2>
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50">
-              <SortHeader label="Name" sortKey="name" current={mwcSortKey} asc={mwcSortAsc} onSort={handleMwcSort} />
-              <SortHeader label="Age" sortKey="age" current={mwcSortKey} asc={mwcSortAsc} onSort={handleMwcSort} align="center" className="w-20" />
-              <SortHeader label="In Calling Pipeline?" sortKey="pipeline" current={mwcSortKey} asc={mwcSortAsc} onSort={handleMwcSort} align="center" className="w-40" />
-              <th className="text-right px-4 py-2 font-medium text-gray-600 w-52">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedMwc.map(m => {
-              const inPipeline = consideredMemberIds.has(m.id);
-              const age = currentAge(m.birth_date);
-              return (
-                <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium text-gray-900">{legalName(m)}</td>
-                  <td className="px-4 py-2 text-center text-gray-600">{age === null ? <span className="text-gray-300">—</span> : age}</td>
-                  <td className="px-4 py-2 text-center">
-                    {inPipeline
-                      ? <span className="text-xs bg-blue-100 text-blue-700 rounded-full px-2 py-0.5">Yes</span>
-                      : <span className="text-xs text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <button type="button" onClick={() => addForConsideration(m)} disabled={inPipeline}
-                      title={inPipeline ? 'Already being considered for a calling' : 'Add to the Calling Pipeline, in Discussion'}
-                      className="text-xs px-2 py-1 rounded text-blue-600 hover:bg-blue-50 disabled:opacity-40 disabled:hover:bg-transparent">
-                      Add for calling consideration
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-            {sortedMwc.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400 text-sm">Everyone active (excluding children) has a calling on record.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {tab === 'unfilled' && (
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <SortHeader label="Calling" sortKey="calling" current={unfilledSortKey} asc={unfilledSortAsc} onSort={handleUnfilledSort} />
+                <SortHeader label="Organization" sortKey="organization" current={unfilledSortKey} asc={unfilledSortAsc} onSort={handleUnfilledSort} className="w-56" />
+                <th className="text-right px-4 py-2 font-medium text-gray-600 w-52">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedUnfilled.map(c => {
+                const added = addedUnfilledKeys.has(`${normCalling(c.calling)}|${c.organization}`);
+                return (
+                  <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-4 py-2 text-gray-900">{c.calling}</td>
+                    <td className="px-4 py-2 text-gray-600">{c.organization}</td>
+                    <td className="px-4 py-2 text-right">
+                      {added ? (
+                        <span className="text-xs text-gray-400">Added</span>
+                      ) : (
+                        <button type="button" onClick={() => addUnfilledToPipeline(c)}
+                          title="Add to the Calling Pipeline, in Discussion"
+                          className="text-xs px-2 py-1 rounded text-blue-600 hover:bg-blue-50">
+                          Add to Calling Pipeline
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {sortedUnfilled.length === 0 && (
+                <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-400 text-sm">No unfilled callings — run the LCR sync to populate this list.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

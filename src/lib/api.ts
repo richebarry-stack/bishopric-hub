@@ -192,6 +192,13 @@ export interface RosterReviewFlag {
   flagged_at: string;
 }
 
+export interface UnfilledCalling {
+  id: number;
+  calling: string;
+  organization: string;
+  synced_at: string;
+}
+
 export interface InterviewPipeline {
   id: number;
   member: string;
