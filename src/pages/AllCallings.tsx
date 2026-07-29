@@ -17,6 +17,22 @@ function currentAge(birthDate: string | null): number | null {
   return age;
 }
 
+function timeInCalling(sustainedDate: string | null): string | null {
+  if (!sustainedDate) return null;
+  const start = new Date(sustainedDate.slice(0, 10) + 'T12:00:00');
+  if (isNaN(start.getTime())) return null;
+  const today = new Date();
+  let months = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth());
+  if (today.getDate() < start.getDate()) months--;
+  if (months < 0) return null;
+  if (months < 1) return '<1 mo';
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+  if (years === 0) return `${months} mo${months === 1 ? '' : 's'}`;
+  if (remMonths === 0) return `${years} yr${years === 1 ? '' : 's'}`;
+  return `${years} yr${years === 1 ? '' : 's'} ${remMonths} mo${remMonths === 1 ? '' : 's'}`;
+}
+
 function isChild(birthDate: string | null): boolean {
   if (!birthDate) return false;
   const ageThisYear = new Date().getFullYear() - parseInt(birthDate.slice(0, 4));
@@ -38,7 +54,7 @@ function SortHeader<K extends string>({ label, sortKey, current, asc, onSort, al
   );
 }
 
-type CallingSortKey = 'calling' | 'sustained_date' | 'member';
+type CallingSortKey = 'calling' | 'sustained_date' | 'member' | 'time_in_calling';
 type MwcSortKey = 'name' | 'age' | 'pipeline';
 
 interface CallingRow extends MemberCalling {
@@ -66,10 +82,14 @@ export default function AllCallings() {
     return s;
   }, [callings]);
 
-  const trackedMemberIds = useMemo(() => {
+  // Members actively being considered for a NEW calling — excludes '7. Need to
+  // release', since that's tracking a release from an existing calling, not a
+  // pending new one, and shouldn't block "Add for calling consideration".
+  const consideredMemberIds = useMemo(() => {
     const s = new Set<number>();
     for (const c of callings) {
-      if (c.type !== 'Calling' || c.ward_member_id === null || c.status === '9. Released' || c.status === '10. Declined') continue;
+      if (c.type !== 'Calling' || c.ward_member_id === null) continue;
+      if (['7. Need to release', '9. Released', '10. Declined'].includes(c.status)) continue;
       s.add(c.ward_member_id);
     }
     return s;
@@ -126,7 +146,7 @@ export default function AllCallings() {
     return [...callingRows].sort((a, b) => {
       let va: string | null, vb: string | null;
       if (callingSortKey === 'calling') { va = a.calling; vb = b.calling; }
-      else if (callingSortKey === 'sustained_date') { va = a.sustained_date; vb = b.sustained_date; }
+      else if (callingSortKey === 'sustained_date' || callingSortKey === 'time_in_calling') { va = a.sustained_date; vb = b.sustained_date; }
       else { va = a.memberName; vb = b.memberName; }
       if (va !== vb) {
         if (!va) return 1;
@@ -165,12 +185,12 @@ export default function AllCallings() {
         return legalName(a).localeCompare(legalName(b));
       }
       // pipeline
-      const pa = trackedMemberIds.has(a.id) ? 1 : 0;
-      const pb = trackedMemberIds.has(b.id) ? 1 : 0;
+      const pa = consideredMemberIds.has(a.id) ? 1 : 0;
+      const pb = consideredMemberIds.has(b.id) ? 1 : 0;
       if (pa !== pb) return mwcSortAsc ? pa - pb : pb - pa;
       return legalName(a).localeCompare(legalName(b));
     });
-  }, [membersWithoutCalling, mwcSortKey, mwcSortAsc, trackedMemberIds]);
+  }, [membersWithoutCalling, mwcSortKey, mwcSortAsc, consideredMemberIds]);
 
   return (
     <div>
@@ -186,6 +206,7 @@ export default function AllCallings() {
             <tr className="border-b border-gray-100 bg-gray-50">
               <SortHeader label="Calling" sortKey="calling" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} />
               <SortHeader label="Sustain Date" sortKey="sustained_date" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-32" />
+              <SortHeader label="Time in Calling" sortKey="time_in_calling" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-36" />
               <SortHeader label="Member Name" sortKey="member" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-56" />
               <th className="text-right px-4 py-2 font-medium text-gray-600 w-40">Actions</th>
             </tr>
@@ -197,6 +218,7 @@ export default function AllCallings() {
                 <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="px-4 py-2 text-gray-900">{c.calling}{!!c.set_apart && <span className="ml-1.5 text-xs text-gray-400">Set apart</span>}</td>
                   <td className="px-4 py-2 text-gray-600">{c.sustained_date || <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-2 text-gray-600">{timeInCalling(c.sustained_date) || <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-2 text-gray-700">{c.memberName}</td>
                   <td className="px-4 py-2 text-right">
                     {tracked ? (
@@ -213,7 +235,7 @@ export default function AllCallings() {
               );
             })}
             {sortedCallingRows.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400 text-sm">No callings yet — run the LCR sync to populate this list.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400 text-sm">No callings yet — run the LCR sync to populate this list.</td></tr>
             )}
           </tbody>
         </table>
@@ -234,7 +256,7 @@ export default function AllCallings() {
           </thead>
           <tbody>
             {sortedMwc.map(m => {
-              const inPipeline = trackedMemberIds.has(m.id);
+              const inPipeline = consideredMemberIds.has(m.id);
               const age = currentAge(m.birth_date);
               return (
                 <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50">

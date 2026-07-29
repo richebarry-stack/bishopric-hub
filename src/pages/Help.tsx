@@ -565,6 +565,9 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Internal: fixed a recurring bug where the LCR callings sync could falsely mark someone "released" from a calling they still actively hold, whenever the tracked calling\'s wording didn\'t exactly match LCR\'s own text (e.g. "Nursery" vs LCR\'s "Nursery Worker") — this could happen on every sync run for affected callings, not just once. Cleaned up 16 more falsely-released callings this caused.',
                 'Added a new All Callings page: one row per calling LCR reports for the ward (sortable by calling, sustain date, or member name), with a "Consider for release" button on each; and a Members Without a Calling table below it, sortable by name, age, or whether they\'re already in the Calling Pipeline, with an "Add for calling consideration" button that starts a Discussion-stage entry for them.',
                 'Ward Members: the Callings and Sustained columns now show only LCR\'s own record for that person, not callings tracked in the Calling Pipeline that haven\'t (yet) shown up in an LCR sync — see the new All Callings page for the pipeline-tracked view.',
+                'All Callings: added a Time in Calling column to the LCR Callings table (e.g. "2 yrs 3 mos"), sortable like the rest.',
+                'Removed the old manually-maintained "Members Without Callings" list from Calling Pipeline — superseded by All Callings\' auto-derived version.',
+                'All Callings: the "In Calling Pipeline?" flag on Members Without a Calling now only reflects being considered for a new calling, not being tracked for release from an existing one.',
               ],
             },
             {

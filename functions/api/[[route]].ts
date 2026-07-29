@@ -37,7 +37,6 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'missionary-pipeline': { name: 'missionary_pipeline', orderBy: 'id DESC' },
   'babies': { name: 'babies', orderBy: 'due_birth_date ASC' },
   'schedule-entries': { name: 'schedule_entries', orderBy: 'date ASC, start_time ASC' },
-  'members-without-callings': { name: 'members_without_callings', orderBy: 'name ASC' },
   'sacrament-announcements': { name: 'sacrament_announcements', orderBy: 'meeting_date DESC' },
   'prayer-others': { name: 'prayer_others', orderBy: 'id ASC' },
   'sacrament-agenda-notes': { name: 'sacrament_agenda_notes', orderBy: 'position ASC' },

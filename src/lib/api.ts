@@ -454,13 +454,6 @@ export interface SacramentAnnouncement {
   notes: string;
 }
 
-export interface MemberWithoutCalling {
-  id: number;
-  name: string;
-  potential_calling: string;
-  notes: string;
-}
-
 export interface YouthActivity {
   id: number;
   date: string;
