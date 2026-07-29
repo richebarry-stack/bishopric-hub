@@ -9,12 +9,17 @@ import { MISSIONARY_STATUSES, MISSIONARY_TEMPLE_STATUSES } from '../lib/constant
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   '0-Not at this time': { bg: 'bg-red-100', text: 'text-red-700' },
   '1-Considering': { bg: 'bg-blue-100', text: 'text-blue-700' },
-  '2-Papers Started': { bg: 'bg-green-100', text: 'text-green-700' },
-  '3-Papers with Stake': { bg: 'bg-teal-100', text: 'text-teal-700' },
-  '4-Papers Submitted': { bg: 'bg-yellow-100', text: 'text-yellow-700' },
-  '5-Call Accepted': { bg: 'bg-pink-100', text: 'text-pink-700' },
-  '6-Serving': { bg: 'bg-orange-100', text: 'text-orange-700' },
-  '7-Released': { bg: 'bg-purple-100', text: 'text-purple-700' },
+  'Candidate Completing Forms': { bg: 'bg-green-100', text: 'text-green-700' },
+  "Ready for Bishop's Action": { bg: 'bg-lime-100', text: 'text-lime-700' },
+  'With the Stake President': { bg: 'bg-teal-100', text: 'text-teal-700' },
+  'With Church Headquarters': { bg: 'bg-cyan-100', text: 'text-cyan-700' },
+  'Assignment Made': { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+  'Postponed Mission Start Date': { bg: 'bg-amber-100', text: 'text-amber-700' },
+  'Entered the MTC': { bg: 'bg-pink-100', text: 'text-pink-700' },
+  'Entered the Mission Field': { bg: 'bg-orange-100', text: 'text-orange-700' },
+  'On Leave': { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+  'Released from Mission Field': { bg: 'bg-purple-100', text: 'text-purple-700' },
+  'Canceled': { bg: 'bg-gray-100', text: 'text-gray-600' },
 };
 
 const EMPTY: Partial<MissionaryType> = {

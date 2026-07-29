@@ -14,6 +14,24 @@ function normCalling(s: string): string {
   return s.trim().toLowerCase();
 }
 
+function computeLcrOnly(tracked: CallingPipeline[], lcr: MemberCalling[]): MemberCalling[] {
+  const trackedNorm = new Set(tracked.map(c => normCalling(c.calling)));
+  return lcr.filter(c => !trackedNorm.has(normCalling(c.calling)));
+}
+
+function callingDisplayNames(tracked: CallingPipeline[], lcrOnly: MemberCalling[]): string {
+  return [...tracked.map(c => c.calling), ...lcrOnly.map(c => c.calling)].join(', ');
+}
+
+// Most recent sustained date among a member's callings (tracked + full LCR list), or null if none.
+function maxSustainedDate(tracked: CallingPipeline[], lcr: MemberCalling[]): string | null {
+  let max: string | null = null;
+  for (const c of [...tracked, ...lcr]) {
+    if (c.sustained_date && (!max || c.sustained_date > max)) max = c.sustained_date;
+  }
+  return max;
+}
+
 function currentAge(birthDate: string | null): number | null {
   if (!birthDate) return null;
   const today = new Date();
@@ -243,7 +261,24 @@ interface GroupedRows {
   unknown: WardMember[];
 }
 
-function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, callingsByMember, lcrCallingsByMember, expandedId, onToggleExpand, onUpdateCalling, onConsiderForRelease, sortByCallingDate, callingSortAsc, onToggleCallingSort, showRecommend = true }: {
+type SortKey = 'name' | 'birth_date' | 'recommend' | 'gender' | 'calling' | 'sustained';
+
+function SortHeader({ label, sortKey, current, asc, onSort, align = 'left', className }: {
+  label: string; sortKey: SortKey; current: SortKey; asc: boolean;
+  onSort: (k: SortKey) => void; align?: 'left' | 'center'; className?: string;
+}) {
+  const active = current === sortKey;
+  return (
+    <th className={`${align === 'center' ? 'text-center' : 'text-left'} px-4 py-2 font-medium text-gray-600 ${className || ''}`}>
+      <button type="button" onClick={() => onSort(sortKey)} className="hover:text-gray-900 inline-flex items-center gap-1">
+        {label}
+        <span className="text-gray-400">{active ? (asc ? '▲' : '▼') : '↕'}</span>
+      </button>
+    </th>
+  );
+}
+
+function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, callingsByMember, lcrCallingsByMember, expandedId, onToggleExpand, onUpdateCalling, onConsiderForRelease, sortKey, sortAsc, onSort, showRecommend = true }: {
   title: string;
   members: WardMember[];
   onToggleActive: (m: WardMember) => void;
@@ -261,9 +296,9 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
   onToggleExpand: (id: number) => void;
   onUpdateCalling: (callingId: number, fields: Record<string, unknown>) => void;
   onConsiderForRelease: (m: WardMember, calling: MemberCalling) => void;
-  sortByCallingDate: boolean;
-  callingSortAsc: boolean;
-  onToggleCallingSort: () => void;
+  sortKey: SortKey;
+  sortAsc: boolean;
+  onSort: (k: SortKey) => void;
   showRecommend?: boolean;
 }) {
   if (members.length === 0) return null;
@@ -276,29 +311,25 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
+              <SortHeader label="Name" sortKey="name" current={sortKey} asc={sortAsc} onSort={onSort} />
               <th className="text-left px-4 py-2 font-medium text-gray-600 w-36">Preferred Name</th>
-              <th className="text-left px-4 py-2 font-medium text-gray-600 w-28">Birth Date</th>
-              {showRecommend && <th className="text-left px-4 py-2 font-medium text-gray-600 w-40">Temple Recommend</th>}
-              <th className="text-center px-4 py-2 font-medium text-gray-600 w-16">Gender</th>
+              <SortHeader label="Birth Date" sortKey="birth_date" current={sortKey} asc={sortAsc} onSort={onSort} className="w-28" />
+              {showRecommend && <SortHeader label="Temple Recommend" sortKey="recommend" current={sortKey} asc={sortAsc} onSort={onSort} className="w-40" />}
+              <SortHeader label="Gender" sortKey="gender" current={sortKey} asc={sortAsc} onSort={onSort} align="center" className="w-16" />
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-24">Status</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Speakers</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Prayers</th>
-              <th className="text-left px-4 py-2 font-medium text-gray-600 w-44">
-                <button type="button" onClick={onToggleCallingSort} className="hover:text-gray-900 inline-flex items-center gap-1"
-                  title="Sort by most recent calling (sustained) date">
-                  Callings
-                  {sortByCallingDate && <span className="text-gray-400">{callingSortAsc ? '▲' : '▼'}</span>}
-                </button>
-              </th>
+              <SortHeader label="Callings" sortKey="calling" current={sortKey} asc={sortAsc} onSort={onSort} className="w-44" />
+              <SortHeader label="Sustained" sortKey="sustained" current={sortKey} asc={sortAsc} onSort={onSort} className="w-28" />
               <th className="text-right px-4 py-2 font-medium text-gray-600 w-32">Actions</th>
             </tr>
           </thead>
           <tbody>
             {members.map(m => {
               const memberCallings = callingsByMember.get(m.id) || [];
-              const trackedNorm = new Set(memberCallings.map(c => normCalling(c.calling)));
-              const lcrOnly = (lcrCallingsByMember.get(m.id) || []).filter(c => !trackedNorm.has(normCalling(c.calling)));
+              const memberLcrCallings = lcrCallingsByMember.get(m.id) || [];
+              const lcrOnly = computeLcrOnly(memberCallings, memberLcrCallings);
+              const sustained = maxSustainedDate(memberCallings, memberLcrCallings);
               return (
               <>
               <tr key={m.id} className={`border-b border-gray-50 hover:bg-gray-50 ${!m.active ? 'opacity-60' : ''}`}>
@@ -348,6 +379,9 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                 <td className="px-4 py-2">
                   <CallingsCell tracked={memberCallings} lcrOnly={lcrOnly} expanded={expandedId === m.id} onToggle={() => onToggleExpand(m.id)} />
                 </td>
+                <td className="px-4 py-2 text-xs text-gray-500">
+                  {sustained || <span className="text-gray-300">—</span>}
+                </td>
                 <td className="px-4 py-2 text-right space-x-2">
                   <button onClick={() => onToggleOutOfWard(m)}
                     title="Informational flag only — does not remove them from ward lists or affect Speakers/Prayers eligibility."
@@ -371,7 +405,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
               </tr>
               {expandedId === m.id && (
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <td colSpan={showRecommend ? 10 : 9} className="px-4 py-2">
+                  <td colSpan={showRecommend ? 11 : 10} className="px-4 py-2">
                     {memberCallings.length === 0 && lcrOnly.length === 0 ? (
                       <p className="text-xs text-gray-400">No current callings.</p>
                     ) : (
@@ -454,24 +488,25 @@ export default function WardMembers() {
     } as unknown as Record<string, unknown>);
   }, [createCalling]);
 
-  // Click "Callings" header: off -> newest first -> oldest first -> off.
-  const [sortByCallingDate, setSortByCallingDate] = useState(false);
-  const [callingSortAsc, setCallingSortAsc] = useState(false);
-  const toggleCallingSort = useCallback(() => {
-    if (!sortByCallingDate) { setSortByCallingDate(true); setCallingSortAsc(false); }
-    else if (!callingSortAsc) { setCallingSortAsc(true); }
-    else { setSortByCallingDate(false); }
-  }, [sortByCallingDate, callingSortAsc]);
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortAsc, setSortAsc] = useState(true);
+  const handleSort = useCallback((key: SortKey) => {
+    if (sortKey === key) setSortAsc(a => !a);
+    else { setSortKey(key); setSortAsc(true); }
+  }, [sortKey]);
 
-  // Most recent sustained date among a member's callings (tracked + full LCR list), or null if none.
-  const mostRecentSustainedDate = useCallback((memberId: number): string | null => {
-    const tracked = callingsByMember.get(memberId) || [];
-    const lcr = lcrCallingsByMember.get(memberId) || [];
-    let max: string | null = null;
-    for (const c of [...tracked, ...lcr]) {
-      if (c.sustained_date && (!max || c.sustained_date > max)) max = c.sustained_date;
+  // Value used to sort by the given key — null sorts to the bottom regardless of direction.
+  const sortValue = useCallback((m: WardMember, key: SortKey): string | null => {
+    const tracked = callingsByMember.get(m.id) || [];
+    const lcr = lcrCallingsByMember.get(m.id) || [];
+    switch (key) {
+      case 'name': return legalName(m);
+      case 'birth_date': return m.birth_date || null;
+      case 'recommend': return m.recommend_expires || null;
+      case 'gender': return m.gender || null;
+      case 'calling': return callingDisplayNames(tracked, computeLcrOnly(tracked, lcr)) || null;
+      case 'sustained': return maxSustainedDate(tracked, lcr);
     }
-    return max;
   }, [callingsByMember, lcrCallingsByMember]);
 
   const filtered = useMemo(() => {
@@ -481,18 +516,17 @@ export default function WardMembers() {
       .filter(r => !q || legalName(r).toLowerCase().includes(q))
       .sort((a, b) => {
         if (a.active !== b.active) return b.active - a.active;
-        if (sortByCallingDate) {
-          const da = mostRecentSustainedDate(a.id);
-          const db = mostRecentSustainedDate(b.id);
-          if (da !== db) {
-            if (!da) return 1;
-            if (!db) return -1;
-            return callingSortAsc ? da.localeCompare(db) : db.localeCompare(da);
-          }
+        const va = sortValue(a, sortKey);
+        const vb = sortValue(b, sortKey);
+        if (va !== vb) {
+          if (va === null) return 1;
+          if (vb === null) return -1;
+          const cmp = va.localeCompare(vb);
+          if (cmp !== 0) return sortAsc ? cmp : -cmp;
         }
         return legalName(a).localeCompare(legalName(b));
       });
-  }, [rows, filter, showInactive, sortByCallingDate, callingSortAsc, mostRecentSustainedDate]);
+  }, [rows, filter, showInactive, sortKey, sortAsc, sortValue]);
 
   const grouped = useMemo<GroupedRows>(() => {
     const groups: GroupedRows = { adults: [], youth: [], children: [], unknown: [] };
@@ -596,7 +630,7 @@ export default function WardMembers() {
     onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard, onSaveRecommend: saveRecommend,
     callingsByMember, lcrCallingsByMember, expandedId, onToggleExpand: toggleExpand, onUpdateCalling: updateCallingFields,
     onConsiderForRelease: considerForRelease,
-    sortByCallingDate, callingSortAsc, onToggleCallingSort: toggleCallingSort,
+    sortKey, sortAsc, onSort: handleSort,
   };
 
   return (

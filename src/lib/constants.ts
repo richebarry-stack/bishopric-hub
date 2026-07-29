@@ -203,7 +203,6 @@ export const MEMBER_NEED_TYPES = ['Health', 'Support', 'Mission'];
 export const MISSIONARY_STATUSES = [
   '0-Not at this time',
   '1-Considering',
-  '2-Papers Started',
   'Candidate Completing Forms',
   "Ready for Bishop's Action",
   'With the Stake President',

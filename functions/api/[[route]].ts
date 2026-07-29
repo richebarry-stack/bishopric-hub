@@ -1443,21 +1443,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     interface CallingRow {
       id: number; member: string; calling: string; organization: string | null; status: string;
       ward_member_id: number | null; sustain_recorded: number; set_apart_recorded: number;
-      sustained_date: string | null; type: string;
+      sustained_date: string | null; type: string; lcr_calling_confirmed: number;
     }
     const allCallings = (await db.prepare(
-      'SELECT id, member, calling, organization, status, ward_member_id, sustain_recorded, set_apart_recorded, sustained_date, type FROM calling_pipeline'
+      'SELECT id, member, calling, organization, status, ward_member_id, sustain_recorded, set_apart_recorded, sustained_date, type, lcr_calling_confirmed FROM calling_pipeline'
     ).all<CallingRow>()).results;
 
     const now = new Date().toISOString();
-    // Rows linked to a ward member BEFORE this run — i.e. confirmed by some
-    // earlier sync using LCR's own calling text. Release-reconciliation below
-    // only auto-releases from this set: a row we're linking for the very
-    // first time (backfilled from old free-text data, possibly using
-    // informal wording like "Nursery" vs LCR's "Nursery Worker") hasn't been
-    // confirmed against LCR's actual wording yet, so a calling-text mismatch
-    // there just means "we don't know," not "they were released."
-    const preExistingLinkedIds = new Set(allCallings.filter(c => c.ward_member_id !== null).map(c => c.id));
     const backfillStmts = [];
     for (const c of allCallings) {
       if (c.type === 'Calling' && c.ward_member_id === null) {
@@ -1504,12 +1496,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         if (row.set_apart && !existing.set_apart_recorded) updates.set_apart_recorded = 1;
         if (row.sustained_date && row.sustained_date !== existing.sustained_date) updates.sustained_date = row.sustained_date;
         if ((row.organization || '') !== (existing.organization || '')) updates.organization = row.organization;
+        const reportableChange = Object.keys(updates).length > 0;
+        // This row's free-text calling wording just matched LCR's own text for
+        // this org — safe to trust an absence next time as a real release.
+        // Not counted as a reportable "updated" change on its own — it's
+        // internal bookkeeping, not something the user asked to sync.
+        if (!existing.lcr_calling_confirmed) updates.lcr_calling_confirmed = 1;
         if (Object.keys(updates).length > 0) {
           const setClause = Object.keys(updates).map(k => `${k} = ?`).join(', ');
           stmts.push(db.prepare(`UPDATE calling_pipeline SET ${setClause}, updated_at = ? WHERE id = ?`)
             .bind(...Object.values(updates), now, existing.id));
-          updated++;
-          changed.push({ name: legalName, calling: row.calling, action: updates.status === '6. Set apart' ? 'set apart' : updates.status === '5. Sustained' ? 'sustained' : 'updated' });
+          if (reportableChange) {
+            updated++;
+            changed.push({ name: legalName, calling: row.calling, action: updates.status === '6. Set apart' ? 'set apart' : updates.status === '5. Sustained' ? 'sustained' : 'updated' });
+          }
         }
       }
       // No `else` — deliberately never creates a new calling_pipeline row.
@@ -1518,12 +1518,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       // workers, etc.) aren't meant to be tracked here.
     }
 
-    // Release reconciliation: any active Calling row that was ALREADY linked
-    // before this run (see preExistingLinkedIds above) and isn't seen in this
-    // week's LCR dump means the person was released from it. Newly-backfilled
-    // rows are excluded — see comment above.
+    // Release reconciliation: any active Calling row whose text has been
+    // confirmed against LCR's own wording at least once (lcr_calling_confirmed
+    // — see above) and isn't seen in this week's LCR dump means the person was
+    // released from it. Never-confirmed rows are excluded permanently, not just
+    // for the run right after backfill — a legacy wording mismatch (e.g.
+    // "Nursery" vs LCR's "Nursery Worker") persists across every future sync,
+    // so an unconfirmed row's absence never means "released," only "unknown."
     const activeCallings = allCallings.filter(c =>
-      c.type === 'Calling' && c.ward_member_id !== null && preExistingLinkedIds.has(c.id) &&
+      c.type === 'Calling' && c.ward_member_id !== null && !!c.lcr_calling_confirmed &&
       !['9. Released', '10. Declined'].includes(c.status) && !isSuperseded(c));
     for (const c of activeCallings) {
       if (seenPairs.has(`${c.ward_member_id}|${normCalling(c.calling)}`)) continue;

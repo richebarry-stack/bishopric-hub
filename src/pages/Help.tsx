@@ -557,9 +557,17 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 29, 2026',
+              items: [
+                'Ward Members: added a Sustained column showing each person\'s most recent calling date directly in the table, no need to expand the row. Name, Birth Date, Temple Recommend, Gender, Callings, and Sustained column headers are all now individually sortable (click to sort ascending, click again for descending).',
+                'Dashboard and Ward Council Dashboard: fixed the Missionaries panel showing empty — it was still filtering on the old missionary status names from before the LCR status vocabulary update. Now shows anyone not yet serving, in the MTC, released, or canceled.',
+                'Missionary Pipeline: removed the "Papers Started" status (unused) and fixed the status color legend, which still referenced the old status names.',
+                'Internal: fixed a recurring bug where the LCR callings sync could falsely mark someone "released" from a calling they still actively hold, whenever the tracked calling\'s wording didn\'t exactly match LCR\'s own text (e.g. "Nursery" vs LCR\'s "Nursery Worker") — this could happen on every sync run for affected callings, not just once. Cleaned up 16 more falsely-released callings this caused.',
+              ],
+            },
+            {
               date: 'Jul 28, 2026',
               items: [
-                'Ward Members: the Callings column header can now be clicked to sort by most recent calling (sustained) date — newest first, then oldest first, then back to name order.',
                 'Ward Members: the Callings column and expandable row now show every calling LCR reports for that person, not just the ones tracked in Calling Pipeline. Untracked callings show read-only with a "Consider for release" button that starts tracking them, flagged as needing release.',
                 'Ward Members: added a review list for members the LCR roster sync could no longer find — flag them "records elsewhere", remove them from the ward, or dismiss as a false alarm, right from the page.',
                 'Internal: LCR sync now only ever updates callings the bishopric already tracks in Calling Pipeline — it no longer auto-creates a row for every filled calling ward-wide (~150+ of them). Also fixed a bug where backfilling a newly-linked calling from old free-text data could falsely mark it "released" if the wording didn\'t exactly match LCR\'s.',
