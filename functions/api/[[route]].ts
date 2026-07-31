@@ -1702,24 +1702,31 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     const roster = (await db.prepare(
-      'SELECT id, first_name, last_name FROM ward_members WHERE active = 1'
-    ).all<RosterMember>()).results;
+      'SELECT id, first_name, last_name, recommend_type, recommend_expires FROM ward_members WHERE active = 1'
+    ).all<RosterMember & { recommend_type: string | null; recommend_expires: string | null }>()).results;
 
     const now = new Date().toISOString();
     const stmts = [];
     const unmatched: string[] = [];
-    let updated = 0;
+    let matched = 0, updated = 0;
     for (const row of rows) {
       const member = matchRosterMember(row.name, roster);
       if (!member) { unmatched.push(row.name); continue; }
+      matched++;
+      // Only write when something actually differs. Older rows can hold '' where
+      // the sync writes null, so normalize both sides before comparing — otherwise
+      // those members would count as "updated" on every run, forever.
+      const type = row.recommend_type || null;
+      const expires = row.recommend_expires || null;
+      if (type === (member.recommend_type || null) && expires === (member.recommend_expires || null)) continue;
       stmts.push(
         db.prepare('UPDATE ward_members SET recommend_type = ?, recommend_expires = ?, updated_at = ?, updated_by = ? WHERE id = ?')
-          .bind(row.recommend_type || null, row.recommend_expires || null, now, session.name, member.id)
+          .bind(type, expires, now, session.name, member.id)
       );
       updated++;
     }
     if (stmts.length > 0) await db.batch(stmts);
-    return json({ ok: true, updated, unmatched });
+    return json({ ok: true, matched, updated, unmatched });
   }
 
   // CRUD endpoints: /api/{table} and /api/{table}/{id}

@@ -557,6 +557,13 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Jul 31, 2026',
+              items: [
+                'Automation & Notifications: the temple recommend line in the LCR sync history now reports how many members actually changed, not how many were matched. It previously showed the same number (everyone on the report) after every run, which made it impossible to tell whether anything had really been updated.',
+                'Internal: the recommend sync now skips writing rows whose status and expiration are unchanged, so a routine sync no longer stamps a "last updated" timestamp on every ward member.',
+              ],
+            },
+            {
               date: 'Jul 29, 2026',
               items: [
                 'Ward Members: added a Sustained column showing each person\'s most recent calling date directly in the table, no need to expand the row. Name, Birth Date, Temple Recommend, Gender, Callings, and Sustained column headers are all now individually sortable (click to sort ascending, click again for descending).',

@@ -80,7 +80,7 @@ function LcrSyncHistory() {
                 <div className="mt-1 text-xs text-gray-500 space-y-0.5">
                   <p>Roster: {run.roster_created ?? 0} created, {run.roster_filled ?? 0} filled in{parseNames(run.roster_missing).length > 0 ? `, ${parseNames(run.roster_missing).length} missing from LCR` : ''}</p>
                   <NameList label="Missing from LCR roster" names={parseNames(run.roster_missing)} />
-                  <p>Recommends: {run.recommend_updated ?? 0} updated{parseNames(run.recommend_unmatched).length > 0 ? `, ${parseNames(run.recommend_unmatched).length} unmatched` : ''}</p>
+                  <p>Recommends: {run.recommend_updated ?? 0} changed{parseNames(run.recommend_unmatched).length > 0 ? `, ${parseNames(run.recommend_unmatched).length} unmatched` : ''}</p>
                   <NameList label="Unmatched recommends" names={parseNames(run.recommend_unmatched)} />
                   <p>Stake activations: {run.stake_flagged ?? 0} flagged, {run.stake_cleared ?? 0} cleared{parseNames(run.stake_unmatched).length > 0 ? `, ${parseNames(run.stake_unmatched).length} unmatched` : ''}</p>
                   <NameList label="Unmatched stake activations" names={parseNames(run.stake_unmatched)} />
