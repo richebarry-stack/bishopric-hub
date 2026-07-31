@@ -455,7 +455,7 @@ export async function syncTempleRecommendInterviews(db: D1Database): Promise<Job
 export async function syncClerkBabyRecordTasks(db: D1Database, todayStr: string): Promise<JobResult> {
   const babiesResult = await db.prepare(
     "SELECT id, name, blessing_date FROM babies WHERE blessing_date IS NOT NULL AND blessing_date != '' AND blessing_date <= ? AND church_record_created = 0"
-  ).all<{ id: number; name: string; blessing_date: string }>();
+  ).bind(todayStr).all<{ id: number; name: string; blessing_date: string }>();
   if (babiesResult.results.length === 0) return { ok: true, created: 0 };
 
   const clerk = await db.prepare("SELECT name FROM users WHERE church_role = 'Clerk' LIMIT 1").first<{ name: string }>();

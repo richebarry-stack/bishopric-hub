@@ -561,6 +561,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
               items: [
                 'Automation & Notifications: the temple recommend line in the LCR sync history now reports how many members actually changed, not how many were matched. It previously showed the same number (everyone on the report) after every run, which made it impossible to tell whether anything had really been updated.',
                 'Internal: the recommend sync now skips writing rows whose status and expiration are unchanged, so a routine sync no longer stamps a "last updated" timestamp on every ward member.',
+                'Fixed the automatic "Create church record for [baby]" clerk task never being created. The daily job that generates it had a malformed database query and had been failing silently on every run since it was added — the Automation & Notifications page was the only place the error showed. Any babies whose blessing date has already passed and aren\'t yet marked "Church record created" will get their task on the next daily run.',
               ],
             },
             {
