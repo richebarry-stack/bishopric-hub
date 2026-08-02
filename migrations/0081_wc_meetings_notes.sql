@@ -1,0 +1,1 @@
+ALTER TABLE wc_meetings ADD COLUMN notes TEXT DEFAULT '';

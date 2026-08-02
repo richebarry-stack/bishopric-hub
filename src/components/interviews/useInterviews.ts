@@ -1,15 +1,16 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../../lib/useTable';
 import type { InterviewPipeline as InterviewType, WardMember, User, CallingPipeline } from '../../lib/api';
 import { displayName, legalName } from '../../lib/displayName';
 import { toast } from '../../lib/toast';
-import { YOUTH_TYPES, computeYouthAge, computeYouthState, type RowMeta } from './shared';
+import { YOUTH_TYPES, TEMPLE_TYPES, computeYouthAge, computeYouthState, type RowMeta } from './shared';
 
 export const EMPTY_INTERVIEW: Partial<InterviewType> = {
   member: '', date_recommend_expires: '', type_of_interview: '', status: 'Unassigned',
   assigned_to: '', setup_assigned_to: '', setup_status: 'Not started',
   last_interview_datetime: '', next_interview_date: '', comments: '', notes: '',
+  flagged_for_meeting: 0,
 };
 
 export function useInterviews() {
@@ -30,6 +31,7 @@ export function useInterviews() {
   const [bulkSetupStatus, setBulkSetupStatus] = useState('');
   const [bulkSetupAssignedTo, setBulkSetupAssignedTo] = useState('');
   const [showAgedOutYouth, setShowAgedOutYouth] = useState(false);
+  const [showUpToDateYouth, setShowUpToDateYouth] = useState(true);
 
   const bishopricOptions = useMemo(() =>
     allUsers.filter(u => u.church_role && /bishop|counselor/i.test(u.church_role)).map(u => u.name),
@@ -152,7 +154,7 @@ export function useInterviews() {
 
   const toggleSelect = (id: number) => setSelected(prev => {
     const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
+    if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
 
@@ -175,12 +177,17 @@ export function useInterviews() {
         }
         const newPreferredFirst = preferredNameDraft.trim();
         if (newPreferredFirst !== (linked.preferred_first_name || '')) wardMemberUpdate.preferred_first_name = newPreferredFirst;
-        if (YOUTH_TYPES.has((data.type_of_interview as string) || '')) {
+        const interviewType = (data.type_of_interview as string) || '';
+        if (YOUTH_TYPES.has(interviewType) || TEMPLE_TYPES.has(interviewType)) {
           const newExpires = ((data.date_recommend_expires as string) || '').slice(0, 7);
           const linkedExpires = (linked.recommend_expires || '').slice(0, 7);
           if (newExpires !== linkedExpires) {
             wardMemberUpdate.recommend_expires = newExpires;
-            if (newExpires) wardMemberUpdate.recommend_type = linked.recommend_type === 'Endowed' ? 'Endowed' : 'Limited';
+            if (newExpires) {
+              wardMemberUpdate.recommend_type = interviewType === 'Endowed Temple Rec' ? 'Endowed'
+                : interviewType === 'Limited' ? 'Limited'
+                : linked.recommend_type === 'Endowed' ? 'Endowed' : 'Limited';
+            }
           }
         }
         if (Object.keys(wardMemberUpdate).length > 0) await updateWardMember(wardMemberId, wardMemberUpdate);
@@ -195,19 +202,31 @@ export function useInterviews() {
     wardMembersLoading ? 0 : rows.filter(r => YOUTH_TYPES.has(r.type_of_interview) && r.ward_member_id && !activeYouthWardMemberIds.has(r.ward_member_id)).length,
     [rows, activeYouthWardMemberIds, wardMembersLoading]);
 
-  useEffect(() => {
+  const upToDateYouthCount = useMemo(() =>
+    rows.filter(r => YOUTH_TYPES.has(r.type_of_interview) && rowMetaById.get(r.id)?.youthState === 'Up to date').length,
+    [rows, rowMetaById]);
+
+  // Resets the preferred-name draft whenever the editing target (or the ward member
+  // it's linked to) changes, without a useEffect round-trip render.
+  const editingIdentity = `${editing?.id ?? ''}:${editing?.ward_member_id ?? ''}`;
+  const [prevEditingIdentity, setPrevEditingIdentity] = useState(editingIdentity);
+  if (editingIdentity !== prevEditingIdentity) {
+    setPrevEditingIdentity(editingIdentity);
     const editingLinkedMember = editing?.ward_member_id ? wardMembersById.get(editing.ward_member_id) : undefined;
     setPreferredNameDraft(editingLinkedMember?.preferred_first_name || '');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing?.id, editing?.ward_member_id]);
+  }
 
   const quickAssignSetup = (id: number, name: string) => update(id, { setup_assigned_to: name }, { silent: true });
+  const toggleFlag = (id: number) => {
+    const row = rows.find(r => r.id === id);
+    return update(id, { flagged_for_meeting: row?.flagged_for_meeting ? 0 : 1 }, { silent: true });
+  };
 
   return {
-    rows, isLoading, filtered, remove, quickAssignSetup,
+    rows, isLoading, filtered, remove, quickAssignSetup, toggleFlag,
     wardMembers, wardMembersById, wardMembersLoading, ageByName, activeYouthWardMemberIds, callingsById,
     bishopricOptions, setupOptions, assignedOptions,
-    rowMetaById, agedOutYouthCount,
+    rowMetaById, agedOutYouthCount, upToDateYouthCount,
     editing, setEditing,
     preferredNameDraft, setPreferredNameDraft,
     filter, setFilter, statusFilter, setStatusFilter, assignedFilter, setAssignedFilter, typeFilter, setTypeFilter,
@@ -217,5 +236,6 @@ export function useInterviews() {
     handleBulkStatus, handleBulkAssign, handleBulkSetupStatus, handleBulkSetupAssign,
     handleSave,
     showAgedOutYouth, setShowAgedOutYouth,
+    showUpToDateYouth, setShowUpToDateYouth,
   };
 }

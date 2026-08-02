@@ -1,8 +1,12 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useTable } from '../lib/useTable';
-import type { BishopricMeeting, BishopricAgendaItem } from '../lib/api';
+import type { BishopricMeeting, BishopricAgendaItem, SacramentTheme } from '../lib/api';
 import { Input, Textarea } from '../components/FormFields';
 import { useConfirm } from '../components/ConfirmDialog';
+import { priorMeetingDate } from '../lib/priorWeek';
+import MoveItemsSection from './bishopricMeeting/MoveItemsSection';
+import CalendaringBox from './bishopricMeeting/CalendaringBox';
+import InterviewsNeededSection from './bishopricMeeting/InterviewsNeededSection';
 
 function formatDate(d: string): string {
   return new Date(d.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', {
@@ -11,6 +15,103 @@ function formatDate(d: string): string {
 }
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
+
+function renderLine(line: string): React.ReactNode {
+  if (!line.trim()) return null;
+  const parts = line.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((p, i) =>
+    p.length >= 4 && p.startsWith('**') && p.endsWith('**')
+      ? <strong key={i}>{p.slice(2, -2)}</strong>
+      : <span key={i}>{p}</span>
+  );
+}
+
+function renderRichContent(text: string): React.ReactNode {
+  if (!text?.trim()) return <span className="text-gray-300">—</span>;
+  const lines = text.split('\n');
+  const out: React.ReactNode[] = [];
+  let bullets: string[] = [];
+  const flushBullets = (idx: number) => {
+    if (!bullets.length) return;
+    out.push(
+      <ul key={`ul-${idx}`} className="list-disc list-inside space-y-0.5">
+        {bullets.map((b, j) => <li key={j} className="text-sm text-gray-700">{renderLine(b)}</li>)}
+      </ul>
+    );
+    bullets = [];
+  };
+  lines.forEach((line, i) => {
+    if (line.startsWith('- ') || line.startsWith('* ')) {
+      bullets.push(line.slice(2));
+    } else {
+      flushBullets(i);
+      const rendered = renderLine(line);
+      if (rendered) out.push(<p key={`p-${i}`} className="text-sm text-gray-700">{rendered}</p>);
+    }
+  });
+  flushBullets(lines.length);
+  return out.length ? <div className="space-y-1 px-2 py-1.5">{out}</div> : <span className="text-gray-300">—</span>;
+}
+
+function AutoTextarea({ value, onSave, readOnly, placeholder, minRows = 1 }: {
+  value: string; onSave?: (v: string) => void; readOnly?: boolean; placeholder?: string; minRows?: number;
+}) {
+  const [local, setLocal] = useState(value);
+  const [prevValue, setPrevValue] = useState(value);
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setLocal(value);
+  }
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }, [local]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Enter') return;
+    const el = ref.current;
+    if (!el) return;
+    const pos = el.selectionStart;
+    const lineStart = local.lastIndexOf('\n', pos - 1) + 1;
+    const line = local.slice(lineStart, pos);
+    if (line === '- ' || line === '* ') {
+      e.preventDefault();
+      const next = local.slice(0, lineStart) + '\n' + local.slice(pos);
+      setLocal(next);
+      setTimeout(() => { el.selectionStart = el.selectionEnd = lineStart + 1; }, 0);
+    } else if (line.startsWith('- ') || line.startsWith('* ')) {
+      e.preventDefault();
+      const prefix = line.startsWith('- ') ? '- ' : '* ';
+      const insert = '\n' + prefix;
+      const next = local.slice(0, pos) + insert + local.slice(pos);
+      setLocal(next);
+      setTimeout(() => { el.selectionStart = el.selectionEnd = pos + insert.length; }, 0);
+    }
+  };
+
+  if (readOnly) {
+    return <div className="min-h-[2rem]">{renderRichContent(value)}</div>;
+  }
+
+  return (
+    <textarea
+      ref={ref}
+      value={local}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={() => { if (local !== value && onSave) onSave(local); }}
+      onKeyDown={handleKeyDown}
+      placeholder={placeholder}
+      rows={minRows}
+      className="w-full resize-none overflow-hidden bg-transparent border border-transparent hover:border-gray-200 focus:border-emerald-400 focus:bg-white focus:outline-none rounded px-2 py-1.5 text-sm placeholder-gray-300 min-h-[2rem]"
+      style={{ overflow: 'hidden' }}
+    />
+  );
+}
 
 function AgendaItemText({ item, onSave }: { item: BishopricAgendaItem; onSave: (v: string) => void }) {
   const [editing, setEditing] = useState(false);
@@ -33,6 +134,7 @@ function AgendaItemText({ item, onSave }: { item: BishopricAgendaItem; onSave: (
 export default function CurrentBishopricMeeting() {
   const { rows: meetings, isLoading: meetingsLoading, update: updateMeeting } = useTable<BishopricMeeting>('bishopric-meetings');
   const { rows: items, isLoading: itemsLoading, create: createItem, update: updateItem, remove: removeItem } = useTable<BishopricAgendaItem>('bishopric-agenda-items');
+  const themes = useTable<SacramentTheme>('sacrament-themes');
   const confirm = useConfirm();
 
   const sortedMeetingDates = useMemo(
@@ -107,6 +209,40 @@ export default function CurrentBishopricMeeting() {
     updateMeeting(meeting.id, { [field]: v }, { silent: true });
   };
 
+  const priorDate = useMemo(() => priorMeetingDate(date, meetings), [date, meetings]);
+  const priorMeeting = priorDate ? meetings.find(m => m.date.slice(0, 10) === priorDate) : undefined;
+
+  const handleCopyUpdatesFromLastWeek = async () => {
+    if (!meeting || !priorMeeting) return;
+    if (!await confirm({ message: "Replace this week's Updates/Announcements with last week's? This week's current text will be lost." })) return;
+    saveMeetingField('updates_announcements', priorMeeting.updates_announcements || '');
+  };
+
+  // Move-ins are announced as one combined sentence rather than repeating the
+  // preamble per person — a second (or third) click on the same week's agenda
+  // appends to the existing line instead of starting a new one.
+  const MOVE_IN_PREAMBLE = 'We have received the records of the following:';
+  const appendMoveIn = (current: string, name: string): string => {
+    const lines = (current || '').split('\n');
+    const idx = lines.findIndex(l => l.trim().startsWith(MOVE_IN_PREAMBLE));
+    if (idx === -1) {
+      const line = `${MOVE_IN_PREAMBLE} ${name}.`;
+      return current ? `${current}\n${line}` : line;
+    }
+    lines[idx] = `${lines[idx].trim().replace(/\.$/, '')}, ${name}.`;
+    return lines.join('\n');
+  };
+
+  const handleAddToSacramentAgenda = async (text: string) => {
+    const existing = themes.rows.find(t => t.meeting_date.slice(0, 10) === date);
+    const next = appendMoveIn(existing?.ward_business || '', text);
+    if (existing) {
+      await themes.update(existing.id, { ward_business: next }, { silent: true });
+    } else {
+      await themes.create({ meeting_date: date, ward_business: next }, { silent: true });
+    }
+  };
+
   const isLoading = meetingsLoading || itemsLoading;
 
   return (
@@ -151,8 +287,46 @@ export default function CurrentBishopricMeeting() {
                 <Input label="Handbook Section" value={meeting.handbook_section || ''} onChange={v => saveMeetingField('handbook_section', v)} />
               </div>
               <Textarea label="Minutes" value={meeting.minutes || ''} onChange={v => saveMeetingField('minutes', v)} rows={4} />
+              <div>
+                <label className="text-sm font-semibold text-gray-600 block mb-1">Notes</label>
+                <div className="rounded-md border border-gray-200">
+                  <AutoTextarea
+                    value={meeting.notes ?? ''}
+                    onSave={v => saveMeetingField('notes', v)}
+                    placeholder="Anything else to note for this meeting…"
+                    minRows={6}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-semibold text-gray-600">Updates / Announcements</label>
+                  {priorMeeting?.updates_announcements && (
+                    <button onClick={handleCopyUpdatesFromLastWeek} className="text-xs text-gray-400 hover:text-gray-600">
+                      Copy from last week
+                    </button>
+                  )}
+                </div>
+                <div className="rounded-md border border-gray-200">
+                  <AutoTextarea
+                    value={meeting.updates_announcements ?? ''}
+                    onSave={v => saveMeetingField('updates_announcements', v)}
+                    placeholder="Updates or church announcements to cover…"
+                    minRows={4}
+                  />
+                </div>
+              </div>
             </section>
           )}
+
+          <CalendaringBox date={date} />
+
+          <MoveItemsSection kind="move_in" date={date} title="Move-ins" meetingDates={meetings}
+            onAddToSacramentAgenda={handleAddToSacramentAgenda} />
+          <MoveItemsSection kind="move_out" date={date} title="Move-outs" meetingDates={meetings} />
+          <MoveItemsSection kind="other" date={date} title="Other Items" meetingDates={meetings} />
+
+          <InterviewsNeededSection />
 
           <section>
             <h2 className="text-sm font-semibold text-gray-700 mb-2">Agenda</h2>

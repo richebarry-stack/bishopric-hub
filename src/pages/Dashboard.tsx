@@ -6,7 +6,7 @@ import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 import type { CallingPipeline, CalendarEvent, Task, MemberNeed, MissionaryPipeline, BishopricMeeting, AnnualDuty, Baby } from '../lib/api';
 import StatusBadge from '../components/StatusBadge';
-import { CALLING_STATUS_COLORS } from '../lib/constants';
+import { CALLING_STATUS_COLORS, MISSIONARY_STATUSES } from '../lib/constants';
 import { renderRichText } from '../lib/richText';
 import {
   type DashboardConfig, type FontSize,
@@ -14,12 +14,16 @@ import {
   loadDashboardConfig, saveDashboardConfig,
 } from '../lib/dashboardConfig';
 import { inDutyWindow, useTimeZoneNow } from '../lib/annualDuties';
-import { NAV_ITEMS, LAST_VISITED_KEY } from '../components/Layout';
+import { NAV_ITEMS, LAST_VISITED_KEY } from '../lib/navItems';
 import { responsiveGridCols } from '../lib/gridCols';
 
 const TODAY = new Date().toISOString().slice(0, 10);
+const DUE_SOON_CUTOFF = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
 const ACTION_STATUSES = new Set(['3. Approved and assigned', '7. Need to release']);
-const ACTIVE_MISSIONARY_STATUSES = new Set(['1-Considering', '2-Papers Started', '3-Papers with Stake', '4-Papers Submitted', '5-Call Accepted']);
+// Everything except still-serving/wrapped-up statuses — this is the dashboard's
+// "in progress toward serving" summary, so those are shown on Missionary Pipeline instead.
+const INACTIVE_MISSIONARY_STATUSES = new Set(['Entered the MTC', 'Entered the Mission Field', 'Released from Mission Field', 'Canceled']);
+const ACTIVE_MISSIONARY_STATUSES = new Set(MISSIONARY_STATUSES.filter(s => !INACTIVE_MISSIONARY_STATUSES.has(s)));
 const FONT_SIZES: FontSize[] = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl'];
 
 function formatEventDate(iso: string): string {
@@ -35,6 +39,30 @@ function SectionTitle({ children, link }: { children: React.ReactNode; link?: st
       <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">{children}</h2>
       {link && <Link to={link} className="text-xs text-blue-400 hover:text-blue-600">↗</Link>}
     </div>
+  );
+}
+
+function InlineEditText({ value, onSave, placeholder, className }: {
+  value: string; onSave: (v: string) => void; placeholder?: string; className?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        defaultValue={value}
+        placeholder={placeholder}
+        onBlur={e => { setEditing(false); if (e.target.value !== value) onSave(e.target.value); }}
+        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
+        className={`rounded border border-blue-300 px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400 ${className ?? ''}`}
+      />
+    );
+  }
+  return (
+    <button type="button" onClick={() => setEditing(true)}
+      className={`block text-left rounded px-1.5 py-0.5 -mx-1.5 hover:bg-gray-50 cursor-text ${className ?? ''}`}>
+      {value || <span className="text-gray-300 font-normal">{placeholder ?? '—'}</span>}
+    </button>
   );
 }
 
@@ -253,7 +281,7 @@ export default function Dashboard() {
   const { rows: tasks } = useTable<Task>('tasks');
   const { rows: needs, create: createNeed, update: updateNeed } = useTable<MemberNeed>('member-needs');
   const { rows: missionaries } = useTable<MissionaryPipeline>('missionary-pipeline');
-  const { rows: meetings } = useTable<BishopricMeeting>('bishopric-meetings');
+  const { rows: meetings, update: updateMeeting } = useTable<BishopricMeeting>('bishopric-meetings');
   const { rows: annualDuties } = useTable<AnnualDuty>('annual-duties');
   const { rows: babies } = useTable<Baby>('babies');
   const { data: tzData } = useQuery({ queryKey: ['app-timezone'], queryFn: () => api.appTimezone.get() });
@@ -294,6 +322,11 @@ export default function Dashboard() {
     [annualDuties, currentMonth, currentYear]);
 
   const removePrayer = (id: number) => updateNeed(id, { pray_for: 0 });
+
+  const saveMeetingField = (field: keyof BishopricMeeting, v: string) => {
+    if (!nextMeeting) return;
+    updateMeeting(nextMeeting.id, { [field]: v }, { silent: true });
+  };
 
   const addNeed = async (type: 'Health' | 'Support', who: string) => {
     const name = who.trim();
@@ -371,35 +404,50 @@ export default function Dashboard() {
                   {cfg.bishopricMeeting.showSpiritualThought && (
                     <div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Spiritual Thought</p>
-                      <p className={`${FONT_SIZE_CLASS[cfg.bishopricMeeting.fontSize]} font-bold text-gray-900`}>
-                        {nextMeeting.spiritual_thought || <span className="text-gray-300 font-normal">—</span>}
-                      </p>
+                      <InlineEditText
+                        value={nextMeeting.spiritual_thought || ''}
+                        onSave={v => saveMeetingField('spiritual_thought', v)}
+                        className={`${FONT_SIZE_CLASS[cfg.bishopricMeeting.fontSize]} font-bold text-gray-900 w-full`}
+                      />
                     </div>
                   )}
                   {cfg.bishopricMeeting.showOpeningPrayer && (
                     <div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Opening Prayer</p>
-                      <p className={`${FONT_SIZE_CLASS[cfg.bishopricMeeting.fontSize]} font-bold text-gray-900`}>
-                        {nextMeeting.opening_prayer || <span className="text-gray-300 font-normal">—</span>}
-                      </p>
+                      <InlineEditText
+                        value={nextMeeting.opening_prayer || ''}
+                        onSave={v => saveMeetingField('opening_prayer', v)}
+                        className={`${FONT_SIZE_CLASS[cfg.bishopricMeeting.fontSize]} font-bold text-gray-900 w-full`}
+                      />
                     </div>
                   )}
                   {cfg.bishopricMeeting.showHandbookTopic && (
                     <div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Handbook Topic</p>
-                      <p className={`${FONT_SIZE_CLASS[cfg.bishopricMeeting.fontSize]} font-bold text-gray-900`}>
-                        {nextMeeting.handbook_training
-                          ? <>{nextMeeting.handbook_training}{nextMeeting.handbook_section ? <span className="text-gray-400 font-normal"> §{nextMeeting.handbook_section}</span> : null}</>
-                          : <span className="text-gray-300 font-normal">—</span>}
-                      </p>
+                      <div className="flex items-baseline gap-2">
+                        <InlineEditText
+                          value={nextMeeting.handbook_training || ''}
+                          onSave={v => saveMeetingField('handbook_training', v)}
+                          className={`${FONT_SIZE_CLASS[cfg.bishopricMeeting.fontSize]} font-bold text-gray-900 truncate flex-1 min-w-0`}
+                        />
+                        <span className="text-gray-400 font-normal shrink-0">§</span>
+                        <InlineEditText
+                          value={nextMeeting.handbook_section || ''}
+                          onSave={v => saveMeetingField('handbook_section', v)}
+                          placeholder="section"
+                          className={`${FONT_SIZE_CLASS[cfg.bishopricMeeting.fontSize]} font-normal text-gray-400 w-20 shrink-0`}
+                        />
+                      </div>
                     </div>
                   )}
                   {cfg.bishopricMeeting.showClosingPrayer && (
                     <div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Closing Prayer</p>
-                      <p className={`${FONT_SIZE_CLASS[cfg.bishopricMeeting.fontSize]} font-bold text-gray-900`}>
-                        {nextMeeting.closing_prayer || <span className="text-gray-300 font-normal">—</span>}
-                      </p>
+                      <InlineEditText
+                        value={nextMeeting.closing_prayer || ''}
+                        onSave={v => saveMeetingField('closing_prayer', v)}
+                        className={`${FONT_SIZE_CLASS[cfg.bishopricMeeting.fontSize]} font-bold text-gray-900 w-full`}
+                      />
                     </div>
                   )}
                 </div>
@@ -464,7 +512,7 @@ export default function Dashboard() {
                   ? <p className="text-xs text-gray-400 py-2">All done!</p>
                   : pendingTasks.map(t => {
                     const isOverdue = t.due_date && t.due_date < TODAY;
-                    const isDueSoon = !isOverdue && t.due_date && t.due_date <= new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+                    const isDueSoon = !isOverdue && t.due_date && t.due_date <= DUE_SOON_CUTOFF;
                     return (
                       <div key={t.id} className="flex items-baseline justify-between py-1 gap-2">
                         <span className={`${FONT_SIZE_CLASS[cfg.tasks.fontSize]} text-gray-800 truncate`}>{t.task}</span>

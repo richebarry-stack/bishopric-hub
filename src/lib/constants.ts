@@ -203,12 +203,17 @@ export const MEMBER_NEED_TYPES = ['Health', 'Support', 'Mission'];
 export const MISSIONARY_STATUSES = [
   '0-Not at this time',
   '1-Considering',
-  '2-Papers Started',
-  '3-Papers with Stake',
-  '4-Papers Submitted',
-  '5-Call Accepted',
-  '6-Serving',
-  '7-Released',
+  'Candidate Completing Forms',
+  "Ready for Bishop's Action",
+  'With the Stake President',
+  'With Church Headquarters',
+  'Assignment Made',
+  'Postponed Mission Start Date',
+  'Entered the MTC',
+  'Entered the Mission Field',
+  'On Leave',
+  'Released from Mission Field',
+  'Canceled',
 ];
 
 export const MISSIONARY_TEMPLE_STATUSES = [
@@ -224,14 +229,21 @@ export const BABY_STATUSES = ['Expecting', 'Born', 'Blessed', 'Recorded'];
 export const SPEAKER_TYPES = ['Youth Speaker', 'Adult Speaker', 'Not Comfortable Speaking'];
 
 export const ORGANIZATIONS = [
+  'Bishopric',
   'Elders Quorum',
   'Relief Society',
+  'Aaronic Priesthood Quorums',
   'Young Men',
   'Young Women',
   'YW',
   'Primary',
   'Sunday School',
+  'Young Single Adult',
+  'Ward Missionaries',
+  'Temple and Family History',
   'Music',
+  'Technology',
+  'Welfare and Self-Reliance',
   'Other',
 ];
 

@@ -4,9 +4,18 @@ import { toast } from '../lib/toast';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useAuth } from '../lib/auth';
 import { legalName } from '../lib/displayName';
-import type { WardMember, InterviewPipeline } from '../lib/api';
+import type { WardMember, InterviewPipeline, MemberCalling, RosterReviewFlag } from '../lib/api';
 import WardMemberImport from '../components/WardMemberImport';
 import { YOUTH_TYPES, formatRecommendDate } from '../components/interviews/shared';
+
+// Most recent sustained date among a member's LCR-sourced callings, or null if none.
+function maxSustainedDate(lcr: MemberCalling[]): string | null {
+  let max: string | null = null;
+  for (const c of lcr) {
+    if (c.sustained_date && (!max || c.sustained_date > max)) max = c.sustained_date;
+  }
+  return max;
+}
 
 function currentAge(birthDate: string | null): number | null {
   if (!birthDate) return null;
@@ -68,12 +77,13 @@ function NameCell({ member, onSave }: { member: WardMember; onSave: (fields: { f
       else { setFirst(member.first_name); setLast(member.last_name); }
     };
     return (
-      <div className="flex gap-1">
+      <div className="flex gap-1"
+        onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) commit(); }}>
         <input autoFocus value={last} onChange={e => setLast(e.target.value)} placeholder="Last"
-          onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
+          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
           className="text-sm rounded border border-gray-300 px-1.5 py-0.5 w-24" />
         <input value={first} onChange={e => setFirst(e.target.value)} placeholder="First"
-          onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
+          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
           className="text-sm rounded border border-gray-300 px-1.5 py-0.5 w-24" />
       </div>
     );
@@ -99,12 +109,13 @@ function PreferredNameCell({ member, onSave }: { member: WardMember; onSave: (fi
       }
     };
     return (
-      <div className="flex gap-1">
+      <div className="flex gap-1"
+        onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) commit(); }}>
         <input autoFocus value={last} onChange={e => setLast(e.target.value)} placeholder="Last"
-          onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
+          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
           className="text-xs rounded border border-gray-300 px-1.5 py-0.5 w-20" />
         <input value={first} onChange={e => setFirst(e.target.value)} placeholder="First"
-          onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
+          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditing(false); }}
           className="text-xs rounded border border-gray-300 px-1.5 py-0.5 w-20" />
       </div>
     );
@@ -133,14 +144,15 @@ function RecommendCell({ member, onSave }: { member: WardMember; onSave: (fields
       }
     };
     return (
-      <div className="flex gap-1">
-        <select value={type} onChange={e => setType(e.target.value)} onBlur={commit}
+      <div className="flex gap-1"
+        onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) commit(); }}>
+        <select value={type} onChange={e => setType(e.target.value)}
           className="text-xs rounded border border-gray-300 px-1 py-0.5">
           <option value="">—</option>
           <option value="Endowed">Endowed</option>
           <option value="Limited">Limited</option>
         </select>
-        <input type="month" value={expires} onChange={e => setExpires(e.target.value)} onBlur={commit}
+        <input type="month" value={expires} onChange={e => setExpires(e.target.value)}
           className="text-xs rounded border border-gray-300 px-1 py-0.5" />
       </div>
     );
@@ -171,6 +183,15 @@ function GenderCell({ member, onSave }: { member: WardMember; onSave: (v: string
   );
 }
 
+function CallingsCell({ callings }: { callings: MemberCalling[] }) {
+  const names = callings.map(c => c.calling).join(', ');
+  return (
+    <span className="text-xs text-gray-600 max-w-[180px] truncate block" title={names || undefined}>
+      {names || <span className="text-gray-300">—</span>}
+    </span>
+  );
+}
+
 interface GroupedRows {
   adults: WardMember[];
   youth: WardMember[];
@@ -178,7 +199,24 @@ interface GroupedRows {
   unknown: WardMember[];
 }
 
-function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, showRecommend = true }: {
+type SortKey = 'name' | 'birth_date' | 'recommend' | 'gender' | 'calling' | 'sustained';
+
+function SortHeader({ label, sortKey, current, asc, onSort, align = 'left', className }: {
+  label: string; sortKey: SortKey; current: SortKey; asc: boolean;
+  onSort: (k: SortKey) => void; align?: 'left' | 'center'; className?: string;
+}) {
+  const active = current === sortKey;
+  return (
+    <th className={`${align === 'center' ? 'text-center' : 'text-left'} px-4 py-2 font-medium text-gray-600 ${className || ''}`}>
+      <button type="button" onClick={() => onSort(sortKey)} className="hover:text-gray-900 inline-flex items-center gap-1">
+        {label}
+        <span className="text-gray-400">{active ? (asc ? '▲' : '▼') : '↕'}</span>
+      </button>
+    </th>
+  );
+}
+
+function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, lcrCallingsByMember, sortKey, sortAsc, onSort, showRecommend = true }: {
   title: string;
   members: WardMember[];
   onToggleActive: (m: WardMember) => void;
@@ -190,6 +228,10 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
   onSavePreferredName: (m: WardMember, fields: { preferred_first_name: string; preferred_last_name: string }) => void;
   onToggleOutOfWard: (m: WardMember) => void;
   onSaveRecommend: (m: WardMember, fields: { recommend_type: string; recommend_expires: string }) => void;
+  lcrCallingsByMember: Map<number, MemberCalling[]>;
+  sortKey: SortKey;
+  sortAsc: boolean;
+  onSort: (k: SortKey) => void;
   showRecommend?: boolean;
 }) {
   if (members.length === 0) return null;
@@ -202,19 +244,24 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
+              <SortHeader label="Name" sortKey="name" current={sortKey} asc={sortAsc} onSort={onSort} />
               <th className="text-left px-4 py-2 font-medium text-gray-600 w-36">Preferred Name</th>
-              <th className="text-left px-4 py-2 font-medium text-gray-600 w-28">Birth Date</th>
-              {showRecommend && <th className="text-left px-4 py-2 font-medium text-gray-600 w-40">Temple Recommend</th>}
-              <th className="text-center px-4 py-2 font-medium text-gray-600 w-16">Gender</th>
+              <SortHeader label="Birth Date" sortKey="birth_date" current={sortKey} asc={sortAsc} onSort={onSort} className="w-28" />
+              {showRecommend && <SortHeader label="Temple Recommend" sortKey="recommend" current={sortKey} asc={sortAsc} onSort={onSort} className="w-40" />}
+              <SortHeader label="Gender" sortKey="gender" current={sortKey} asc={sortAsc} onSort={onSort} align="center" className="w-16" />
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-24">Status</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Speakers</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Prayers</th>
+              <SortHeader label="Callings" sortKey="calling" current={sortKey} asc={sortAsc} onSort={onSort} className="w-44" />
+              <SortHeader label="Sustained" sortKey="sustained" current={sortKey} asc={sortAsc} onSort={onSort} className="w-28" />
               <th className="text-right px-4 py-2 font-medium text-gray-600 w-32">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {members.map(m => (
+            {members.map(m => {
+              const memberLcrCallings = lcrCallingsByMember.get(m.id) || [];
+              const sustained = maxSustainedDate(memberLcrCallings);
+              return (
               <tr key={m.id} className={`border-b border-gray-50 hover:bg-gray-50 ${!m.active ? 'opacity-60' : ''}`}>
                 <td className="px-4 py-2 font-medium text-gray-900">
                   <NameCell member={m} onSave={fields => onSaveName(m, fields)} />
@@ -259,6 +306,12 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                     {m.exclude_prayers ? 'Excluded' : 'Included'}
                   </button>
                 </td>
+                <td className="px-4 py-2">
+                  <CallingsCell callings={memberLcrCallings} />
+                </td>
+                <td className="px-4 py-2 text-xs text-gray-500">
+                  {sustained || <span className="text-gray-300">—</span>}
+                </td>
                 <td className="px-4 py-2 text-right space-x-2">
                   <button onClick={() => onToggleOutOfWard(m)}
                     title="Informational flag only — does not remove them from ward lists or affect Speakers/Prayers eligibility."
@@ -280,7 +333,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                   )}
                 </td>
               </tr>
-            ))}
+            );})}
           </tbody>
         </table>
       </div>
@@ -293,6 +346,8 @@ export default function WardMembers() {
   const isAdmin = user?.role === 'admin';
   const { rows, create, update, remove, refetch } = useTable<WardMember>('ward-members');
   const { rows: interviews, update: updateInterview } = useTable<InterviewPipeline>('interview-pipeline');
+  const { rows: lcrCallings } = useTable<MemberCalling>('member-callings');
+  const { rows: reviewFlags, remove: removeReviewFlag } = useTable<RosterReviewFlag>('roster-review-flags');
   const [filter, setFilter] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -301,6 +356,36 @@ export default function WardMembers() {
   const [newFirst, setNewFirst] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const lcrCallingsByMember = useMemo(() => {
+    const m = new Map<number, MemberCalling[]>();
+    for (const c of lcrCallings) {
+      const list = m.get(c.ward_member_id) || [];
+      list.push(c);
+      m.set(c.ward_member_id, list);
+    }
+    return m;
+  }, [lcrCallings]);
+
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortAsc, setSortAsc] = useState(true);
+  const handleSort = useCallback((key: SortKey) => {
+    if (sortKey === key) setSortAsc(a => !a);
+    else { setSortKey(key); setSortAsc(true); }
+  }, [sortKey]);
+
+  // Value used to sort by the given key — null sorts to the bottom regardless of direction.
+  const sortValue = useCallback((m: WardMember, key: SortKey): string | null => {
+    const lcr = lcrCallingsByMember.get(m.id) || [];
+    switch (key) {
+      case 'name': return legalName(m);
+      case 'birth_date': return m.birth_date || null;
+      case 'recommend': return m.recommend_expires || null;
+      case 'gender': return m.gender || null;
+      case 'calling': return lcr.map(c => c.calling).join(', ') || null;
+      case 'sustained': return maxSustainedDate(lcr);
+    }
+  }, [lcrCallingsByMember]);
+
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
     return rows
@@ -308,9 +393,17 @@ export default function WardMembers() {
       .filter(r => !q || legalName(r).toLowerCase().includes(q))
       .sort((a, b) => {
         if (a.active !== b.active) return b.active - a.active;
+        const va = sortValue(a, sortKey);
+        const vb = sortValue(b, sortKey);
+        if (va !== vb) {
+          if (va === null) return 1;
+          if (vb === null) return -1;
+          const cmp = va.localeCompare(vb);
+          if (cmp !== 0) return sortAsc ? cmp : -cmp;
+        }
         return legalName(a).localeCompare(legalName(b));
       });
-  }, [rows, filter, showInactive]);
+  }, [rows, filter, showInactive, sortKey, sortAsc, sortValue]);
 
   const grouped = useMemo<GroupedRows>(() => {
     const groups: GroupedRows = { adults: [], youth: [], children: [], unknown: [] };
@@ -384,7 +477,33 @@ export default function WardMembers() {
     if (await confirm({ message: `Permanently delete ${legalName(m)}? This cannot be undone.` })) remove(m.id);
   }, [remove, confirm]);
 
-  const sectionProps = { onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude, onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSaveName: saveName, onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard, onSaveRecommend: saveRecommend };
+  const reviewFlagMembers = useMemo(() => {
+    return reviewFlags
+      .map(f => ({ flag: f, member: rows.find(r => r.id === f.ward_member_id) }))
+      .filter((x): x is { flag: RosterReviewFlag; member: WardMember } => !!x.member);
+  }, [reviewFlags, rows]);
+
+  const handleFlagOutOfWard = useCallback((flag: RosterReviewFlag, m: WardMember) => {
+    toggleOutOfWard(m);
+    removeReviewFlag(flag.id);
+  }, [toggleOutOfWard, removeReviewFlag]);
+
+  const handleRemoveFromWardReview = useCallback((flag: RosterReviewFlag, m: WardMember) => {
+    toggleActive(m);
+    removeReviewFlag(flag.id);
+  }, [toggleActive, removeReviewFlag]);
+
+  const handleDismissFlag = useCallback((flag: RosterReviewFlag) => {
+    removeReviewFlag(flag.id);
+  }, [removeReviewFlag]);
+
+  const sectionProps = {
+    onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude,
+    onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSaveName: saveName,
+    onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard, onSaveRecommend: saveRecommend,
+    lcrCallingsByMember,
+    sortKey, sortAsc, onSort: handleSort,
+  };
 
   return (
     <div>
@@ -411,6 +530,33 @@ export default function WardMembers() {
           </button>
         </div>
       </div>
+
+      {reviewFlagMembers.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+          <p className="text-sm font-medium text-amber-800 mb-2">
+            Not found in LCR's Member Directory ({reviewFlagMembers.length}) — records elsewhere, moved, or a name mismatch?
+          </p>
+          <div className="space-y-1.5">
+            {reviewFlagMembers.map(({ flag, member }) => (
+              <div key={flag.id} className="flex items-center gap-3 text-sm">
+                <span className="flex-1 text-gray-800">{legalName(member)}</span>
+                <button type="button" onClick={() => handleFlagOutOfWard(flag, member)}
+                  className="text-xs px-2 py-1 rounded text-amber-700 hover:bg-amber-100">
+                  Flag: records elsewhere
+                </button>
+                <button type="button" onClick={() => handleRemoveFromWardReview(flag, member)}
+                  className="text-xs px-2 py-1 rounded text-orange-600 hover:bg-orange-100">
+                  Remove from ward
+                </button>
+                <button type="button" onClick={() => handleDismissFlag(flag)}
+                  className="text-xs px-2 py-1 rounded text-gray-500 hover:bg-gray-100">
+                  Dismiss
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-3 mb-4">
         <input value={filter} onChange={e => setFilter(e.target.value)}
@@ -452,6 +598,7 @@ export default function WardMembers() {
         "Remove from ward" takes them off the active roster — hides them from Speakers &amp; Prayers, but preserves their history.
         "Flag: records elsewhere" is unrelated — it just marks someone who attends here but whose membership record is in another ward. It's informational only and doesn't remove them from anything.
         Age groups: children (&lt;12 this year), youth (12–17 this year), adults (18+ this year).
+        Callings shown here are LCR's own record — for the bishopric's tracked calling workflow (discussion, release, etc.), see Calling Pipeline and All Callings.
       </p>
     </div>
   );

@@ -385,12 +385,17 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
     existingTheme?.recognize ? existingTheme.recognize.split('\n').filter(Boolean) : defaultRecognizeRows);
 
   // The user list loads asynchronously — backfill the current High Councilor's name once it's
-  // ready, if this date has no saved value yet (a genuinely new/unedited future agenda).
-  useEffect(() => {
-    if (usersLoading || existingTheme?.high_councilor || !currentHighCouncilor) return;
-    setHighCouncilorName(name => name || currentHighCouncilor.name);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usersLoading, currentHighCouncilor?.name]);
+  // ready, if this date has no saved value yet (a genuinely new/unedited future agenda). Tracked
+  // by a "ready" key so this only fires on the loading→ready transition, not on every render
+  // (which would otherwise re-fill the field after the user manually clears it).
+  const highCouncilorReadyKey = `${usersLoading}:${currentHighCouncilor?.name ?? ''}`;
+  const [prevHighCouncilorReadyKey, setPrevHighCouncilorReadyKey] = useState(highCouncilorReadyKey);
+  if (highCouncilorReadyKey !== prevHighCouncilorReadyKey) {
+    setPrevHighCouncilorReadyKey(highCouncilorReadyKey);
+    if (!usersLoading && !existingTheme?.high_councilor && currentHighCouncilor) {
+      setHighCouncilorName(name => name || currentHighCouncilor.name);
+    }
+  }
 
   // Always reflects the High Councilor field above, rather than being frozen into the saved Recognize text
   const highCouncilorLastName = highCouncilorName.trim().split(/\s+/).pop();
@@ -466,6 +471,32 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   const [saving, setSaving]   = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [dirty, setDirty]     = useState(false);
+
+  // All the theme fields above are seeded from existingTheme only once, at mount —
+  // they don't otherwise notice when the row changes underneath them (another tab's
+  // save, the 30s background poll, or "Add to sacrament agenda" on the Current
+  // Bishopric Meeting page appending to ward_business). Without this, that kind of
+  // external change is either invisible on screen, or gets silently overwritten by
+  // this page's own next autosave. Re-adopt the fresh row whenever it changes and we
+  // don't have unsaved local edits of our own to protect.
+  const themeUpdatedAt = existingTheme?.updated_at ?? null;
+  const [prevThemeUpdatedAt, setPrevThemeUpdatedAt] = useState(themeUpdatedAt);
+  if (themeUpdatedAt !== prevThemeUpdatedAt) {
+    setPrevThemeUpdatedAt(themeUpdatedAt);
+    if (!dirty) {
+      setIntroRemarks(existingTheme?.intro_remarks || DEFAULT_INTRO_REMARKS);
+      setPresiding(existingTheme?.presiding || '');
+      setConducting(existingTheme?.conducting || '');
+      setHighCouncilorName(existingTheme?.high_councilor || '');
+      setStakeReps(existingTheme?.stake_reps || '');
+      setRecognizeRows(existingTheme?.recognize ? existingTheme.recognize.split('\n').filter(Boolean) : defaultRecognizeRows);
+      setWardBusiness(existingTheme?.ward_business || '');
+      setStakeBusiness(existingTheme?.stake_business || '');
+      setClosingRemarks(existingTheme?.closing_remarks || '');
+      setIsFastSunday(!!existingTheme?.is_fast_sunday);
+      setSacramentIntro(existingTheme?.sacrament_intro || DEFAULT_SACRAMENT_INTRO);
+    }
+  }
 
   const isSavingRef   = useRef(false);
   const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -617,7 +648,9 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   };
 
   // Keep ref current so the debounced callback always calls the latest closure
-  handleSaveRef.current = handleSave;
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  });
 
   // If user navigates away while a debounced save is pending, fire it immediately
   useEffect(() => {
@@ -736,8 +769,8 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       return `<p style="margin:0.3rem 0">${l}</p>`;
     }).join('');
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${dateLabel} — Sacrament Meeting</title>
-<style>body{font-family:Georgia,serif;max-width:580px;margin:2rem auto;color:#111;font-size:13pt}h1{font-size:1.1rem;text-align:center;border-bottom:1px solid #ccc;padding-bottom:0.6rem;margin-bottom:1.2rem}@media print{@page{margin:1.5cm}}</style>
-</head><body><h1>Sacrament Meeting<br>${dateLabel}</h1>${bodyLines}</body></html>`;
+<style>body{font-family:Georgia,serif;max-width:580px;margin:2rem auto;color:#111;font-size:13pt}h1{font-size:1.1rem;text-align:center;border-bottom:1px solid #ccc;padding-bottom:0.6rem;margin-bottom:1.2rem}@media print{@page{margin:1.5cm}.no-print{display:none}}</style>
+</head><body><p class="no-print" style="text-align:center;color:#888;font-size:10pt;margin-bottom:1rem">Click any text below to edit it before printing.</p><h1 contenteditable="true">Sacrament Meeting<br>${dateLabel}</h1><div contenteditable="true" spellcheck="false">${bodyLines}</div></body></html>`;
     const w = window.open('', '_blank');
     if (w) { w.document.write(html); w.document.close(); }
   };

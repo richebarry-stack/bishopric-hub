@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { User, RegistrationRequest } from '../lib/api';
 import { api } from '../lib/api';
@@ -20,7 +20,11 @@ async function fetchUsers(): Promise<User[]> {
 
 function ChurchRoleCell({ userId, value, onSave }: { userId: number; value: string; onSave: (id: number, role: string) => void }) {
   const [local, setLocal] = useState(value);
-  useEffect(() => { setLocal(value); }, [value]);
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setLocal(value);
+  }
   return (
     <input
       list={DATALIST_ID}
@@ -52,6 +56,15 @@ export default function Users() {
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'admin';
   const { data: users = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: fetchUsers });
+  const { data: verificationData } = useQuery({
+    queryKey: ['email-verification-status'],
+    queryFn: () => api.emailVerificationStatus.get(),
+    enabled: isAdmin,
+  });
+  const verifiedMap = useMemo(
+    () => new Map((verificationData?.statuses ?? []).map(v => [v.user_id, v.verified])),
+    [verificationData],
+  );
   const confirmDialog = useConfirm();
 
   const [adding, setAdding] = useState(false);
@@ -267,6 +280,12 @@ export default function Users() {
       </div>
       <p className="text-sm text-gray-500 mb-4">Manage who has access to the hub and what they can do.</p>
 
+      {isAdmin && verificationData?.cf_check_error && (
+        <p className="mb-4 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+          Couldn't check email verification status with Cloudflare: {verificationData.cf_check_error}
+        </p>
+      )}
+
       {isAdmin && regRequests.length > 0 && (
         <div className="mb-6 bg-white rounded-lg border border-amber-300 overflow-x-auto">
           <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
@@ -375,7 +394,24 @@ export default function Users() {
                     {group.map(u => (
                       <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50">
                         <td className="px-3 py-2 font-medium text-gray-900">{u.name}</td>
-                        <td className="px-3 py-2 text-gray-700">{u.email}</td>
+                        <td className="px-3 py-2 text-gray-700">
+                          <div className="flex items-center gap-1.5">
+                            {u.email}
+                            {isAdmin && hub === 'both' && (
+                              verifiedMap.get(u.id) ? (
+                                <span title="This address is verified with Cloudflare and can receive assignment emails."
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700 whitespace-nowrap">
+                                  ✓ Verified
+                                </span>
+                              ) : (
+                                <span title="This address hasn't been verified with Cloudflare yet, so it can't receive assignment emails until it is."
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap">
+                                  ⏳ Pending
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </td>
                         <td className="px-3 py-2">
                           {isAdmin ? (
                             BISHOPRIC_CALLINGS.includes(u.church_role ?? '') ? (

@@ -1,15 +1,17 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../lib/useTable';
-import type { CallingPipeline as CallingType, MemberWithoutCalling, User } from '../lib/api';
+import type { CallingPipeline as CallingType, User } from '../lib/api';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
-import { Input, Select, Checkbox, Textarea } from '../components/FormFields';
+import { Input, Select, Checkbox } from '../components/FormFields';
 import { CALLING_STATUSES, CALLING_STATUS_COLORS, ORGANIZATIONS } from '../lib/constants';
 import { renderRichText, stripBold } from '../lib/richText';
 import LastEdited from '../components/LastEdited';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const ASSIGNED_DATALIST = 'assigned-to-options';
+const NOW = Date.now();
 
 function AssignedToField({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
   return (
@@ -71,17 +73,13 @@ const EMPTY: Partial<CallingType> = {
   sustain_recorded: 0, set_apart_recorded: 0, organization: '', type: 'Calling',
 };
 
-const EMPTY_MWC: Partial<MemberWithoutCalling> = { name: '', potential_calling: '', notes: '' };
-
 export default function CallingPipeline() {
   const { rows, isLoading, create, update, remove } = useTable<CallingType>('calling-pipeline');
   const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['users'], queryFn: () => fetch('/api/users').then(r => r.json()) });
   const bishopricOptions = allUsers
     .filter(u => u.church_role && /bishop|counselor/i.test(u.church_role))
     .map(u => u.name);
-  const { rows: mwcRows, create: mwcCreate, update: mwcUpdate, remove: mwcRemove } = useTable<MemberWithoutCalling>('members-without-callings');
   const [editing, setEditing] = useState<Partial<CallingType> | null>(null);
-  const [editingMwc, setEditingMwc] = useState<Partial<MemberWithoutCalling> | null>(null);
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [groupBy, setGroupBy] = useState<'status' | 'org' | 'sustained' | 'timeline'>('status');
@@ -93,7 +91,7 @@ export default function CallingPipeline() {
   const toggleOrgStatus = (s: string) =>
     setOrgStatusFilter(prev => {
       const next = new Set(prev);
-      next.has(s) ? next.delete(s) : next.add(s);
+      if (next.has(s)) next.delete(s); else next.add(s);
       return next;
     });
 
@@ -105,20 +103,6 @@ export default function CallingPipeline() {
     }
     return true;
   });
-
-  const handleSaveMwc = async () => {
-    if (!editingMwc || saving) return;
-    setSaving(true);
-    try {
-      const data = { ...editingMwc };
-      delete (data as Record<string, unknown>).id;
-      if (editingMwc.id) await mwcUpdate(editingMwc.id, data as Record<string, unknown>);
-      else await mwcCreate(data as Record<string, unknown>);
-      setEditingMwc(null);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleSave = async () => {
     if (!editing || saving) return;
@@ -287,10 +271,9 @@ export default function CallingPipeline() {
           );
         })()
       : groupBy === 'timeline' ? (() => {
-          const now = Date.now();
           const daysAgo = (ts: string) => {
             if (!ts) return null;
-            const diff = Math.floor((now - new Date(ts).getTime()) / 86400000);
+            const diff = Math.floor((NOW - new Date(ts).getTime()) / 86400000);
             return diff;
           };
           const MAX_DAYS = 60;
@@ -357,41 +340,6 @@ export default function CallingPipeline() {
         </>
       )}
 
-      {groupBy === 'status' && !statusFilter && (
-        <div className="mt-10">
-          <div className="flex items-center justify-between mb-3 border-b border-gray-200 pb-2">
-            <h2 className="text-lg font-bold text-gray-800">Members Without Callings ({mwcRows.length})</h2>
-            <button onClick={() => setEditingMwc({ ...EMPTY_MWC })} className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>
-          </div>
-          {mwcRows.length === 0 ? (
-            <div className="bg-white rounded-lg border border-gray-200 border-dashed p-4 text-center text-gray-400 text-sm">No members listed</div>
-          ) : (
-            <MwcTable rows={mwcRows} onEdit={setEditingMwc} onDelete={mwcRemove} />
-          )}
-        </div>
-      )}
-
-      <Modal open={!!editingMwc} onClose={() => setEditingMwc(null)} title={editingMwc?.id ? 'Edit Member' : 'Add Member Without Calling'}>
-        {editingMwc && (
-          <form onSubmit={e => { e.preventDefault(); handleSaveMwc(); }} className="space-y-3">
-            <Input label="Name" value={editingMwc.name || ''} onChange={v => setEditingMwc({ ...editingMwc, name: v })} required />
-            <Input label="Potential Calling" value={editingMwc.potential_calling || ''} onChange={v => setEditingMwc({ ...editingMwc, potential_calling: v })} />
-            <Textarea label="Notes" value={editingMwc.notes || ''} onChange={v => setEditingMwc({ ...editingMwc, notes: v })} />
-            <div className="flex justify-between pt-2">
-              <div>
-                {editingMwc.id && (
-                  <button type="button" onClick={() => { mwcRemove(editingMwc.id!); setEditingMwc(null); }} className="px-4 py-2 text-sm text-red-600 hover:text-red-800">Delete</button>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setEditingMwc(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
-                <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">Save</button>
-              </div>
-            </div>
-          </form>
-        )}
-      </Modal>
-
       <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit Calling' : 'New Calling'}>
         {editing && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
@@ -431,62 +379,22 @@ export default function CallingPipeline() {
   );
 }
 
-type MwcSortKey = 'name' | 'potential_calling' | 'notes';
+type SortKey = 'member' | 'calling' | 'status' | 'assigned_to' | 'organization';
 
-function MwcTable({ rows, onEdit, onDelete }: { rows: MemberWithoutCalling[]; onEdit: (r: MemberWithoutCalling) => void; onDelete: (id: number) => void }) {
-  const [sortKey, setSortKey] = useState<MwcSortKey>('name');
-  const [sortAsc, setSortAsc] = useState(true);
-
-  const handleSort = (key: MwcSortKey) => {
-    if (key === sortKey) setSortAsc(a => !a);
-    else { setSortKey(key); setSortAsc(true); }
-  };
-
-  const sorted = useMemo(() => [...rows].sort((a, b) => {
-    const av = (a[sortKey] ?? '') as string;
-    const bv = (b[sortKey] ?? '') as string;
-    return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
-  }), [rows, sortKey, sortAsc]);
-
-  const Th = ({ col, label }: { col: MwcSortKey; label: string }) => (
+function Th({ col, label, sortKey, sortAsc, onSort }: {
+  col: SortKey; label: string; sortKey: SortKey; sortAsc: boolean; onSort: (col: SortKey) => void;
+}) {
+  return (
     <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap"
-      onClick={() => handleSort(col)}>
+      onClick={() => onSort(col)}>
       {label}
       <span className="ml-1 text-gray-400">{sortKey === col ? (sortAsc ? '↑' : '↓') : '↕'}</span>
     </th>
   );
-
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 bg-gray-50">
-            <Th col="name" label="Name" />
-            <Th col="potential_calling" label="Potential Calling" />
-            <Th col="notes" label="Notes" />
-            <th className="px-3 py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map(r => (
-            <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => onEdit(r)}>
-              <td className="px-3 py-2 font-medium text-gray-900">{r.name}</td>
-              <td className="px-3 py-2 text-gray-700">{r.potential_calling}</td>
-              <td className="px-3 py-2 text-gray-600">{r.notes}</td>
-              <td className="px-3 py-2">
-                <button onClick={e => { e.stopPropagation(); onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
 }
 
-type SortKey = 'member' | 'calling' | 'status' | 'assigned_to' | 'organization';
-
 function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: CallingType) => void; onDelete: (id: number) => void }) {
+  const confirm = useConfirm();
   const [sortKey, setSortKey] = useState<SortKey>('member');
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -496,7 +404,7 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
   };
 
   const sorted = useMemo(() => [...rows].sort((a, b) => {
-    let av = '', bv = '';
+    let av: string, bv: string;
     if (sortKey === 'status') {
       av = String(CALLING_STATUSES.indexOf(a.status ?? ''));
       bv = String(CALLING_STATUSES.indexOf(b.status ?? ''));
@@ -508,24 +416,16 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
     return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
   }), [rows, sortKey, sortAsc]);
 
-  const Th = ({ col, label }: { col: SortKey; label: string }) => (
-    <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap"
-      onClick={() => handleSort(col)}>
-      {label}
-      <span className="ml-1 text-gray-400">{sortKey === col ? (sortAsc ? '↑' : '↓') : '↕'}</span>
-    </th>
-  );
-
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100 bg-gray-50">
-            <Th col="member" label="Member" />
-            <Th col="calling" label="Calling" />
-            <Th col="status" label="Status" />
-            <Th col="assigned_to" label="Assigned To" />
-            <Th col="organization" label="Org" />
+            <Th col="member" label="Member" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="calling" label="Calling" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="status" label="Status" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="assigned_to" label="Assigned To" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="organization" label="Org" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <th className="text-left px-3 py-2 font-medium text-gray-600">LCR</th>
             <th className="px-3 py-2"></th>
           </tr>
@@ -542,7 +442,7 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
                 {r.sustain_recorded ? '✓S' : ''}{r.set_apart_recorded ? ' ✓A' : ''}
               </td>
               <td className="px-3 py-2">
-                <button onClick={e => { e.stopPropagation(); onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
+                <button onClick={async e => { e.stopPropagation(); if (await confirm({ message: `Delete ${stripBold(r.member) || 'this entry'} — ${r.calling}?` })) onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
               </td>
             </tr>
           ))}

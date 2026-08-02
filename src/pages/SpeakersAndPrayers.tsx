@@ -335,7 +335,7 @@ function SpeakersTab({ speakers, notes, onSaveNote, activeWardMembers, wardMembe
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
-      let cmp = 0;
+      let cmp: number;
       if (sortKey === 'name') cmp = a.label.localeCompare(b.label);
       else if (sortKey === 'count') cmp = a.count - b.count;
       else cmp = a.lastDate.localeCompare(b.lastDate);
@@ -611,7 +611,7 @@ function PrayersTab({ prayers, notes, onSaveNote, activeWardMembers, wardMembers
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
-      let cmp = 0;
+      let cmp: number;
       if (sortKey === 'name') cmp = a.label.localeCompare(b.label);
       else if (sortKey === 'count') cmp = a.count - b.count;
       else cmp = a.lastDate.localeCompare(b.lastDate);

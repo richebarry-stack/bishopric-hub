@@ -78,7 +78,7 @@ function formatDate(iso: string): string {
   });
 }
 
-function renderLine(line: string, _key: number): React.ReactNode {
+function renderLine(line: string): React.ReactNode {
   if (!line.trim()) return null;
   const parts = line.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((p, i) =>
@@ -97,7 +97,7 @@ function renderRichContent(text: string): React.ReactNode {
     if (!bullets.length) return;
     out.push(
       <ul key={`ul-${idx}`} className="list-disc list-inside space-y-0.5">
-        {bullets.map((b, j) => <li key={j} className="text-sm text-gray-700">{renderLine(b, j)}</li>)}
+        {bullets.map((b, j) => <li key={j} className="text-sm text-gray-700">{renderLine(b)}</li>)}
       </ul>
     );
     bullets = [];
@@ -107,7 +107,7 @@ function renderRichContent(text: string): React.ReactNode {
       bullets.push(line.slice(2));
     } else {
       flushBullets(i);
-      const rendered = renderLine(line, i);
+      const rendered = renderLine(line);
       if (rendered) out.push(<p key={`p-${i}`} className="text-sm text-gray-700">{rendered}</p>);
     }
   });
@@ -115,13 +115,17 @@ function renderRichContent(text: string): React.ReactNode {
   return out.length ? <div className="space-y-1 px-2 py-1.5">{out}</div> : <span className="text-gray-300">—</span>;
 }
 
-function AutoTextarea({ value, onSave, readOnly, placeholder }: {
-  value: string; onSave?: (v: string) => void; readOnly?: boolean; placeholder?: string;
+function AutoTextarea({ value, onSave, readOnly, placeholder, minRows = 1 }: {
+  value: string; onSave?: (v: string) => void; readOnly?: boolean; placeholder?: string; minRows?: number;
 }) {
   const [local, setLocal] = useState(value);
+  const [prevValue, setPrevValue] = useState(value);
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => { setLocal(value); }, [value]);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setLocal(value);
+  }
 
   useEffect(() => {
     const el = ref.current;
@@ -166,7 +170,7 @@ function AutoTextarea({ value, onSave, readOnly, placeholder }: {
       onBlur={() => { if (local !== value && onSave) onSave(local); }}
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
-      rows={1}
+      rows={minRows}
       className="w-full resize-none overflow-hidden bg-transparent border border-transparent hover:border-gray-200 focus:border-emerald-400 focus:bg-white focus:outline-none rounded px-2 py-1.5 text-sm placeholder-gray-300 min-h-[2rem]"
       style={{ overflow: 'hidden' }}
     />
@@ -275,7 +279,7 @@ export default function WcDiscussionTopics() {
     dragOrgRef.current = null;
   };
 
-  const { rows: meetings, isLoading: loadingMeetings } = useTable<WcMeeting>('wc-meetings');
+  const { rows: meetings, isLoading: loadingMeetings, update: updateMeeting } = useTable<WcMeeting>('wc-meetings');
   const { rows: topics, isLoading: loadingTopics, create, update } = useTable<WcDiscussionTopic>('wc-discussion-topics');
 
   const upcomingMeetings = useMemo(() =>
@@ -343,6 +347,15 @@ export default function WcDiscussionTopics() {
       await create({ meeting_date: activeMeetingDate, organization: org, topic: '', status: payload.status, next_steps: payload.next_steps, help_needed: payload.help_needed });
     }
   }, [activeMeetingDate, getOrgRow, create, update]);
+
+  const activeMeeting = useMemo(() =>
+    meetings.find(m => m.date.slice(0, 10) === activeMeetingDate) ?? null,
+    [meetings, activeMeetingDate]);
+
+  const handleSaveNotes = useCallback((value: string) => {
+    if (!activeMeeting) return;
+    updateMeeting(activeMeeting.id, { notes: value });
+  }, [activeMeeting, updateMeeting]);
 
   const isLoading = loadingMeetings || loadingTopics;
 
@@ -419,6 +432,17 @@ export default function WcDiscussionTopics() {
                 {copyingPrior ? 'Copying…' : 'Copy from prior meeting'}
               </button>
             )}
+          </div>
+
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <label className="text-sm font-semibold text-gray-600 block mb-2">General Topics</label>
+            <AutoTextarea
+              value={activeMeeting?.notes ?? ''}
+              onSave={handleSaveNotes}
+              readOnly={isPastMeeting}
+              placeholder="Anything else to note for this meeting…"
+              minRows={10}
+            />
           </div>
 
           <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">

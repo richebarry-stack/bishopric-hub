@@ -1,14 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useTable } from '../lib/useTable';
 import type { CalendarEvent } from '../lib/api';
-import Modal from '../components/Modal';
-import { Input, Select, Textarea, Checkbox } from '../components/FormFields';
-import { SHARE_WITH_OPTIONS } from '../lib/constants';
+import CalendarEventModal from '../components/CalendarEventModal';
 import { useAuth } from '../lib/auth';
-import LastEdited from '../components/LastEdited';
-
-const TODAY_PREFIX = new Date().toISOString().slice(0, 10);
-
+import { isUpcoming } from '../lib/calendaring';
 
 // Use local noon to avoid UTC timezone shift from new Date('YYYY-MM-DD')
 function formatDate(dates: string): string {
@@ -18,19 +13,23 @@ function formatDate(dates: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// Extract YYYY-MM-DD for a date input — slicing avoids any timezone conversion
-function toDateInput(dates: string): string {
-  return dates ? dates.slice(0, 10) : '';
-}
-
-function isUpcoming(dates: string): boolean {
-  if (!dates) return true;
-  return dates.slice(0, 10) >= TODAY_PREFIX;
-}
-
 type SortKey = 'name' | 'dates' | 'notes' | 'announce_in_sacrament';
 
 const EMPTY: Partial<CalendarEvent> = { name: '', dates: '', notes: '', announce_in_sacrament: 0, share_with: '' };
+
+function Th({ col, label, className, sortKey, sortAsc, onSort }: {
+  col: SortKey; label: string; className?: string; sortKey: SortKey; sortAsc: boolean; onSort: (col: SortKey) => void;
+}) {
+  return (
+    <th
+      className={`text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap ${className ?? ''}`}
+      onClick={() => onSort(col)}
+    >
+      {label}
+      <span className="ml-1 text-gray-400 text-xs">{sortKey === col ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+    </th>
+  );
+}
 
 function EventTable({ rows, onEdit, onDelete, defaultSortKey, defaultAsc, readOnly }: {
   rows: CalendarEvent[];
@@ -60,16 +59,6 @@ function EventTable({ rows, onEdit, onDelete, defaultSortKey, defaultAsc, readOn
     return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
   }), [rows, sortKey, sortAsc]);
 
-  const Th = ({ col, label, className }: { col: SortKey; label: string; className?: string }) => (
-    <th
-      className={`text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap ${className ?? ''}`}
-      onClick={() => handleSort(col)}
-    >
-      {label}
-      <span className="ml-1 text-gray-400 text-xs">{sortKey === col ? (sortAsc ? '↑' : '↓') : '↕'}</span>
-    </th>
-  );
-
   if (sorted.length === 0) {
     return <p className="text-gray-400 text-sm italic py-2">None</p>;
   }
@@ -79,10 +68,10 @@ function EventTable({ rows, onEdit, onDelete, defaultSortKey, defaultAsc, readOn
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100 bg-gray-50">
-            <Th col="name" label="Event" />
-            <Th col="dates" label="Date" />
-            <Th col="notes" label="Notes" />
-            <Th col="announce_in_sacrament" label="Announce" className="text-center" />
+            <Th col="name" label="Event" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="dates" label="Date" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="notes" label="Notes" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="announce_in_sacrament" label="Announce" className="text-center" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <th className="px-3 py-2"></th>
           </tr>
         </thead>
@@ -152,29 +141,13 @@ export default function Calendaring() {
         </div>
       )}
 
-      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit Event' : 'New Event'}>
-        {editing && (
-          <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
-            <Input label="Event Name" value={editing.name || ''} onChange={v => setEditing({ ...editing, name: v })} required />
-            <Input label="Date" value={toDateInput(editing.dates || '')} onChange={v => setEditing({ ...editing, dates: v })} type="date" />
-            <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} />
-            <Select label="Share With" value={editing.share_with || ''} onChange={v => setEditing({ ...editing, share_with: v })} options={SHARE_WITH_OPTIONS} />
-            <Checkbox label="Announce in sacrament meeting" checked={!!editing.announce_in_sacrament} onChange={v => setEditing({ ...editing, announce_in_sacrament: v ? 1 : 0 })} />
-            <LastEdited updatedBy={editing.updated_by} updatedAt={editing.updated_at} />
-            <div className="flex justify-between pt-2">
-              <div>
-                {editing.id && (
-                  <button type="button" onClick={() => { remove(editing.id!); setEditing(null); }} className="px-4 py-2 text-sm text-red-600 hover:text-red-800">Delete</button>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">Save</button>
-              </div>
-            </div>
-          </form>
-        )}
-      </Modal>
+      <CalendarEventModal
+        editing={editing}
+        onClose={() => setEditing(null)}
+        onChange={next => setEditing(prev => (prev ? { ...prev, ...next } : prev))}
+        onSave={handleSave}
+        onDelete={remove}
+      />
     </div>
   );
 }

@@ -1,14 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Suspense, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, useAuth } from './lib/auth';
+import { useAuth } from './lib/auth';
+import { AuthProvider } from './lib/AuthProvider';
 import { lazyWithReload } from './lib/lazyWithReload';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import ForceResetPassword from './pages/ForceResetPassword';
 import SecurityQuestionsSetup from './pages/SecurityQuestionsSetup';
 import ToastContainer from './components/Toast';
-import { ConfirmProvider } from './components/ConfirmDialog';
+import { ConfirmProvider } from './components/ConfirmProvider';
 
 const Dashboard = lazyWithReload(() => import('./pages/Dashboard'));
 const CallingPipeline = lazyWithReload(() => import('./pages/CallingPipeline'));
@@ -26,16 +27,19 @@ const Babies = lazyWithReload(() => import('./pages/Babies'));
 const OutOfTown = lazyWithReload(() => import('./pages/OutOfTown'));
 const Calendaring = lazyWithReload(() => import('./pages/Calendaring'));
 const BishopSchedule = lazyWithReload(() => import('./pages/BishopSchedule'));
+const CounselorSchedule = lazyWithReload(() => import('./pages/CounselorSchedule'));
 const Assignments = lazyWithReload(() => import('./pages/Assignments'));
 const Users = lazyWithReload(() => import('./pages/Users'));
 const EmailNotifications = lazyWithReload(() => import('./pages/EmailNotifications'));
 const ImportantLinks = lazyWithReload(() => import('./pages/ImportantLinks'));
 const Help = lazyWithReload(() => import('./pages/Help'));
+const PrivacyPolicy = lazyWithReload(() => import('./pages/PrivacyPolicy'));
 const YouthActivities = lazyWithReload(() => import('./pages/YouthActivities'));
 const SacramentProgram = lazyWithReload(() => import('./pages/SacramentProgram'));
 const WardCouncilMembers = lazyWithReload(() => import('./pages/WardCouncilMembers'));
 const SpeakersAndPrayers = lazyWithReload(() => import('./pages/SpeakersAndPrayers'));
 const WardMembers = lazyWithReload(() => import('./pages/WardMembers'));
+const AllCallings = lazyWithReload(() => import('./pages/AllCallings'));
 const WcDashboard = lazyWithReload(() => import('./pages/WcDashboard'));
 const WcMeetings = lazyWithReload(() => import('./pages/WcMeetings'));
 const WcWins = lazyWithReload(() => import('./pages/WcWins'));
@@ -62,7 +66,7 @@ function WcGuard({ children }: { children: React.ReactNode }) {
     '/', '/my-actions', '/wc-meetings', '/wc-wins', '/wc-family-needs', '/wc-discussion-topics',
     '/current-sacrament', '/calendaring',
     '/babies', '/youth-activities', '/tasks', '/wc-members', '/hub-suggestions', '/help',
-    '/yc-meetings',
+    '/yc-meetings', '/privacy',
   ];
   if (!wcPaths.includes(location.pathname)) {
     return <Navigate to="/" replace />;
@@ -72,7 +76,7 @@ function WcGuard({ children }: { children: React.ReactNode }) {
 
 function CalGuard({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const calPaths = ['/calendaring', '/help'];
+  const calPaths = ['/calendaring', '/help', '/privacy'];
   if (!calPaths.includes(location.pathname)) {
     return <Navigate to="/calendaring" replace />;
   }
@@ -98,14 +102,18 @@ function AppRoutes() {
         <Route element={<Layout />}>
           <Route path="/calendaring" element={<Calendaring />} />
           <Route path="/help" element={<Help />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="*" element={<CalGuard><Calendaring /></CalGuard>} />
         </Route>
       </Routes>
     );
   }
 
-  // Youth Council hub users and guests
-  if (user.hub === 'yc') {
+  // Youth Council hub — real yc accounts/guests, or a dual-access ('both') user who has
+  // switched into YC view. Scoped to youth-only routes so no bishopric or Ward Council
+  // data is reachable while looking at this hub, even though a 'both' account technically
+  // has access to it elsewhere.
+  if (user.hub === 'yc' || (user.hub === 'both' && selectedHub === 'yc')) {
     // Sacrament-only guest: one page, no nav elsewhere
     if (user.role === 'guest' && user.church_role === 'sac') {
       return (
@@ -124,8 +132,9 @@ function AppRoutes() {
         <Route element={<Layout />}>
           <Route path="/youth-activities" element={<YouthActivities />} />
           {!isYcGuest && <Route path="/yc-meetings" element={<YcMeetings />} />}
-          {!isYcGuest && <Route path="/tasks" element={<Tasks />} />}
+          {!isYcGuest && <Route path="/my-actions" element={<MyActions />} />}
           {!isYcGuest && <Route path="/help" element={<Help />} />}
+          {!isYcGuest && <Route path="/privacy" element={<PrivacyPolicy />} />}
           <Route path="*" element={<Navigate to="/youth-activities" replace />} />
         </Route>
       </Routes>
@@ -153,6 +162,7 @@ function AppRoutes() {
           <Route path="/hub-suggestions" element={<HubSuggestions />} />
           <Route path="/yc-meetings" element={<YcMeetings />} />
           <Route path="/help" element={<Help />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="*" element={<WcGuard><WcDashboard /></WcGuard>} />
         </Route>
       </Routes>
@@ -181,6 +191,7 @@ function AppRoutes() {
         <Route path="/out-of-town" element={<OutOfTown />} />
         <Route path="/calendaring" element={<Calendaring />} />
         <Route path="/bishop-schedule" element={<BishopSchedule />} />
+        <Route path="/counselor-schedule" element={<CounselorSchedule />} />
         <Route path="/assignments" element={<Assignments />} />
         <Route path="/users" element={<Users />} />
         <Route path="/email-notifications" element={<EmailNotifications />} />
@@ -188,11 +199,13 @@ function AppRoutes() {
         <Route path="/youth-activities" element={<YouthActivities />} />
         <Route path="/speakers-and-prayers" element={<SpeakersAndPrayers />} />
         <Route path="/ward-members" element={<WardMembers />} />
+        <Route path="/all-callings" element={<AllCallings />} />
         <Route path="/ordinances" element={<Ordinances />} />
         <Route path="/annual-duties" element={<AnnualDuties />} />
         <Route path="/yc-meetings" element={<YcMeetings />} />
         <Route path="/hub-suggestions" element={<HubSuggestions />} />
         <Route path="/help" element={<Help />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

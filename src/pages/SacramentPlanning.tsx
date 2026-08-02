@@ -48,11 +48,14 @@ export default function SacramentPlanning() {
     return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
   });
 
-  // If a ?date param is present, navigate the month view to show that date
+  // If a ?date param is present, navigate the month view to show that date. Kept as an
+  // effect (not a render-time adjustment) since it reacts to browser navigation over the
+  // component's lifetime, not just a prop/query value changing once.
   useEffect(() => {
     const d = searchParams.get('date');
     if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
       const [y, m] = d.split('-').map(Number);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setViewDate(new Date(y, m - 1, 1));
     }
   }, [searchParams]);
@@ -156,7 +159,7 @@ export default function SacramentPlanning() {
                     <h3 className="font-medium text-gray-600 mb-1">Speakers</h3>
                     {dateSpeakers.length > 0 ? dateSpeakers.map(s => (
                       <p key={s.id} className="text-gray-700">
-                        {s.speaker} <span className="text-gray-400">({s.speaker_type})</span>
+                        {s.speaker || <span className="italic text-gray-400">TBD</span>} <span className="text-gray-400">({s.speaker_type})</span>
                         {s.topic && <span className="text-gray-500"> — {s.topic}</span>}
                       </p>
                     )) : <p className="text-gray-400">No speakers</p>}
@@ -288,7 +291,7 @@ export default function SacramentPlanning() {
       {/* Speaker modal */}
       <Modal open={!!editSpeaker} onClose={() => setEditSpeaker(null)} title={editSpeaker?.id ? 'Edit Speaker' : 'New Speaker'}>
         {editSpeaker && (
-          <form onSubmit={async e => { e.preventDefault(); const d = { ...editSpeaker }; delete (d as Record<string, unknown>).id; editSpeaker.id ? await updateSpeaker(editSpeaker.id, d as Record<string, unknown>) : await createSpeaker(d as Record<string, unknown>); setEditSpeaker(null); }} className="space-y-3">
+          <form onSubmit={async e => { e.preventDefault(); const d = { ...editSpeaker }; delete (d as Record<string, unknown>).id; if (editSpeaker.id) await updateSpeaker(editSpeaker.id, d as Record<string, unknown>); else await createSpeaker(d as Record<string, unknown>); setEditSpeaker(null); }} className="space-y-3">
             <Input label="Meeting Date" value={toDateKey(editSpeaker.meeting_date || '')} onChange={v => setEditSpeaker({ ...editSpeaker, meeting_date: v })} type="date" required />
             <Input label="Speaker" value={editSpeaker.speaker || ''} onChange={v => setEditSpeaker({ ...editSpeaker, speaker: v })} required />
             <Select label="Speaker Type" value={editSpeaker.speaker_type || ''} onChange={v => setEditSpeaker({ ...editSpeaker, speaker_type: v })} options={SPEAKER_TYPES} />
@@ -306,7 +309,7 @@ export default function SacramentPlanning() {
       {/* Prayer modal */}
       <Modal open={!!editPrayer} onClose={() => setEditPrayer(null)} title={editPrayer?.id ? 'Edit Prayer' : 'New Prayer'}>
         {editPrayer && (
-          <form onSubmit={async e => { e.preventDefault(); const d = { ...editPrayer, name: resolveMemberName(editPrayer.name || '', wardMembers) }; delete (d as Record<string, unknown>).id; editPrayer.id ? await updatePrayer(editPrayer.id, d as Record<string, unknown>) : await createPrayer(d as Record<string, unknown>); setEditPrayer(null); }} className="space-y-3">
+          <form onSubmit={async e => { e.preventDefault(); const d = { ...editPrayer, name: resolveMemberName(editPrayer.name || '', wardMembers) }; delete (d as Record<string, unknown>).id; if (editPrayer.id) await updatePrayer(editPrayer.id, d as Record<string, unknown>); else await createPrayer(d as Record<string, unknown>); setEditPrayer(null); }} className="space-y-3">
             <Input label="Meeting Date" value={toDateKey(editPrayer.meeting_date || '')} onChange={v => setEditPrayer({ ...editPrayer, meeting_date: v })} type="date" required />
             <Input label="Name" value={editPrayer.name || ''} onChange={v => setEditPrayer({ ...editPrayer, name: v })} required />
             <Select label="Opening/Closing" value={editPrayer.opening_closing || ''} onChange={v => setEditPrayer({ ...editPrayer, opening_closing: v })} options={['Opening', 'Closing']} />
@@ -321,7 +324,7 @@ export default function SacramentPlanning() {
       {/* Music modal */}
       <Modal open={!!editMusic} onClose={() => setEditMusic(null)} title={editMusic?.id ? 'Edit Music' : 'New Music'}>
         {editMusic && (
-          <form onSubmit={async e => { e.preventDefault(); const d = { ...editMusic }; delete (d as Record<string, unknown>).id; editMusic.id ? await updateMusic(editMusic.id, d as Record<string, unknown>) : await createMusic(d as Record<string, unknown>); setEditMusic(null); }} className="space-y-3">
+          <form onSubmit={async e => { e.preventDefault(); const d = { ...editMusic }; delete (d as Record<string, unknown>).id; if (editMusic.id) await updateMusic(editMusic.id, d as Record<string, unknown>); else await createMusic(d as Record<string, unknown>); setEditMusic(null); }} className="space-y-3">
             <Input label="Meeting Date" value={toDateKey(editMusic.meeting_date || '')} onChange={v => setEditMusic({ ...editMusic, meeting_date: v })} type="date" required />
             <Input label="Chorister" value={editMusic.chorister || ''} onChange={v => setEditMusic({ ...editMusic, chorister: v })} />
             <Input label="Organist" value={editMusic.organist || ''} onChange={v => setEditMusic({ ...editMusic, organist: v })} />
@@ -340,7 +343,7 @@ export default function SacramentPlanning() {
       {/* Theme modal */}
       <Modal open={!!editTheme} onClose={() => setEditTheme(null)} title={editTheme?.id ? 'Edit Theme' : 'New Theme'}>
         {editTheme && (
-          <form onSubmit={async e => { e.preventDefault(); const d = { ...editTheme }; delete (d as Record<string, unknown>).id; editTheme.id ? await updateTheme(editTheme.id, d as Record<string, unknown>) : await createTheme(d as Record<string, unknown>); setEditTheme(null); }} className="space-y-3">
+          <form onSubmit={async e => { e.preventDefault(); const d = { ...editTheme }; delete (d as Record<string, unknown>).id; if (editTheme.id) await updateTheme(editTheme.id, d as Record<string, unknown>); else await createTheme(d as Record<string, unknown>); setEditTheme(null); }} className="space-y-3">
             <Input label="Meeting Date" value={toDateKey(editTheme.meeting_date || '')} onChange={v => setEditTheme({ ...editTheme, meeting_date: v })} type="date" required />
             <Input label="Theme" value={editTheme.theme || ''} onChange={v => setEditTheme({ ...editTheme, theme: v })} />
             <Textarea label="References" value={editTheme.references_text || ''} onChange={v => setEditTheme({ ...editTheme, references_text: v })} />
@@ -357,7 +360,7 @@ export default function SacramentPlanning() {
       {/* Announcement modal */}
       <Modal open={!!editAnnouncement} onClose={() => setEditAnnouncement(null)} title={editAnnouncement?.id ? 'Edit Announcement' : 'New Announcement'}>
         {editAnnouncement && (
-          <form onSubmit={async e => { e.preventDefault(); const d = { ...editAnnouncement }; delete (d as Record<string, unknown>).id; editAnnouncement.id ? await updateAnnouncement(editAnnouncement.id, d as Record<string, unknown>) : await createAnnouncement(d as Record<string, unknown>); setEditAnnouncement(null); }} className="space-y-3">
+          <form onSubmit={async e => { e.preventDefault(); const d = { ...editAnnouncement }; delete (d as Record<string, unknown>).id; if (editAnnouncement.id) await updateAnnouncement(editAnnouncement.id, d as Record<string, unknown>); else await createAnnouncement(d as Record<string, unknown>); setEditAnnouncement(null); }} className="space-y-3">
             <Input label="Meeting Date" value={toDateKey(editAnnouncement.meeting_date || '')} onChange={v => setEditAnnouncement({ ...editAnnouncement, meeting_date: v })} type="date" required />
             <Input label="Title" value={editAnnouncement.title || ''} onChange={v => setEditAnnouncement({ ...editAnnouncement, title: v })} required />
             <Textarea label="Details" value={editAnnouncement.notes || ''} onChange={v => setEditAnnouncement({ ...editAnnouncement, notes: v })} />
@@ -533,8 +536,12 @@ function AgendaModal(props: AgendaModalProps) {
       else if (existingMusic && !musHas) await props.removeMusic(existingMusic.id);
       else if (!existingMusic && musHas) await props.createMusic(musData, { silent: true });
 
-      // Speakers (delete removed, upsert the rest, renumber by order) — none for a fast/testimony meeting
-      const keepSpeakers = isFastSunday ? [] : speakerRows.filter(r => r.speaker.trim());
+      // Speakers (delete removed, upsert the rest, renumber by order) — none for a fast/testimony meeting.
+      // Keep a row once the user has put anything into it, not just once a name is assigned —
+      // an unnamed placeholder slot (topic/type/accepted set, speaker still TBD) is real data too.
+      const speakerRowHasContent = (r: SpeakerRow) =>
+        !!(r.speaker.trim() || r.topic.trim() || r.accepted.trim() || (r.speaker_type && r.speaker_type !== 'Adult Speaker'));
+      const keepSpeakers = isFastSunday ? [] : speakerRows.filter(speakerRowHasContent);
       const keepSpeakerIds = new Set(keepSpeakers.filter(r => r.id).map(r => r.id));
       for (const s of existingSpeakers) if (!keepSpeakerIds.has(s.id)) await props.removeSpeaker(s.id);
       for (let i = 0; i < keepSpeakers.length; i++) {

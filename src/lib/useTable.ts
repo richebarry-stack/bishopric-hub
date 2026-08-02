@@ -2,14 +2,21 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
 import { toast } from './toast';
 import { markEditing } from './editingActivity';
+import { useAuth } from './auth';
 
 export function useTable<T extends { id: number }>(tableName: string, options?: { enabled?: boolean; pollMs?: number | false }) {
   const queryClient = useQueryClient();
-  const queryKey = [tableName];
+  const { user, selectedHub } = useAuth();
+  // Dual-access ('both') accounts can be actively viewing WC or YC — the server only
+  // knows the account's fixed hub, not which view is open, so for tables shared across
+  // hubs we tell it via ?viewHub= and key the cache on it to avoid cross-hub bleed.
+  const viewHubTables = tableName === 'tasks' || tableName === 'hub-suggestions';
+  const viewHub = viewHubTables && user?.hub === 'both' ? selectedHub : undefined;
+  const queryKey = viewHub ? [tableName, viewHub] : [tableName];
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey,
-    queryFn: () => api.list<T>(tableName),
+    queryFn: () => api.list<T>(tableName, viewHub ? { viewHub } : undefined),
     enabled: options?.enabled !== false,
     // Omit refetchInterval entirely unless overridden, so the global default in App.tsx applies.
     ...(options?.pollMs !== undefined ? { refetchInterval: options.pollMs } : {}),

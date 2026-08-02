@@ -45,6 +45,8 @@ export const api = {
       request('/auth/reset-by-questions', { method: 'POST', body: JSON.stringify(data) }),
     guest: (type: 'yc' | 'sac') =>
       request<{ user: User }>(`/auth/guest/${type}`, { method: 'POST' }),
+    setEmailPreference: (enabled: boolean) =>
+      request('/auth/email-preference', { method: 'PUT', body: JSON.stringify({ enabled }) }),
   },
   users: {
     list: (filter?: 'wc') => request<User[]>(`/users${filter ? `?hub=${filter}` : ''}`),
@@ -84,6 +86,14 @@ export const api = {
     save: (timeZone: string) =>
       request('/app-timezone', { method: 'PUT', body: JSON.stringify({ timeZone }) }),
   },
+  mailerSettings: {
+    get: () => request<{ weekday: string; hour: number }>('/mailer-settings'),
+    save: (weekday: string, hour: number) =>
+      request('/mailer-settings', { method: 'PUT', body: JSON.stringify({ weekday, hour }) }),
+  },
+  emailVerificationStatus: {
+    get: () => request<{ statuses: EmailVerificationStatus[]; cf_check_error?: string }>('/email-verification-status'),
+  },
   wardName: {
     get: () => request<{ wardName: string }>('/ward-name'),
     save: (wardName: string) =>
@@ -97,9 +107,35 @@ export const api = {
     }) => request<{ ok: true; updated: number; created: number; deactivated: number }>('/ward-members/import', {
       method: 'POST', body: JSON.stringify(data),
     }),
+    importRecommends: (rows: { name: string; recommend_type: string | null; recommend_expires: string | null }[]) =>
+      request<{ ok: true; updated: number; unmatched: string[] }>('/ward-members/import-recommends', {
+        method: 'POST', body: JSON.stringify({ rows }),
+      }),
+    fullSync: (rows: { name: string; gender: string | null; birth_date: string | null }[]) =>
+      request<{ ok: true; created: number; filledDetails: number; missingFromRoster: string[] }>('/ward-members/full-sync', {
+        method: 'POST', body: JSON.stringify({ rows }),
+      }),
+    syncStakeActivations: (names: string[]) =>
+      request<{ ok: true; flagged: number; cleared: number; unmatched: string[] }>('/ward-members/sync-stake-activations', {
+        method: 'POST', body: JSON.stringify({ names }),
+      }),
+    syncCallings: (rows: { organization: string | null; calling: string; person: string; sustained_date: string | null; set_apart: boolean }[]) =>
+      request<{ ok: true; created: number; updated: number; released: number; changed: { name: string; calling: string; action: string }[]; unmatched: string[] }>('/ward-members/sync-callings', {
+        method: 'POST', body: JSON.stringify({ rows }),
+      }),
+    syncMissionaryStatus: (rows: { name: string; section: string; mission: string | null; mission_start: string | null; mission_end: string | null; received_date: string | null; assignment_made_date: string | null }[]) =>
+      request<{ ok: true; created: number; updated: number; changed: { name: string; section: string; action: string }[]; unmatched: string[] }>('/ward-members/sync-missionary-status', {
+        method: 'POST', body: JSON.stringify({ rows }),
+      }),
   },
   automationStatus: {
     get: () => request<{ last_run: string | null; results: Record<string, { ok: boolean; error?: string; [key: string]: unknown }> }>('/automation-status'),
+  },
+  lcrSyncRuns: {
+    clearArchived: (keep: number) =>
+      request<{ deleted: number; kept: number }>('/lcr-sync-runs/clear-archived', {
+        method: 'POST', body: JSON.stringify({ keep }),
+      }),
   },
   presence: {
     heartbeat: (path: string, editing: boolean) =>
@@ -115,7 +151,8 @@ export const api = {
   },
   syncTempleRecommends: () =>
     request<{ ok: boolean; created: number }>('/sync-temple-recommends', { method: 'POST' }),
-  list: <T>(table: string) => request<T[]>(`/${table}`),
+  list: <T>(table: string, query?: Record<string, string>) =>
+    request<T[]>(`/${table}${query ? `?${new URLSearchParams(query)}` : ''}`),
   get: <T>(table: string, id: number) => request<T>(`/${table}/${id}`),
   create: <T>(table: string, data: Record<string, unknown>) =>
     request<T>(`/${table}`, { method: 'POST', body: JSON.stringify(data) }),
@@ -136,6 +173,13 @@ export interface User {
   last_access?: string;
   must_reset_password?: boolean;
   has_security_questions?: boolean;
+  email_notifications?: boolean;
+  email_verified?: boolean;
+}
+
+export interface EmailVerificationStatus {
+  user_id: number;
+  verified: boolean;
 }
 
 export interface CallingPipeline {
@@ -149,8 +193,33 @@ export interface CallingPipeline {
   release_recorded: number;
   organization: string;
   type: string; // 'Calling' | 'Release'
+  ward_member_id: number | null;
+  sustained_date: string | null;
   updated_at: string;
   updated_by?: string;
+}
+
+export interface MemberCalling {
+  id: number;
+  ward_member_id: number;
+  calling: string;
+  organization: string;
+  sustained_date: string | null;
+  set_apart: number;
+  synced_at: string;
+}
+
+export interface RosterReviewFlag {
+  id: number;
+  ward_member_id: number;
+  flagged_at: string;
+}
+
+export interface UnfilledCalling {
+  id: number;
+  calling: string;
+  organization: string;
+  synced_at: string;
 }
 
 export interface InterviewPipeline {
@@ -168,6 +237,8 @@ export interface InterviewPipeline {
   next_interview_date: string;
   comments: string;
   notes: string;
+  with_stake?: number;
+  flagged_for_meeting?: number;
 }
 
 export interface Task {
@@ -198,6 +269,8 @@ export interface BishopricMeeting {
   handbook_training: string;
   handbook_section: string;
   minutes: string;
+  notes: string;
+  updates_announcements: string;
   no_meeting: number;
   reason_not_meeting: string;
   recurrence_id: string | null;
@@ -213,6 +286,17 @@ export interface BishopricAgendaItem {
   position: number;
   updated_at: string;
   updated_by: string | null;
+}
+
+export interface BishopricMoveItem {
+  id: number;
+  meeting_date: string;
+  kind: 'move_in' | 'move_out' | 'other';
+  item: string;
+  done: number;
+  position: number;
+  updated_at?: string;
+  updated_by?: string | null;
 }
 
 export interface OutOfTown {
@@ -251,6 +335,7 @@ export interface WcMeeting {
   opening_prayer: string;
   spiritual_thought: string;
   closing_prayer: string;
+  notes: string;
 }
 
 export interface WcWin {
@@ -311,6 +396,8 @@ export interface SacramentTheme {
   sacrament_intro: string;
   high_councilor: string;
   stake_reps: string;
+  updated_at?: string;
+  updated_by?: string;
 }
 
 export interface SacramentAgendaNote {
@@ -356,6 +443,8 @@ export interface MissionaryPipeline {
   report_date: string;
   release_date: string;
   status: string;
+  ward_member_id: number | null;
+  mission_end_estimated: string | null;
 }
 
 export interface Baby {
@@ -397,13 +486,6 @@ export interface SacramentAnnouncement {
   notes: string;
 }
 
-export interface MemberWithoutCalling {
-  id: number;
-  name: string;
-  potential_calling: string;
-  notes: string;
-}
-
 export interface YouthActivity {
   id: number;
   date: string;
@@ -439,13 +521,18 @@ export interface RegistrationRequest {
   requested_at: string;
 }
 
-export interface BishopScheduleEntry {
+export type ScheduleCalendar = 'Bishop' | 'First Counselor' | 'Second Counselor';
+
+export interface ScheduleEntry {
   id: number;
+  calendars: string; // JSON-stringified ScheduleCalendar[]
   date: string;
   start_time: string;
   end_time: string;
   title: string;
   notes: string;
+  updated_at?: string;
+  updated_by?: string;
   recurrence_id?: string | null;
   recurrence_frequency?: 'daily' | 'weekly' | 'monthly_nth_weekday' | null;
   recurrence_interval?: number | null;
@@ -466,6 +553,7 @@ export interface HubSuggestion {
   status: string;
   admin_notes: string;
   updated_at: string;
+  hub: string;
 }
 
 export interface WardMember {
@@ -483,6 +571,41 @@ export interface WardMember {
   recommend_type: string | null;
   recommend_expires: string | null;
   updated_at: string;
+}
+
+export interface LcrSyncRun {
+  id: number;
+  ran_at: string;
+  success: number;
+  error: string | null;
+  roster_created: number | null;
+  roster_filled: number | null;
+  roster_missing: string | null; // JSON-stringified string[]
+  users_unmatched: string | null; // JSON-stringified string[] — hub accounts not found in the LCR roster
+  recommend_updated: number | null;
+  recommend_unmatched: string | null; // JSON-stringified string[]
+  stake_flagged: number | null;
+  stake_cleared: number | null;
+  stake_unmatched: string | null; // JSON-stringified string[]
+  callings_created: number | null;
+  callings_updated: number | null;
+  callings_released: number | null;
+  callings_changed: string | null; // JSON-stringified {name, calling, action}[]
+  callings_unmatched: string | null; // JSON-stringified string[]
+  missionary_created: number | null;
+  missionary_updated: number | null;
+  missionary_changed: string | null; // JSON-stringified {name, section, action}[]
+  missionary_unmatched: string | null; // JSON-stringified string[]
+  updated_by: string | null;
+}
+
+export interface MailerRun {
+  id: number;
+  ran_at: string;
+  kind: string; // 'new-items' | 'weekly'
+  emails_sent: number;
+  items_notified: number;
+  errors: string | null; // JSON-stringified {recipient, error}[]
 }
 
 export interface Ordinance {

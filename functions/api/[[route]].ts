@@ -1,8 +1,11 @@
 import { syncConduct, runDailyJobs, syncSettingApartInterviews, syncTempleRecommendInterviews } from './jobs';
+import { matchRosterMember, matchRosterMemberExact, splitLastFirstCased, toLastFirst, stripBold, type RosterMember, type RosterMemberNames } from './nameMatch';
 
 interface Env {
   DB: D1Database;
   RECOVERY_KEY?: string;
+  CF_API_TOKEN?: string;
+  CF_ACCOUNT_ID?: string;
 }
 
 interface Session {
@@ -18,11 +21,15 @@ interface Session {
 
 const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'calling-pipeline': { name: 'calling_pipeline', orderBy: 'id DESC' },
+  'member-callings': { name: 'member_callings', orderBy: 'ward_member_id ASC' },
+  'unfilled-callings': { name: 'unfilled_callings', orderBy: 'organization ASC, calling ASC' },
+  'roster-review-flags': { name: 'roster_review_flags', orderBy: 'flagged_at ASC' },
   'interview-pipeline': { name: 'interview_pipeline', orderBy: 'id DESC' },
   'tasks': { name: 'tasks', orderBy: 'done ASC, created_date DESC' },
   'rotating-assignments': { name: 'rotating_assignments', orderBy: 'id ASC' },
   'bishopric-meetings': { name: 'bishopric_meetings', orderBy: 'date DESC' },
   'bishopric-agenda-items': { name: 'bishopric_agenda_items', orderBy: 'meeting_date ASC, position ASC, id ASC' },
+  'bishopric-move-items': { name: 'bishopric_move_items', orderBy: 'meeting_date ASC, kind ASC, position ASC, id ASC' },
   'out-of-town': { name: 'out_of_town', orderBy: 'start_date ASC' },
   'sacrament-speakers': { name: 'sacrament_speakers', orderBy: 'meeting_date DESC, speaking_order ASC' },
   'prayers': { name: 'prayers', orderBy: 'meeting_date DESC' },
@@ -32,8 +39,7 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'calendaring': { name: 'calendaring', orderBy: 'dates DESC' },
   'missionary-pipeline': { name: 'missionary_pipeline', orderBy: 'id DESC' },
   'babies': { name: 'babies', orderBy: 'due_birth_date ASC' },
-  'bishop-schedule': { name: '"bishop-schedule"', orderBy: 'date ASC, start_time ASC' },
-  'members-without-callings': { name: 'members_without_callings', orderBy: 'name ASC' },
+  'schedule-entries': { name: 'schedule_entries', orderBy: 'date ASC, start_time ASC' },
   'sacrament-announcements': { name: 'sacrament_announcements', orderBy: 'meeting_date DESC' },
   'prayer-others': { name: 'prayer_others', orderBy: 'id ASC' },
   'sacrament-agenda-notes': { name: 'sacrament_agenda_notes', orderBy: 'position ASC' },
@@ -41,6 +47,8 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'sacrament-agenda-exclusions': { name: 'sacrament_agenda_exclusions', orderBy: 'id ASC' },
   'important-links': { name: 'important_links', orderBy: 'id ASC' },
   'ward-members': { name: 'ward_members', orderBy: 'last_name ASC, first_name ASC' },
+  'lcr-sync-runs': { name: 'lcr_sync_runs', orderBy: 'id DESC' },
+  'mailer-runs': { name: 'mailer_runs', orderBy: 'id DESC' },
   'youth-activities': { name: 'youth_activities', orderBy: 'date ASC' },
   'wc-meetings': { name: 'wc_meetings', orderBy: 'date ASC' },
   'wc-wins': { name: 'wc_wins', orderBy: 'date DESC' },
@@ -68,6 +76,26 @@ async function checkConflict(db: D1Database, tableName: string, recordId: string
     return json({ error: 'conflict', current }, 409);
   }
   return null;
+}
+
+// The Calling Pipeline's Member field is free text, so entries get typed as
+// "Richard Talbot" as often as "Talbot, Richard" — and an entry that isn't linked to
+// a ward_member_id is invisible to everything that matches by member (All Callings'
+// release tracking, the callings sync, My Actions). Resolve the typed name against the
+// roster on save, accepting either name order and preferred names. Exact variants only:
+// placeholder rows like "Replacement for Richard Talbot" must stay unlinked.
+//
+// A resolvable name wins over whatever ward_member_id came in, so retyping the Member
+// field to a different person re-points the row instead of leaving it linked to the
+// previous one. An unresolvable name leaves the incoming id untouched.
+async function linkCallingMember(db: D1Database, body: Record<string, unknown>): Promise<void> {
+  const member = typeof body.member === 'string' ? body.member : '';
+  if (!member.trim()) return;
+  const roster = (await db.prepare(
+    'SELECT id, first_name, last_name, preferred_first_name, preferred_last_name FROM ward_members WHERE active = 1'
+  ).all<RosterMemberNames>()).results;
+  const match = matchRosterMemberExact(member, roster);
+  if (match) body.ward_member_id = match.id;
 }
 
 function isUniqueConstraintError(e: unknown): boolean {
@@ -275,8 +303,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
 
       const user = await db.prepare(
-        'SELECT id, name, email, role, church_role, hub, must_reset_password, password_hash FROM users WHERE email = ?'
-      ).bind(email).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number; password_hash: string }>();
+        'SELECT id, name, email, role, church_role, hub, must_reset_password, email_notifications, password_hash FROM users WHERE email = ?'
+      ).bind(email).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number; email_notifications: number; password_hash: string }>();
       const check = user ? await verifyPassword(password, user.password_hash) : { valid: false, legacy: false };
       if (!user || !check.valid) {
         await db.prepare('INSERT INTO login_attempts (identifier) VALUES (?)').bind(emailLower).run();
@@ -297,7 +325,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       ).bind(sessionId, user.id, expiresAt).run();
 
       const sq = await db.prepare('SELECT user_id FROM security_questions WHERE user_id = ?').bind(user.id).first();
-      return new Response(JSON.stringify({ user: { id: user.id, name: user.name, email: user.email, role: user.role, church_role: user.church_role, hub: user.hub ?? 'both', must_reset_password: !!user.must_reset_password, has_security_questions: !!sq } }), {
+      return new Response(JSON.stringify({ user: { id: user.id, name: user.name, email: user.email, role: user.role, church_role: user.church_role, hub: user.hub ?? 'both', must_reset_password: !!user.must_reset_password, email_notifications: !!user.email_notifications, has_security_questions: !!sq } }), {
         headers: {
           'Content-Type': 'application/json',
           'Set-Cookie': `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`,
@@ -341,11 +369,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const session = await getSession(request, db);
       if (!session) return json({ user: null });
       const user = await db.prepare(
-        'SELECT id, name, email, role, church_role, hub, must_reset_password FROM users WHERE id = ?'
-      ).bind(session.user_id).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number }>();
+        'SELECT id, name, email, role, church_role, hub, must_reset_password, email_notifications FROM users WHERE id = ?'
+      ).bind(session.user_id).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number; email_notifications: number }>();
       if (!user) return json({ user: null });
       const sq2 = await db.prepare('SELECT user_id FROM security_questions WHERE user_id = ?').bind(user.id).first();
-      return json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, church_role: user.church_role, hub: user.hub ?? 'both', must_reset_password: !!user.must_reset_password, has_security_questions: !!sq2 } });
+      return json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, church_role: user.church_role, hub: user.hub ?? 'both', must_reset_password: !!user.must_reset_password, email_notifications: !!user.email_notifications, has_security_questions: !!sq2 } });
+    }
+
+    if (routeParts[1] === 'email-preference' && method === 'PUT') {
+      const session = await getSession(request, db);
+      if (!session) return json({ error: 'Unauthorized' }, 401);
+      const body = await request.json() as { enabled?: boolean };
+      await db.prepare('UPDATE users SET email_notifications = ? WHERE id = ?').bind(body.enabled ? 1 : 0, session.user_id).run();
+      return json({ ok: true });
     }
 
     if (routeParts[1] === 'change-password' && method === 'POST') {
@@ -524,15 +560,33 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (method === 'GET') {
       // Guest accounts (guest_yc/guest_sac) aren't real people — they're login shortcuts
       // for the read-only guest views, so they never show up in user management.
-      // WC-hub users only see WC users
+      const FULL_FIELDS = 'id, name, email, role, church_role, hub, last_login, last_access, email_verified';
+      const MINIMAL_FIELDS = 'id, name, church_role';
+
+      // WC-hub users: full account detail for their own (wc) hub, but only name/calling
+      // for the bishopric's ex-officio ward council members — bishopric account details
+      // (email, login activity, etc.) aren't Ward Council's data to see.
       if (session.hub === 'wc') {
-        const users = await db.prepare("SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE hub IN ('wc','both') AND role != 'guest' ORDER BY name ASC").all();
+        const wcUsers = await db.prepare(`SELECT ${FULL_FIELDS} FROM users WHERE hub = 'wc' AND role != 'guest' ORDER BY name ASC`).all();
+        const bishopricUsers = await db.prepare(`SELECT ${MINIMAL_FIELDS} FROM users WHERE hub = 'both' ORDER BY name ASC`).all();
+        const merged = [...wcUsers.results, ...bishopricUsers.results] as { name: string }[];
+        merged.sort((a, b) => a.name.localeCompare(b.name));
+        return json(merged);
+      }
+
+      // Any other non-bishopric session (Youth Council, Calendar hub, guests): names and
+      // callings only, across every hub — enough for assignee/name lookups without
+      // exposing anyone's email, account role, hub assignment, or login activity.
+      if (session.hub !== 'both') {
+        const users = await db.prepare(`SELECT ${MINIMAL_FIELDS} FROM users WHERE role != 'guest' ORDER BY name ASC`).all();
         return json(users.results);
       }
+
+      // Bishopric hub: full directory access.
       const filterHub = url.searchParams.get('hub');
       const users = filterHub === 'wc'
-        ? await db.prepare("SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE hub IN ('wc','both') AND role != 'guest' ORDER BY name ASC").all()
-        : await db.prepare("SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE role != 'guest' ORDER BY name ASC").all();
+        ? await db.prepare(`SELECT ${FULL_FIELDS} FROM users WHERE hub IN ('wc','both') AND role != 'guest' ORDER BY name ASC`).all()
+        : await db.prepare(`SELECT ${FULL_FIELDS} FROM users WHERE role != 'guest' ORDER BY name ASC`).all();
       return json(users.results);
     }
 
@@ -820,6 +874,72 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ error: 'Method not allowed' }, 405);
   }
 
+  // When the weekly action-item digest goes out (workers/mailer reads this each run;
+  // defaults to Saturday 08:00 in the ward's time zone if never set).
+  if (routeParts[0] === 'mailer-settings') {
+    const WEEKDAYS = new Set(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+    if (method === 'GET') {
+      const row = await db.prepare("SELECT value FROM ui_settings WHERE key = 'mailer_weekly_schedule'").first<{ value: string }>();
+      const parsed = row?.value ? JSON.parse(row.value) : null;
+      return json({ weekday: parsed?.weekday || 'Sat', hour: typeof parsed?.hour === 'number' ? parsed.hour : 8 });
+    }
+    if (method === 'PUT') {
+      if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+      const body = await request.json() as { weekday?: string; hour?: number };
+      if (!WEEKDAYS.has(body.weekday || '')) return json({ error: 'weekday must be one of Sun..Sat' }, 400);
+      if (typeof body.hour !== 'number' || body.hour < 0 || body.hour > 23) return json({ error: 'hour must be 0-23' }, 400);
+      const now = new Date().toISOString();
+      await db.prepare(
+        "INSERT INTO ui_settings (key, value, updated_at) VALUES ('mailer_weekly_schedule', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
+      ).bind(JSON.stringify({ weekday: body.weekday, hour: body.hour }), now).run();
+      return json({ ok: true });
+    }
+    return json({ error: 'Method not allowed' }, 405);
+  }
+
+  // Checks each bishopric-hub account's email address against Cloudflare's verified
+  // destination-address list (required before the mailer can send it anything).
+  // Verification is one-way — once true it stays true — so only accounts still
+  // marked unverified in our own DB are re-checked against Cloudflare each call.
+  if (routeParts[0] === 'email-verification-status' && method === 'GET') {
+    if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+
+    const users = await db.prepare(
+      "SELECT id, email, email_verified FROM users WHERE hub IN ('bh','both') AND role != 'guest'"
+    ).all<{ id: number; email: string; email_verified: number }>();
+
+    const pending = users.results.filter(u => !u.email_verified);
+    let cf_check_error: string | undefined;
+    if (pending.length > 0) {
+      if (!env.CF_API_TOKEN || !env.CF_ACCOUNT_ID) {
+        cf_check_error = 'CF_API_TOKEN or CF_ACCOUNT_ID not configured';
+      } else {
+        const cfRes = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/email/routing/addresses?per_page=50`,
+          { headers: { Authorization: `Bearer ${env.CF_API_TOKEN}` } }
+        );
+        if (cfRes.ok) {
+          const cfData = await cfRes.json() as { result: { email: string; verified: string | null }[] };
+          const verifiedEmails = new Set(
+            cfData.result.filter(a => a.verified).map(a => a.email.toLowerCase())
+          );
+          const newlyVerified = pending.filter(u => verifiedEmails.has(u.email.toLowerCase()));
+          for (const u of newlyVerified) {
+            await db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').bind(u.id).run();
+            u.email_verified = 1;
+          }
+        } else {
+          cf_check_error = `Cloudflare API returned ${cfRes.status}: ${(await cfRes.text()).slice(0, 300)}`;
+        }
+      }
+    }
+
+    return json({
+      statuses: users.results.map(u => ({ user_id: u.id, verified: !!u.email_verified })),
+      cf_check_error,
+    });
+  }
+
   // Email preview — returns recipients + rendered data for each email type (admin only)
   if (routeParts[0] === 'email-preview' && method === 'POST') {
     if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
@@ -1003,6 +1123,30 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           return json(newRow, 201);
         }
       }
+      // hub-suggestions: WC users only see/modify suggestions submitted from Ward Council
+      if (tbl === 'hub-suggestions') {
+        if (method === 'GET' && !routeParts[1]) {
+          const results = await db.prepare(
+            "SELECT * FROM hub_suggestions WHERE hub = 'Ward Council' ORDER BY id DESC"
+          ).all();
+          return json(results.results);
+        }
+        if (routeParts[1] && (method === 'GET' || method === 'PUT' || method === 'DELETE')) {
+          const row = await db.prepare('SELECT hub FROM hub_suggestions WHERE id = ?').bind(routeParts[1]).first<{ hub: string }>();
+          if (!row || row.hub !== 'Ward Council') return json({ error: 'Forbidden' }, 403);
+        }
+        if (method === 'POST') {
+          const body = await request.json() as Record<string, unknown>;
+          body.hub = 'Ward Council';
+          delete body.id;
+          const keys = Object.keys(body);
+          const result = await db.prepare(
+            `INSERT INTO hub_suggestions (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
+          ).bind(...keys.map(k => body[k])).run();
+          const newRow = await db.prepare('SELECT * FROM hub_suggestions WHERE id = ?').bind(result.meta.last_row_id).first();
+          return json(newRow, 201);
+        }
+      }
       // fall through to generic TABLES handler — full CRUD allowed
     } else if (WC_READABLE.has(tbl)) {
       if (method !== 'GET') return json({ error: 'Forbidden' }, 403);
@@ -1088,9 +1232,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // fall through to generic TABLES handler
   }
 
-  // Bishopric hub: only show/modify tasks that aren't scoped to another hub's list
+  // Bishopric hub: only show/modify tasks that aren't scoped to another hub's list.
+  // Dual-access ('both') accounts can also be actively viewing WC or YC in the client
+  // (selectedHub) — the client tells us via ?viewHub= since the session itself only
+  // knows the account's fixed hub, not which view is currently open.
   if (session.hub === 'both' && routeParts[0] === 'tasks') {
+    const viewHub = url.searchParams.get('viewHub');
     if (method === 'GET' && !routeParts[1]) {
+      if (viewHub === 'wc') {
+        const results = await db.prepare(
+          "SELECT * FROM tasks WHERE share_with LIKE '%Ward Council%' ORDER BY done ASC, id DESC"
+        ).all();
+        return json(results.results);
+      }
+      if (viewHub === 'yc') {
+        const results = await db.prepare(
+          "SELECT * FROM tasks WHERE share_with LIKE '%Youth Council%' ORDER BY done ASC, id DESC"
+        ).all();
+        return json(results.results);
+      }
       const results = await db.prepare(
         "SELECT * FROM tasks WHERE (share_with IS NULL OR (share_with NOT LIKE '%Ward Council%' AND share_with NOT LIKE '%Youth Council%')) ORDER BY done ASC, id DESC"
       ).all();
@@ -1111,6 +1271,37 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json(newRow, 201);
     }
     // fall through to generic TABLES handler for single GET/PUT/DELETE — bishopric keeps full access to any task
+  }
+
+  // Bishopric hub: hub-suggestions scoped the same way as tasks — dual-access accounts
+  // pass ?viewHub= for whichever view is currently open, so WC and Bishopric each only
+  // see suggestions submitted from their own hub.
+  if (session.hub === 'both' && routeParts[0] === 'hub-suggestions') {
+    const viewHub = url.searchParams.get('viewHub');
+    if (method === 'GET' && !routeParts[1]) {
+      if (viewHub === 'wc') {
+        const results = await db.prepare(
+          "SELECT * FROM hub_suggestions WHERE hub = 'Ward Council' ORDER BY id DESC"
+        ).all();
+        return json(results.results);
+      }
+      const results = await db.prepare(
+        "SELECT * FROM hub_suggestions WHERE hub IS NULL OR hub != 'Ward Council' ORDER BY id DESC"
+      ).all();
+      return json(results.results);
+    }
+    if (method === 'POST') {
+      const body = await request.json() as Record<string, unknown>;
+      if (!body.hub) body.hub = viewHub === 'wc' ? 'Ward Council' : 'Bishopric';
+      delete body.id;
+      const keys = Object.keys(body);
+      const result = await db.prepare(
+        `INSERT INTO hub_suggestions (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
+      ).bind(...keys.map(k => body[k])).run();
+      const newRow = await db.prepare('SELECT * FROM hub_suggestions WHERE id = ?').bind(result.meta.last_row_id).first();
+      return json(newRow, 201);
+    }
+    // fall through to generic TABLES handler for single GET/PUT/DELETE — bishopric keeps full access to any suggestion
   }
 
   // Calendar hub: full CRUD on calendaring only
@@ -1140,6 +1331,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
     const row = await db.prepare("SELECT value FROM ui_settings WHERE key = 'daily_jobs'").first<{ value: string }>();
     return json(row ? JSON.parse(row.value) : { last_run: null, results: {} });
+  }
+
+
+  // Clears archived LCR sync runs (admin only), keeping the most recent `keep` runs
+  // that the Automation page shows by default. Must be matched before the generic
+  // TABLES dispatch below, or "clear-archived" would be parsed as a record id.
+  if (routeParts[0] === 'lcr-sync-runs' && routeParts[1] === 'clear-archived' && method === 'POST') {
+    if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+    const body = await request.json().catch(() => ({})) as { keep?: number };
+    const keep = Math.max(0, Math.min(50, Number.isFinite(body.keep) ? Number(body.keep) : 5));
+    const result = await db.prepare(
+      'DELETE FROM lcr_sync_runs WHERE id NOT IN (SELECT id FROM lcr_sync_runs ORDER BY id DESC LIMIT ?)'
+    ).bind(keep).run();
+    return json({ ok: true, deleted: result.meta.changes ?? 0, kept: keep });
   }
 
   // Bulk ward-roster import from a CSV upload (admin only). Must be matched before the
@@ -1173,6 +1378,486 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ ok: true, updated: updates.length, created: creates.length, deactivated: deactivate.length });
   }
 
+  // Bulk roster reconciliation against a full LCR member-directory export: creates
+  // ward_members rows for people not yet tracked, fills in birth_date/gender for
+  // existing members whose record is incomplete (never overwrites a value that's
+  // already set), and reports active members absent from the export so the clerk
+  // can investigate (move-outs, name mismatches, etc.) rather than auto-deactivating.
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'full-sync' && method === 'POST') {
+    const body = await request.json() as {
+      rows?: { name: string; gender: string | null; birth_date: string | null }[];
+    };
+    const rows = (body.rows || []).slice(0, 2000);
+    const genderRe = /^[MF]$/;
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    for (const r of rows) {
+      if (!r.name || !r.name.trim()) return json({ error: 'Row missing name' }, 400);
+      if (r.gender && !genderRe.test(r.gender)) return json({ error: `Invalid gender "${r.gender}" for "${r.name}"` }, 400);
+      if (r.birth_date && !dateRe.test(r.birth_date)) return json({ error: `Invalid birth_date "${r.birth_date}" for "${r.name}"` }, 400);
+    }
+
+    const roster = (await db.prepare(
+      'SELECT id, first_name, last_name, birth_date, gender, active, out_of_ward FROM ward_members'
+    ).all<RosterMember & { birth_date: string | null; gender: string | null; active: number; out_of_ward: number }>()).results;
+
+    const now = new Date().toISOString();
+    const stmts = [];
+    const matchedIds = new Set<number>();
+    let created = 0;
+    let filledDetails = 0;
+
+    for (const row of rows) {
+      const member = matchRosterMember(row.name, roster);
+      if (member) {
+        matchedIds.add(member.id);
+        const fillBirthDate = !member.birth_date && row.birth_date;
+        const fillGender = !member.gender && row.gender;
+        if (fillBirthDate || fillGender) {
+          // ward_members stores "missing" as '' rather than NULL for these columns,
+          // so SQL COALESCE (which only treats NULL as empty) can't be used here —
+          // compute the final value in JS instead.
+          stmts.push(
+            db.prepare('UPDATE ward_members SET birth_date = ?, gender = ?, updated_at = ?, updated_by = ? WHERE id = ?')
+              .bind(
+                fillBirthDate ? row.birth_date : member.birth_date,
+                fillGender ? row.gender : member.gender,
+                now, session.name, member.id
+              )
+          );
+          filledDetails++;
+        }
+        continue;
+      }
+
+      const { last, first } = splitLastFirstCased(toLastFirst(row.name));
+      if (!last) continue;
+      stmts.push(
+        db.prepare('INSERT INTO ward_members (last_name, first_name, active, birth_date, gender, updated_at, updated_by) VALUES (?, ?, 1, ?, ?, ?, ?)')
+          .bind(last, first, row.birth_date || null, row.gender || null, now, session.name)
+      );
+      created++;
+    }
+    if (stmts.length > 0) await db.batch(stmts);
+
+    // Members flagged "records elsewhere" (out_of_ward) legitimately won't
+    // appear in this ward's LCR Member Directory — their membership record
+    // lives in another unit, so absence here isn't a real discrepancy.
+    const missing = roster.filter(m => m.active && !m.out_of_ward && !matchedIds.has(m.id));
+    const missingFromRoster = missing.map(m => `${m.last_name}, ${m.first_name}`);
+
+    // Surface newly-missing members for the user to review on Ward Members
+    // (flag "records elsewhere", remove from ward, or dismiss) rather than
+    // silently reporting it in the sync log only. Anyone who reappeared in
+    // this run's LCR dump is cleared automatically.
+    const flagStmts = [
+      ...missing.map(m => db.prepare(
+        'INSERT OR IGNORE INTO roster_review_flags (ward_member_id, flagged_at) VALUES (?, ?)'
+      ).bind(m.id, now)),
+      ...[...matchedIds].map(id => db.prepare('DELETE FROM roster_review_flags WHERE ward_member_id = ?').bind(id)),
+    ];
+    if (flagStmts.length > 0) await db.batch(flagStmts);
+
+    // Everything that routes work to a person — interview setup, calling assignments,
+    // My Actions — matches a hub account's name against free-text names that ultimately
+    // come from LCR. An account name that doesn't correspond to anyone in the LCR export
+    // (a typo, a maiden name, a move-out) silently matches nothing, so report it rather
+    // than restricting anything. High councilors are stake, not ward, so they're never
+    // expected in this ward's roster.
+    const hubUsers = (await db.prepare(
+      "SELECT name, church_role FROM users WHERE hub IN ('bh', 'both') AND role <> 'guest' AND COALESCE(church_role, '') <> 'High Councilor'"
+    ).all<{ name: string; church_role: string | null }>()).results;
+    const lcrRoster: RosterMember[] = rows.map((r, i) => {
+      const { last, first } = splitLastFirstCased(toLastFirst(r.name));
+      return { id: i + 1, last_name: last, first_name: first };
+    });
+    const unmatchedHubUsers = hubUsers
+      .filter(u => u.name && !matchRosterMember(u.name, lcrRoster))
+      .map(u => `${u.name}${u.church_role ? ` (${u.church_role})` : ''}`);
+
+    return json({ ok: true, created, filledDetails, missingFromRoster, unmatchedHubUsers });
+  }
+
+  // Syncs the "with the stake" flag on temple-recommend interviews from LCR's
+  // Recommend Activations > Awaiting Stake Activation list: flags matching
+  // interviews (creating one with sensible defaults if none exists yet), and
+  // clears the flag on any temple-recommend interview previously flagged whose
+  // member is no longer on the list (i.e. their recommend was activated).
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'sync-stake-activations' && method === 'POST') {
+    const body = await request.json() as { names?: string[] };
+    const names = (body.names || []).slice(0, 500);
+    const RECOMMEND_TYPE_TO_INTERVIEW_TYPE: Record<string, string> = { Endowed: 'Endowed Temple Rec', Limited: 'Limited' };
+
+    const roster = (await db.prepare(
+      'SELECT id, first_name, last_name, recommend_type, recommend_expires FROM ward_members WHERE active = 1'
+    ).all<RosterMember & { recommend_type: string | null; recommend_expires: string | null }>()).results;
+
+    const now = new Date().toISOString();
+    const stmts = [];
+    const matchedMemberIds = new Set<number>();
+    const unmatched: string[] = [];
+    let flagged = 0;
+
+    for (const name of names) {
+      const member = matchRosterMember(name, roster);
+      const interviewType = member?.recommend_type ? RECOMMEND_TYPE_TO_INTERVIEW_TYPE[member.recommend_type] : undefined;
+      if (!member || !interviewType) { unmatched.push(name); continue; }
+      matchedMemberIds.add(member.id);
+
+      const existing = await db.prepare(
+        'SELECT id, with_stake FROM interview_pipeline WHERE ward_member_id = ? AND type_of_interview = ?'
+      ).bind(member.id, interviewType).first<{ id: number; with_stake: number }>();
+
+      if (existing) {
+        if (!existing.with_stake) {
+          stmts.push(db.prepare('UPDATE interview_pipeline SET with_stake = 1, updated_at = ? WHERE id = ?').bind(now, existing.id));
+          flagged++;
+        }
+      } else {
+        const legalName = member.first_name ? `${member.last_name}, ${member.first_name}` : member.last_name;
+        stmts.push(db.prepare(
+          'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, date_recommend_expires, ward_member_id, with_stake, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)'
+        ).bind(legalName, interviewType, 'Unassigned', '', member.recommend_expires || '', member.id, now, now));
+        flagged++;
+      }
+    }
+
+    // Only reconcile rows we could plausibly have set ourselves (linked to a
+    // ward member) — a with_stake flag on an unlinked row was set some other
+    // way and isn't ours to touch.
+    const currentlyFlagged = (await db.prepare(
+      "SELECT id, ward_member_id FROM interview_pipeline WHERE with_stake = 1 AND type_of_interview IN ('Endowed Temple Rec', 'Limited') AND ward_member_id IS NOT NULL"
+    ).all<{ id: number; ward_member_id: number }>()).results;
+    let cleared = 0;
+    for (const row of currentlyFlagged) {
+      if (!matchedMemberIds.has(row.ward_member_id)) {
+        stmts.push(db.prepare('UPDATE interview_pipeline SET with_stake = 0, updated_at = ? WHERE id = ?').bind(now, row.id));
+        cleared++;
+      }
+    }
+
+    if (stmts.length > 0) await db.batch(stmts);
+    return json({ ok: true, flagged, cleared, unmatched });
+  }
+
+  // Bulk callings sync from LCR's Organizations page. Matches by ward_member_id
+  // (backfilling it from calling_pipeline's free-text member name where missing)
+  // rather than raw name strings, since LCR names and locally-typed names can
+  // differ slightly. Creates/advances Calling rows for what LCR shows active,
+  // and auto-records a release (via a companion Release row) for anything this
+  // sync previously linked that's no longer on LCR's list.
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'sync-callings' && method === 'POST') {
+    const body = await request.json() as {
+      rows?: { organization: string | null; calling: string; person: string; sustained_date: string | null; set_apart: boolean }[];
+      unfilled?: { organization: string | null; calling: string }[];
+    };
+    const rows = (body.rows || []).slice(0, 2000);
+    const unfilledRows = (body.unfilled || []).slice(0, 2000).filter(r => r.calling && r.calling.trim());
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    for (const r of rows) {
+      if (!r.person || !r.person.trim()) return json({ error: 'Row missing person' }, 400);
+      if (!r.calling || !r.calling.trim()) return json({ error: `Row missing calling for "${r.person}"` }, 400);
+      if (r.sustained_date && !dateRe.test(r.sustained_date)) return json({ error: `Invalid sustained_date "${r.sustained_date}" for "${r.person}"` }, 400);
+    }
+
+    const CALLING_STATUS_ORDER = [
+      '1. Discussion', '2. Pray about', '3. Approved and assigned', '4. Called & accepted',
+      '4.5 Call & accepted, handle in class/quorum', '5. Sustained', '6. Set apart',
+      '7. Need to release', '8. Need to thank at pulpit', '9. Released', '10. Declined',
+    ];
+    const statusIdx = (s: string) => { const i = CALLING_STATUS_ORDER.indexOf(s); return i === -1 ? 0 : i; };
+    const normCalling = (s: string) => stripBold(s).trim().toLowerCase();
+
+    const roster = (await db.prepare('SELECT id, first_name, last_name FROM ward_members WHERE active = 1').all<RosterMember>()).results;
+
+    interface CallingRow {
+      id: number; member: string; calling: string; organization: string | null; status: string;
+      ward_member_id: number | null; sustain_recorded: number; set_apart_recorded: number;
+      sustained_date: string | null; type: string; lcr_calling_confirmed: number;
+    }
+    const allCallings = (await db.prepare(
+      'SELECT id, member, calling, organization, status, ward_member_id, sustain_recorded, set_apart_recorded, sustained_date, type, lcr_calling_confirmed FROM calling_pipeline'
+    ).all<CallingRow>()).results;
+
+    const now = new Date().toISOString();
+    const backfillStmts = [];
+    for (const c of allCallings) {
+      // Release rows are backfilled too — they're matched by (member, calling) the same
+      // way Calling rows are, so an unlinked one is invisible to the release tracking.
+      if (c.ward_member_id === null) {
+        const m = matchRosterMember(stripBold(c.member), roster);
+        if (m) {
+          backfillStmts.push(db.prepare('UPDATE calling_pipeline SET ward_member_id = ? WHERE id = ?').bind(m.id, c.id));
+          c.ward_member_id = m.id;
+        }
+      }
+    }
+    if (backfillStmts.length > 0) await db.batch(backfillStmts);
+
+    // A Calling row counts as "superseded" once a Release row for the same
+    // (member, calling) at status='9. Released' was created after it — id order
+    // is used as a chronology proxy since rows aren't otherwise linked.
+    const isSuperseded = (c: { id: number; ward_member_id: number | null; calling: string }) =>
+      allCallings.some(r => r.type === 'Release' && r.ward_member_id === c.ward_member_id &&
+        normCalling(r.calling) === normCalling(c.calling) && r.status === '9. Released' && r.id > c.id);
+
+    const stmts = [];
+    const changed: { name: string; calling: string; action: string }[] = [];
+    const unmatched: string[] = [];
+    // Deliberately never creates new calling_pipeline rows — see comment
+    // below — kept in the response shape for schema/UI consistency.
+    const created = 0;
+    let updated = 0, released = 0;
+    const seenPairs = new Set<string>();
+
+    for (const row of rows) {
+      const member = matchRosterMember(row.person, roster);
+      if (!member) { unmatched.push(row.person); continue; }
+      seenPairs.add(`${member.id}|${normCalling(row.calling)}`);
+      const legalName = `${member.last_name}, ${member.first_name}`;
+      const targetStatus = row.set_apart ? '6. Set apart' : '5. Sustained';
+
+      const existing = allCallings
+        .filter(c => c.type === 'Calling' && c.ward_member_id === member.id && normCalling(c.calling) === normCalling(row.calling) && !isSuperseded(c))
+        .sort((a, b) => b.id - a.id)[0];
+
+      if (existing) {
+        const updates: Record<string, unknown> = {};
+        if (statusIdx(targetStatus) > statusIdx(existing.status)) updates.status = targetStatus;
+        if (!existing.sustain_recorded) updates.sustain_recorded = 1;
+        if (row.set_apart && !existing.set_apart_recorded) updates.set_apart_recorded = 1;
+        if (row.sustained_date && row.sustained_date !== existing.sustained_date) updates.sustained_date = row.sustained_date;
+        if ((row.organization || '') !== (existing.organization || '')) updates.organization = row.organization;
+        const reportableChange = Object.keys(updates).length > 0;
+        // This row's free-text calling wording just matched LCR's own text for
+        // this org — safe to trust an absence next time as a real release.
+        // Not counted as a reportable "updated" change on its own — it's
+        // internal bookkeeping, not something the user asked to sync.
+        if (!existing.lcr_calling_confirmed) updates.lcr_calling_confirmed = 1;
+        if (Object.keys(updates).length > 0) {
+          const setClause = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+          stmts.push(db.prepare(`UPDATE calling_pipeline SET ${setClause}, updated_at = ? WHERE id = ?`)
+            .bind(...Object.values(updates), now, existing.id));
+          if (reportableChange) {
+            updated++;
+            changed.push({ name: legalName, calling: row.calling, action: updates.status === '6. Set apart' ? 'set apart' : updates.status === '5. Sustained' ? 'sustained' : 'updated' });
+          }
+        }
+      }
+      // No `else` — deliberately never creates a new calling_pipeline row.
+      // Only callings the bishopric already tracks get synced; LCR has ~150+
+      // filled callings ward-wide and most (Sunday School teachers, Primary
+      // workers, etc.) aren't meant to be tracked here.
+    }
+
+    // Release reconciliation: any active Calling row whose text has been
+    // confirmed against LCR's own wording at least once (lcr_calling_confirmed
+    // — see above) and isn't seen in this week's LCR dump means the person was
+    // released from it. Never-confirmed rows are excluded permanently, not just
+    // for the run right after backfill — a legacy wording mismatch (e.g.
+    // "Nursery" vs LCR's "Nursery Worker") persists across every future sync,
+    // so an unconfirmed row's absence never means "released," only "unknown."
+    const activeCallings = allCallings.filter(c =>
+      c.type === 'Calling' && c.ward_member_id !== null && !!c.lcr_calling_confirmed &&
+      !['9. Released', '10. Declined'].includes(c.status) && !isSuperseded(c));
+    for (const c of activeCallings) {
+      if (seenPairs.has(`${c.ward_member_id}|${normCalling(c.calling)}`)) continue;
+
+      const inProgressRelease = allCallings.find(r =>
+        r.type === 'Release' && r.ward_member_id === c.ward_member_id &&
+        normCalling(r.calling) === normCalling(c.calling) && r.status !== '9. Released' && r.id > c.id);
+
+      if (inProgressRelease) {
+        stmts.push(db.prepare('UPDATE calling_pipeline SET status = ?, release_recorded = 1, updated_at = ? WHERE id = ?').bind('9. Released', now, inProgressRelease.id));
+      } else {
+        stmts.push(db.prepare(
+          'INSERT INTO calling_pipeline (member, calling, organization, status, release_recorded, type, ward_member_id, assigned_to, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?)'
+        ).bind(c.member, c.calling, c.organization || '', '9. Released', 'Release', c.ward_member_id, '', now, now));
+      }
+      released++;
+      changed.push({ name: c.member, calling: c.calling, action: 'released' });
+    }
+
+    if (stmts.length > 0) await db.batch(stmts);
+
+    // Full read-only mirror of every filled calling LCR reports (not just
+    // tracked ones) for the Ward Members "all callings" display — wholesale
+    // replace each run since LCR's dump is always the full current picture.
+    const memberCallingStmts = [db.prepare('DELETE FROM member_callings')];
+    for (const row of rows) {
+      const member = matchRosterMember(row.person, roster);
+      if (!member) continue;
+      memberCallingStmts.push(db.prepare(
+        'INSERT INTO member_callings (ward_member_id, calling, organization, sustained_date, set_apart, synced_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(member.id, row.calling, row.organization || '', row.sustained_date, row.set_apart ? 1 : 0, now));
+    }
+    await db.batch(memberCallingStmts);
+
+    // Full read-only mirror of every vacant, non-custom calling — same
+    // wholesale-replace pattern as member_callings above.
+    const unfilledStmts = [db.prepare('DELETE FROM unfilled_callings')];
+    for (const row of unfilledRows) {
+      unfilledStmts.push(db.prepare(
+        'INSERT INTO unfilled_callings (calling, organization, synced_at) VALUES (?, ?, ?)'
+      ).bind(row.calling, row.organization || '', now));
+    }
+    await db.batch(unfilledStmts);
+
+    return json({ ok: true, created, updated, released, changed, unmatched });
+  }
+
+  // Bulk missionary-status sync from missionaryrecommendations.churchofjesuschrist.org.
+  // Section names map 1:1 onto MISSIONARY_STATUSES (src/lib/constants.ts) — status is
+  // only ever advanced forward, never regressed, and disappearing from a section
+  // doesn't undo anything (unlike callings/stake-activations, there's no "gone means
+  // reverted" signal here — a released missionary just stops appearing next week).
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'sync-missionary-status' && method === 'POST') {
+    const body = await request.json() as {
+      rows?: {
+        name: string; section: string; mission: string | null; mission_start: string | null;
+        mission_end: string | null; received_date: string | null; assignment_made_date: string | null;
+      }[];
+    };
+    const rows = (body.rows || []).slice(0, 500);
+
+    const SECTION_TO_STATUS: Record<string, string> = {
+      'Candidate(s) Completing Forms': 'Candidate Completing Forms',
+      "Ready for Bishop's Action": "Ready for Bishop's Action",
+      'With the Stake President': 'With the Stake President',
+      'With Church Headquarters': 'With Church Headquarters',
+      'Assignment Made': 'Assignment Made',
+      'Postponed Mission Start Date': 'Postponed Mission Start Date',
+      'Entered the MTC': 'Entered the MTC',
+      'Entered the Mission Field': 'Entered the Mission Field',
+      'On Leave': 'On Leave',
+      'Released from Mission Field': 'Released from Mission Field',
+      'Canceled': 'Canceled',
+    };
+    const STATUS_ORDER = [
+      '0-Not at this time', '1-Considering', '2-Papers Started', 'Candidate Completing Forms',
+      "Ready for Bishop's Action", 'With the Stake President', 'With Church Headquarters',
+      'Assignment Made', 'Postponed Mission Start Date', 'Entered the MTC',
+      'Entered the Mission Field', 'On Leave', 'Released from Mission Field', 'Canceled',
+    ];
+    const statusIdx = (s: string) => { const i = STATUS_ORDER.indexOf(s); return i === -1 ? 0 : i; };
+
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    for (const r of rows) {
+      if (!r.name || !r.name.trim()) return json({ error: 'Row missing name' }, 400);
+      if (!SECTION_TO_STATUS[r.section]) return json({ error: `Unknown section "${r.section}" for "${r.name}"` }, 400);
+      for (const d of [r.mission_start, r.mission_end, r.received_date, r.assignment_made_date]) {
+        if (d && !dateRe.test(d)) return json({ error: `Invalid date "${d}" for "${r.name}"` }, 400);
+      }
+    }
+
+    const roster = (await db.prepare('SELECT id, first_name, last_name FROM ward_members WHERE active = 1').all<RosterMember>()).results;
+
+    interface MissionaryRow {
+      id: number; who: string; status: string; ward_member_id: number | null;
+      report_date: string | null; release_date: string | null; mission_call: string | null;
+      mission_end_estimated: string | null;
+    }
+    const allMissionaries = (await db.prepare(
+      'SELECT id, who, status, ward_member_id, report_date, release_date, mission_call, mission_end_estimated FROM missionary_pipeline'
+    ).all<MissionaryRow>()).results;
+
+    const now = new Date().toISOString();
+    const backfillStmts = [];
+    for (const m of allMissionaries) {
+      if (m.ward_member_id === null) {
+        const match = matchRosterMember(m.who, roster);
+        if (match) {
+          backfillStmts.push(db.prepare('UPDATE missionary_pipeline SET ward_member_id = ? WHERE id = ?').bind(match.id, m.id));
+          m.ward_member_id = match.id;
+        }
+      }
+    }
+    if (backfillStmts.length > 0) await db.batch(backfillStmts);
+
+    const stmts = [];
+    const changed: { name: string; section: string; action: string }[] = [];
+    const unmatched: string[] = [];
+    let created = 0, updated = 0;
+
+    for (const row of rows) {
+      const member = matchRosterMember(row.name, roster);
+      if (!member) { unmatched.push(row.name); continue; }
+      const targetStatus = SECTION_TO_STATUS[row.section];
+      const legalName = `${member.last_name}, ${member.first_name}`;
+      const reportDate = row.mission_start || row.received_date || row.assignment_made_date || null;
+
+      const existing = allMissionaries.find(m => m.ward_member_id === member.id && m.status !== 'Released from Mission Field')
+        || allMissionaries.filter(m => m.ward_member_id === member.id).sort((a, b) => b.id - a.id)[0];
+
+      if (existing) {
+        const updates: Record<string, unknown> = {};
+        if (statusIdx(targetStatus) > statusIdx(existing.status)) updates.status = targetStatus;
+        if (row.mission && row.mission !== existing.mission_call) updates.mission_call = row.mission;
+        if (reportDate && reportDate !== existing.report_date) updates.report_date = reportDate;
+        if (row.mission_end && row.mission_end !== existing.mission_end_estimated) updates.mission_end_estimated = row.mission_end;
+        if (targetStatus === 'Released from Mission Field' && !existing.release_date) updates.release_date = reportDate || now.slice(0, 10);
+        if (Object.keys(updates).length > 0) {
+          const setClause = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+          stmts.push(db.prepare(`UPDATE missionary_pipeline SET ${setClause}, updated_at = ? WHERE id = ?`)
+            .bind(...Object.values(updates), now, existing.id));
+          updated++;
+          changed.push({ name: legalName, section: row.section, action: 'updated' });
+        }
+      } else {
+        stmts.push(db.prepare(
+          'INSERT INTO missionary_pipeline (who, status, ward_member_id, mission_call, report_date, mission_end_estimated, release_date, notes, next_steps, temple_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        ).bind(legalName, targetStatus, member.id, row.mission, reportDate, row.mission_end, targetStatus === 'Released from Mission Field' ? reportDate : null, '', '', '', now, now));
+        created++;
+        changed.push({ name: legalName, section: row.section, action: 'created' });
+      }
+    }
+
+    if (stmts.length > 0) await db.batch(stmts);
+    return json({ ok: true, created, updated, changed, unmatched });
+  }
+
+  // Bulk temple-recommend-status sync (e.g. from an automated LCR export). Matches rows
+  // to the roster by name using the same logic as the manual CSV import above.
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'import-recommends' && method === 'POST') {
+    const body = await request.json() as {
+      rows?: { name: string; recommend_type: string | null; recommend_expires: string | null }[];
+    };
+    const rows = (body.rows || []).slice(0, 1000);
+    const typeRe = /^(Endowed|Limited)$/;
+    const expiresRe = /^\d{4}-\d{2}$/;
+    for (const r of rows) {
+      if (!r.name || !r.name.trim()) return json({ error: 'Row missing name' }, 400);
+      if (r.recommend_type && !typeRe.test(r.recommend_type)) return json({ error: `Invalid recommend_type "${r.recommend_type}" for "${r.name}"` }, 400);
+      if (r.recommend_expires && !expiresRe.test(r.recommend_expires)) return json({ error: `Invalid recommend_expires "${r.recommend_expires}" for "${r.name}"` }, 400);
+    }
+
+    const roster = (await db.prepare(
+      'SELECT id, first_name, last_name, recommend_type, recommend_expires FROM ward_members WHERE active = 1'
+    ).all<RosterMember & { recommend_type: string | null; recommend_expires: string | null }>()).results;
+
+    const now = new Date().toISOString();
+    const stmts = [];
+    const unmatched: string[] = [];
+    let matched = 0, updated = 0;
+    for (const row of rows) {
+      const member = matchRosterMember(row.name, roster);
+      if (!member) { unmatched.push(row.name); continue; }
+      matched++;
+      // Only write when something actually differs. Older rows can hold '' where
+      // the sync writes null, so normalize both sides before comparing — otherwise
+      // those members would count as "updated" on every run, forever.
+      const type = row.recommend_type || null;
+      const expires = row.recommend_expires || null;
+      if (type === (member.recommend_type || null) && expires === (member.recommend_expires || null)) continue;
+      stmts.push(
+        db.prepare('UPDATE ward_members SET recommend_type = ?, recommend_expires = ?, updated_at = ?, updated_by = ? WHERE id = ?')
+          .bind(type, expires, now, session.name, member.id)
+      );
+      updated++;
+    }
+    if (stmts.length > 0) await db.batch(stmts);
+    return json({ ok: true, matched, updated, unmatched });
+  }
+
   // CRUD endpoints: /api/{table} and /api/{table}/{id}
   const tableName = routeParts[0];
   const recordId = routeParts[1];
@@ -1199,6 +1884,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const body = await request.json() as Record<string, unknown>;
     delete body.updated_by;
     body.updated_by = session.name;
+    if (tableName === 'calling-pipeline') await linkCallingMember(db, body);
     const keys = Object.keys(body);
     const placeholders = keys.map(() => '?').join(', ');
     const values = keys.map(k => body[k]);
@@ -1234,6 +1920,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     body.updated_at = new Date().toISOString();
     body.updated_by = session.name;
+    if (tableName === 'calling-pipeline') await linkCallingMember(db, body);
     const keys = Object.keys(body);
     const setClause = keys.map(k => `${k} = ?`).join(', ');
     const values = keys.map(k => body[k]);

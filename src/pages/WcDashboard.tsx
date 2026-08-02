@@ -9,9 +9,13 @@ import {
   loadWcDashboardConfig, saveWcDashboardConfig,
 } from '../lib/wcDashboardConfig';
 import { responsiveGridCols } from '../lib/gridCols';
+import { MISSIONARY_STATUSES } from '../lib/constants';
 
 const TODAY = new Date().toISOString().slice(0, 10);
-const ACTIVE_MISSIONARY_STATUSES = new Set(['1-Considering', '2-Papers Started', '3-Papers with Stake', '4-Papers Submitted', '5-Call Accepted']);
+// Everything except still-serving/wrapped-up statuses — this is the dashboard's
+// "in progress toward serving" summary, so those are shown on Missionary Pipeline instead.
+const INACTIVE_MISSIONARY_STATUSES = new Set(['Entered the MTC', 'Entered the Mission Field', 'Released from Mission Field', 'Canceled']);
+const ACTIVE_MISSIONARY_STATUSES = new Set(MISSIONARY_STATUSES.filter(s => !INACTIVE_MISSIONARY_STATUSES.has(s)));
 const FONT_SIZES: FontSize[] = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl'];
 
 function formatDate(iso: string): string {

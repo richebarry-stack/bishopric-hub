@@ -1,24 +1,6 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { api, type User } from './api';
-
-type Hub = 'bh' | 'wc' | 'yc' | 'cal';
-
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  selectedHub: Hub;
-  isWcReadOnly: boolean;
-  isGuest: boolean;
-  guestType: 'yc' | 'sac' | null;
-  login: (email: string, password: string) => Promise<{ needsHubChoice: boolean }>;
-  loginAsGuest: (type: 'yc' | 'sac') => Promise<void>;
-  chooseHub: (hub: Hub) => void;
-  logout: () => Promise<void>;
-  clearResetFlag: () => void;
-  markSecurityQuestionsSetup: () => void;
-}
-
-const AuthContext = createContext<AuthContextType>(null!);
+import { AuthContext, type Hub } from './auth';
 
 function resolveHub(user: User, stored: Hub | null): Hub {
   if (user.hub === 'yc') return 'yc';
@@ -82,17 +64,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) setUser({ ...user, has_security_questions: true });
   };
 
+  const setEmailNotifications = (enabled: boolean) => {
+    if (user) setUser({ ...user, email_notifications: enabled });
+  };
+
   const isWcReadOnly = user?.hub === 'wc';
   const isGuest = user?.role === 'guest';
   const guestType = isGuest ? ((user?.church_role === 'sac' ? 'sac' : 'yc') as 'yc' | 'sac') : null;
 
   return (
-    <AuthContext.Provider value={{ user, loading, selectedHub, isWcReadOnly, isGuest, guestType, login, loginAsGuest, chooseHub, logout, clearResetFlag, markSecurityQuestionsSetup }}>
+    <AuthContext.Provider value={{ user, loading, selectedHub, isWcReadOnly, isGuest, guestType, login, loginAsGuest, chooseHub, logout, clearResetFlag, markSecurityQuestionsSetup, setEmailNotifications }}>
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  return useContext(AuthContext);
 }

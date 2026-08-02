@@ -8,7 +8,8 @@ import { toast } from '../lib/toast';
 
 const EMPTY: Partial<BishopricMeeting> = {
   date: '', spiritual_thought: '', opening_prayer: '', closing_prayer: '',
-  handbook_training: '', handbook_section: '', minutes: '', no_meeting: 0, reason_not_meeting: '',
+  handbook_training: '', handbook_section: '', minutes: '', notes: '', updates_announcements: '',
+  no_meeting: 0, reason_not_meeting: '',
 };
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -42,6 +43,8 @@ export default function BishopricMeetings() {
   const [repeatCount, setRepeatCount] = useState(12);
   const [saving, setSaving] = useState(false);
   const [viewDate, setViewDate] = useState(() => new Date());
+  const [monthPicker, setMonthPicker] = useState(false);
+  const [pickerYearView, setPickerYearView] = useState(() => new Date().getFullYear());
 
   const viewYear = viewDate.getFullYear();
   const viewMonth = viewDate.getMonth();
@@ -54,6 +57,11 @@ export default function BishopricMeetings() {
   const goPrev = () => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
   const goNext = () => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
   const goToday = () => setViewDate(new Date());
+
+  const jumpToMonth = (year: number, month: number) => {
+    setViewDate(new Date(year, month, 1));
+    setMonthPicker(false);
+  };
 
   const handleSave = async () => {
     if (!editing) return;
@@ -78,6 +86,7 @@ export default function BishopricMeetings() {
       } else {
         await create(data as Record<string, unknown>);
       }
+      if (editing.date) setViewDate(new Date(editing.date.slice(0, 10) + 'T12:00:00'));
       setEditing(null);
       setRepeatEnabled(false);
       setRepeatWeeks(1);
@@ -138,7 +147,30 @@ export default function BishopricMeetings() {
         <button onClick={goToday} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50">Today</button>
         <button onClick={goPrev} className="border border-gray-300 text-gray-700 px-2 py-1.5 rounded-md text-sm hover:bg-gray-50">‹</button>
         <button onClick={goNext} className="border border-gray-300 text-gray-700 px-2 py-1.5 rounded-md text-sm hover:bg-gray-50">›</button>
-        <span className="font-semibold text-gray-800 text-sm">{MONTH_NAMES[viewMonth]} {viewYear}</span>
+        <div className="relative">
+          <button onClick={() => { setPickerYearView(viewYear); setMonthPicker(!monthPicker); }}
+            className="font-semibold text-gray-800 text-sm px-2 py-1.5 hover:bg-gray-100 rounded-md">
+            {MONTH_NAMES[viewMonth]} {viewYear}
+          </button>
+          {monthPicker && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 w-64">
+              <div className="flex items-center justify-between mb-2">
+                <button onClick={() => setPickerYearView(y => y - 1)} className="text-gray-500 hover:text-gray-800 px-1">‹</button>
+                <span className="font-semibold text-gray-800">{pickerYearView}</span>
+                <button onClick={() => setPickerYearView(y => y + 1)} className="text-gray-500 hover:text-gray-800 px-1">›</button>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {MONTH_NAMES.map((m, i) => (
+                  <button key={m} onClick={() => jumpToMonth(pickerYearView, i)}
+                    className={`px-2 py-1.5 rounded text-sm hover:bg-blue-50 hover:text-blue-700 ${
+                      pickerYearView === viewYear && i === viewMonth
+                        ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-700'
+                    }`}>{m.slice(0, 3)}</button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
@@ -217,6 +249,8 @@ export default function BishopricMeetings() {
                 <Input label="Handbook Training" value={editing.handbook_training || ''} onChange={v => setEditing({ ...editing, handbook_training: v })} />
                 <Input label="Handbook Section" value={editing.handbook_section || ''} onChange={v => setEditing({ ...editing, handbook_section: v })} />
                 <Textarea label="Minutes" value={editing.minutes || ''} onChange={v => setEditing({ ...editing, minutes: v })} rows={6} />
+                <Textarea label="Updates / Announcements" value={editing.updates_announcements || ''} onChange={v => setEditing({ ...editing, updates_announcements: v })} rows={4} />
+                <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} rows={4} />
               </>
             )}
             <div className="flex justify-end gap-2 pt-2">

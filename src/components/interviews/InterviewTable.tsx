@@ -7,6 +7,18 @@ import {
   recommendRowClass, formatRecommendDate, isPast,
 } from './shared';
 
+function Th({ col, label, sortKey, sortAsc, onSort }: {
+  col: SortKey; label: string; sortKey: SortKey; sortAsc: boolean; onSort: (col: SortKey) => void;
+}) {
+  return (
+    <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap"
+      onClick={() => onSort(col)}>
+      {label}
+      <span className="ml-1 text-gray-400">{sortKey === col ? (sortAsc ? '↑' : '↓') : '↕'}</span>
+    </th>
+  );
+}
+
 function SetupAssignedCell({ row, setupOptions, onAssign }: {
   row: InterviewType;
   setupOptions: string[];
@@ -26,7 +38,7 @@ function SetupAssignedCell({ row, setupOptions, onAssign }: {
   );
 }
 
-export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRecExpires = true, showCalling = false, showLastInterview = true, nextInterviewLabel = 'Next Interview', rowMetaById, selected, onToggleSelect, setupOptions, onQuickAssignSetup }: {
+export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRecExpires = true, showCalling = false, showLastInterview = true, nextInterviewLabel = 'Next Interview', rowMetaById, selected, onToggleSelect, setupOptions, onQuickAssignSetup, onToggleFlag }: {
   rows: InterviewType[];
   onEdit: (r: InterviewType) => void;
   onDelete: (id: number) => void;
@@ -40,6 +52,7 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
   onToggleSelect: (id: number) => void;
   setupOptions: string[];
   onQuickAssignSetup: (id: number, name: string) => void;
+  onToggleFlag: (id: number) => void;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('member');
   const [sortAsc, setSortAsc] = useState(true);
@@ -73,14 +86,6 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
     return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
   }), [rows, sortKey, sortAsc, rowMetaById]);
 
-  const Th = ({ col, label }: { col: SortKey; label: string }) => (
-    <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap"
-      onClick={() => handleSort(col)}>
-      {label}
-      <span className="ml-1 text-gray-400">{sortKey === col ? (sortAsc ? '↑' : '↓') : '↕'}</span>
-    </th>
-  );
-
   const rowTint = (r: InterviewType): { overdueInterview: boolean; rowColor: string } => {
     const meta = rowMetaById.get(r.id);
     const rowColor = showRecExpires ? recommendRowClass(r.date_recommend_expires) : '';
@@ -95,16 +100,17 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
               <th className="px-3 py-2 w-8"></th>
-              <Th col="member" label="Member" />
-              {showAge && <Th col="age" label="Age" />}
+              <th className="px-1 py-2 w-6" title="Flag for bishopric meeting"></th>
+              <Th col="member" label="Member" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+              {showAge && <Th col="age" label="Age" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />}
               {showCalling && <th className="text-left px-3 py-2 font-medium text-gray-600 whitespace-nowrap">Calling</th>}
-              <Th col="status" label="Status" />
-              <Th col="assigned_to" label="Interviewer" />
-              <Th col="setup_status" label="Setup" />
-              {showRecExpires && <Th col="date_recommend_expires" label="Rec. Expires" />}
-              {showLastInterview && <Th col="last_interview_datetime" label="Last Interview" />}
-              <Th col="next_interview_date" label={nextInterviewLabel} />
-              <Th col="comments" label="Comments" />
+              <Th col="status" label="Status" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+              <Th col="assigned_to" label="Interviewer" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+              <Th col="setup_status" label="Setup" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+              {showRecExpires && <Th col="date_recommend_expires" label="Rec. Expires" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />}
+              {showLastInterview && <Th col="last_interview_datetime" label="Last Interview" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />}
+              <Th col="next_interview_date" label={nextInterviewLabel} sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+              <Th col="comments" label="Comments" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -118,7 +124,16 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
                   <input type="checkbox" checked={selected.has(r.id)} onChange={() => onToggleSelect(r.id)}
                     className="rounded border-gray-300 text-blue-600" />
                 </td>
-                <td className="px-3 py-2 font-medium text-gray-900">{meta?.displayName ?? r.member}</td>
+                <td className="px-1 py-2" onClick={e => e.stopPropagation()}>
+                  <button type="button" onClick={() => onToggleFlag(r.id)}
+                    title={r.flagged_for_meeting ? 'Unflag from bishopric meeting' : 'Flag for bishopric meeting'}
+                    className={`text-sm ${r.flagged_for_meeting ? 'text-amber-500' : 'text-gray-300 hover:text-gray-400'}`}>
+                    🚩
+                  </button>
+                </td>
+                <td className="px-3 py-2 font-medium text-gray-900">
+                  {meta?.displayName ?? r.member}
+                </td>
                 {showAge && <td className="px-3 py-2 text-gray-600 text-center">{meta?.age ?? '—'}</td>}
                 {showCalling && <td className="px-3 py-2 text-gray-600">{meta?.calling ?? ''}</td>}
                 <td className="px-3 py-2">
@@ -176,8 +191,15 @@ export default function InterviewTable({ rows, onEdit, onDelete, showAge, showRe
                     <p className="font-medium text-gray-900 truncate">
                       {meta?.displayName ?? r.member}{showAge && meta?.age !== undefined && <span className="text-gray-500 font-normal"> (age {meta.age})</span>}
                     </p>
-                    <button onClick={e => { e.stopPropagation(); onDelete(r.id); }}
-                      className="text-red-400 hover:text-red-600 text-xs shrink-0">Del</button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={e => { e.stopPropagation(); onToggleFlag(r.id); }}
+                        title={r.flagged_for_meeting ? 'Unflag from bishopric meeting' : 'Flag for bishopric meeting'}
+                        className={`text-sm ${r.flagged_for_meeting ? 'text-amber-500' : 'text-gray-300 hover:text-gray-400'}`}>
+                        🚩
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); onDelete(r.id); }}
+                        className="text-red-400 hover:text-red-600 text-xs">Del</button>
+                    </div>
                   </div>
                   {showCalling && meta?.calling && <p className="text-xs text-gray-500 mt-0.5">{meta.calling}</p>}
                   <div className="mt-1 flex flex-wrap gap-1.5 items-center">

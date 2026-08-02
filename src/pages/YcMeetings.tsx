@@ -17,6 +17,35 @@ function formatDate(iso: string): string {
 
 const EMPTY: Partial<YcMeeting> = { date: '', agenda: '', notes: '' };
 
+function MeetingList({ meetings, readOnly, onEdit, onDelete, confirm }: {
+  meetings: YcMeeting[];
+  readOnly?: boolean;
+  onEdit: (m: YcMeeting) => void;
+  onDelete: (id: number) => void;
+  confirm: (message: string) => Promise<boolean>;
+}) {
+  return (
+    <div className="space-y-2">
+      {meetings.length === 0 && <p className="text-sm text-gray-400 text-center py-4">None</p>}
+      {meetings.map(m => (
+        <div key={m.id}
+          className={`bg-white rounded-lg border border-gray-200 p-3 ${!readOnly ? 'cursor-pointer hover:shadow-sm' : ''}`}
+          onClick={!readOnly ? () => onEdit(m) : undefined}>
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-gray-900">{formatDate(m.date)}</p>
+            {!readOnly && (
+              <button onClick={async e => { e.stopPropagation(); if (await confirm('Delete this meeting?')) onDelete(m.id); }}
+                className="text-red-400 hover:text-red-600 text-xs">Del</button>
+            )}
+          </div>
+          {m.agenda && <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{m.agenda}</p>}
+          {m.notes && <p className="text-sm text-gray-400 mt-1 whitespace-pre-wrap">{m.notes}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function YcMeetings() {
   const { isGuest, isWcReadOnly } = useAuth();
   const canEdit = !isGuest && !isWcReadOnly;
@@ -37,27 +66,6 @@ export default function YcMeetings() {
     setEditing(null);
   };
 
-  const MeetingList = ({ meetings, readOnly }: { meetings: YcMeeting[]; readOnly?: boolean }) => (
-    <div className="space-y-2">
-      {meetings.length === 0 && <p className="text-sm text-gray-400 text-center py-4">None</p>}
-      {meetings.map(m => (
-        <div key={m.id}
-          className={`bg-white rounded-lg border border-gray-200 p-3 ${!readOnly ? 'cursor-pointer hover:shadow-sm' : ''}`}
-          onClick={!readOnly ? () => setEditing(m) : undefined}>
-          <div className="flex items-center justify-between">
-            <p className="font-medium text-gray-900">{formatDate(m.date)}</p>
-            {!readOnly && (
-              <button onClick={async e => { e.stopPropagation(); if (await confirm('Delete this meeting?')) remove(m.id); }}
-                className="text-red-400 hover:text-red-600 text-xs">Del</button>
-            )}
-          </div>
-          {m.agenda && <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{m.agenda}</p>}
-          {m.notes && <p className="text-sm text-gray-400 mt-1 whitespace-pre-wrap">{m.notes}</p>}
-        </div>
-      ))}
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -75,14 +83,14 @@ export default function YcMeetings() {
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading…</p> : (
         <>
-          <MeetingList meetings={upcoming} readOnly={!canEdit} />
+          <MeetingList meetings={upcoming} readOnly={!canEdit} onEdit={setEditing} onDelete={remove} confirm={confirm} />
 
           <div>
             <button onClick={() => setShowPast(p => !p)}
               className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 mb-2">
               {showPast ? '▼' : '▶'} Past meetings ({past.length})
             </button>
-            {showPast && <MeetingList meetings={past} readOnly />}
+            {showPast && <MeetingList meetings={past} readOnly onEdit={setEditing} onDelete={remove} confirm={confirm} />}
           </div>
         </>
       )}

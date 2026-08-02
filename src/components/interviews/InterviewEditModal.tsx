@@ -1,9 +1,9 @@
 import Modal from '../Modal';
 import StatusBadge from '../StatusBadge';
-import { Input, Select, Textarea } from '../FormFields';
+import { Input, Select, Textarea, Checkbox } from '../FormFields';
 import type { InterviewPipeline as InterviewType, WardMember, CallingPipeline } from '../../lib/api';
 import { INTERVIEW_STATUSES, SETUP_STATUSES, SETTING_APART_STATUSES } from '../../lib/constants';
-import { YOUTH_TYPES, NO_REC_TYPES, YOUTH_STATE_COLORS, computeYouthAge, computeYouthState } from './shared';
+import { YOUTH_TYPES, TEMPLE_TYPES, NO_REC_TYPES, YOUTH_STATE_COLORS, computeYouthAge, computeYouthState } from './shared';
 import { legalName } from '../../lib/displayName';
 
 function AssignedToField({ label, value, onChange, options, datalistId, help }: {
@@ -60,6 +60,7 @@ export default function InterviewEditModal({
   const editingYouthState = editingIsManagedYouth ? computeYouthState(editing) : null;
   const showLinkPicker = !editing.ward_member_id && YOUTH_TYPES.has(editing.type_of_interview || '');
   const hideRecExpires = NO_REC_TYPES.has(editing.type_of_interview || '');
+  const isTempleType = TEMPLE_TYPES.has(editing.type_of_interview || '');
 
   return (
     <Modal open={!!editing} onClose={onClose} title={editing.id ? 'Edit Interview' : 'New Interview'}>
@@ -178,12 +179,21 @@ export default function InterviewEditModal({
         {!hideRecExpires && (
           <Input label="Recommend Expires" value={(editing.date_recommend_expires || '').slice(0, 7)} onChange={v => onChange({ date_recommend_expires: v })} type="month" />
         )}
+        {isTempleType && (
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={!!editing.with_stake} onChange={e => onChange({ with_stake: e.target.checked ? 1 : 0 })}
+              className="rounded border-gray-300 text-blue-600" />
+            <span className="text-sm font-medium text-gray-700">With the stake</span>
+          </label>
+        )}
         {!isSettingApart && (
           <Input label="Last Interview Date" value={(editing.last_interview_datetime || '').slice(0, 10)} onChange={v => onChange({ last_interview_datetime: v })} type="date" />
         )}
         <Input label={isSettingApart ? 'Scheduled Date' : 'Next Interview Date'} value={(editing.next_interview_date || '').slice(0, 10)} onChange={v => onChange({ next_interview_date: v })} type="date" />
         <Input label="Comments" value={editing.comments || ''} onChange={v => onChange({ comments: v })} />
         <Textarea label="Notes" value={editing.notes || ''} onChange={v => onChange({ notes: v })} />
+        <Checkbox label="Flag for bishopric meeting" checked={!!editing.flagged_for_meeting}
+          onChange={v => onChange({ flagged_for_meeting: v ? 1 : 0 })} />
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
           <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">Save</button>

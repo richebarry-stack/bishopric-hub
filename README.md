@@ -77,21 +77,11 @@ Edit `wrangler.jsonc` and fill in your `database_name` and `database_id`.
 
 ### 4. Run migrations
 
-Apply all migration files in order:
-
 ```bash
-for f in migrations/*.sql; do
-  npx wrangler d1 execute bishopric-hub-db --remote --file="$f"
-done
+npm run migrate
 ```
 
-Or run them one at a time:
-
-```bash
-npx wrangler d1 execute bishopric-hub-db --remote --file=migrations/0001_schema.sql
-npx wrangler d1 execute bishopric-hub-db --remote --file=migrations/0002_sessions.sql
-# ... continue through all migration files in order
-```
+This runs `wrangler d1 migrations apply bishopric-hub-db --remote`, which applies every committed migration in `migrations/` in order and records each one in D1's own `d1_migrations` tracking table. Always use this (not `wrangler d1 execute --file=`) for schema migrations, so the tracking table can't drift from what's actually applied. It's safe to re-run — it only applies files that haven't been recorded yet.
 
 ### 5. Create the first admin user
 
@@ -172,6 +162,35 @@ npm run build
 npx wrangler pages deploy dist --branch main
 ```
 
+### The action-item mailer (separate Worker)
+
+`workers/mailer/` is a second, independent Worker — not part of the Pages app — that
+emails leaders when they're assigned an action item and sends a weekly digest on a
+cron trigger. It has its own `wrangler.jsonc` (gitignored, same reasons as the root
+one) and needs its own one-time setup:
+
+```bash
+cp workers/mailer/wrangler.jsonc.example workers/mailer/wrangler.jsonc
+```
+
+Fill in your `database_id` (same D1 database as the main app) and a `FROM_ADDRESS` on
+a domain with Cloudflare Email Routing enabled. Sending to arbitrary recipients
+requires the Workers Paid plan; on the Free plan, only recipients added as **verified
+destination addresses** on the account can receive mail (`wrangler email routing
+addresses create <email>`, then the recipient clicks the verification link Cloudflare
+sends them) — see [Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/).
+
+Deploy with `npm run deploy:mailer`. GitHub Actions deploys it automatically alongside
+the Pages app, generating `workers/mailer/wrangler.jsonc` from the committed `.example`
+on every run (it's gitignored locally, same policy as the root config) using one more
+repo secret: add `CLOUDFLARE_D1_DATABASE_ID` (the same `database_id` from your local
+`wrangler.jsonc`) alongside `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`.
+
+**First deploy is always in `seed` mode** (the `MAILER_MODE` var) — it computes and
+records what's already assigned to everyone without sending anything, so the entire
+existing backlog doesn't email at once. Flip it to `live` once you've checked
+`action_item_notifications` looks right, then redeploy.
+
 ### With Claude Code assistance
 
 This project was built and is maintained with [Claude Code](https://claude.ai/code). To continue development with AI assistance:
@@ -194,17 +213,25 @@ Claude can read and edit source files, run migrations against your remote D1 dat
 
 ## Database Migrations
 
-Migrations live in `migrations/` and are numbered sequentially (`0001_schema.sql`, `0002_sessions.sql`, …). Run them in order. There is no auto-migration runner — apply each file explicitly:
+Migrations live in `migrations/` and are numbered sequentially (`0001_schema.sql`, `0002_sessions.sql`, …). Apply pending ones with:
 
 ```bash
-npx wrangler d1 execute bishopric-hub-db --remote --file=migrations/XXXX_name.sql
+npm run migrate
 ```
+
+Wrangler tracks which migrations have already run in D1's own `d1_migrations` table, so this command is always safe to re-run — it only applies files that haven't been recorded yet. Run it before `npm run deploy` whenever a new migration file was added, not as part of deploy itself (a remote schema change shouldn't run unattended as a deploy side effect).
 
 ### Schema vs. data migrations
 
-**Schema migrations** (`*_schema.sql`, `*_add_*.sql`, etc.) define tables and columns and are committed to the repo.
+**Schema migrations** live directly in `migrations/` and are committed to the repo — this is exactly the set of files `npm run migrate` will ever see.
 
-**Data import migrations** (files ending in `_import.sql` or `_seed.sql`) contain ward-specific data — member names, events, callings — and are **gitignored**. These are generated locally (or by Claude) when importing from external sources and are not shared. Run them against your own database but do not commit them.
+**Data import/seed migrations** (ward-specific data — member names, events, callings) live in `migrations/data/` instead, are **gitignored**, and are never tracked by `d1_migrations`. Apply them manually, after any schema migrations they depend on:
+
+```bash
+npx wrangler d1 execute bishopric-hub-db --remote --file=migrations/data/XXXX_name.sql
+```
+
+These are generated locally (or by Claude) when importing from external sources and are not shared. Run them against your own database but do not commit them.
 
 ---
 
@@ -214,7 +241,7 @@ npx wrangler d1 execute bishopric-hub-db --remote --file=migrations/XXXX_name.sq
 - Cloudflare D1 encrypts data at rest and in transit (TLS) by default
 - Sessions use HTTP-only cookies with a 30-day expiry
 - `wrangler.jsonc` is gitignored — it contains your database ID and must not be committed
-- Data import/seed migrations (`*_import.sql`, `*_seed.sql`) are gitignored — they may contain member names and ward-specific event details
+- Data import/seed migrations (`migrations/data/*.sql`) are gitignored — they may contain member names and ward-specific event details
 - The `scripts/` directory is gitignored for the same reason
 - `.env` and `.env.*` files are gitignored — never commit API keys or secrets
 - Data exports (`*.csv`, `exports/`, `data-export/`) are gitignored — CSV/JSON dumps may contain member data
