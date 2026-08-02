@@ -200,11 +200,20 @@ async function run(env: Env): Promise<void> {
   const live = env.MAILER_MODE === 'live';
   const [tz, weeklySchedule] = await Promise.all([getTimeZone(db), getWeeklySchedule(db)]);
 
-  const [recipients, sources, nameIndex] = await Promise.all([
+  const [recipients, sources, nameIndex, allNotified] = await Promise.all([
     getRecipients(db),
     getSources(db),
     getWardMemberNameIndex(db),
+    db.prepare('SELECT user_id, item_id FROM action_item_notifications').all<{ user_id: number; item_id: string }>(),
   ]);
+  // One query for every recipient's ledger, grouped in memory, instead of one
+  // round trip per recipient — keeps this well under the per-invocation CPU budget.
+  const notifiedByUser = new Map<number, string[]>();
+  for (const row of allNotified.results) {
+    const list = notifiedByUser.get(row.user_id) || [];
+    list.push(row.item_id);
+    notifiedByUser.set(row.user_id, list);
+  }
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const currentMonthAbbr = new Date().toLocaleDateString('en-US', { month: 'short' }).toLowerCase();
@@ -220,10 +229,8 @@ async function run(env: Env): Promise<void> {
     const items = computeActionItems(user.name, permissions, sources, nameIndex, todayStr, currentMonthAbbr);
     perUserItems.set(user.id, items);
 
-    const { results: existing } = await db.prepare(
-      'SELECT item_id FROM action_item_notifications WHERE user_id = ?'
-    ).bind(user.id).all<{ item_id: string }>();
-    const alreadyNotified = new Set(existing.map(r => r.item_id));
+    const existingIds = notifiedByUser.get(user.id) || [];
+    const alreadyNotified = new Set(existingIds);
     const currentIds = new Set(items.map(i => i.id));
 
     const freshItems = items.filter(i => !alreadyNotified.has(i.id));
@@ -248,7 +255,7 @@ async function run(env: Env): Promise<void> {
     }
 
     // Prune ledger rows for items no longer open, so a re-assigned item can notify again.
-    const staleIds = existing.map(r => r.item_id).filter(id => !currentIds.has(id));
+    const staleIds = existingIds.filter(id => !currentIds.has(id));
     if (staleIds.length > 0) {
       await db.batch(staleIds.map(id =>
         db.prepare('DELETE FROM action_item_notifications WHERE user_id = ? AND item_id = ?').bind(user.id, id)
