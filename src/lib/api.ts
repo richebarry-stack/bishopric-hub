@@ -121,6 +121,12 @@ export const api = {
   automationStatus: {
     get: () => request<{ last_run: string | null; results: Record<string, { ok: boolean; error?: string; [key: string]: unknown }> }>('/automation-status'),
   },
+  lcrSyncRuns: {
+    clearArchived: (keep: number) =>
+      request<{ deleted: number; kept: number }>('/lcr-sync-runs/clear-archived', {
+        method: 'POST', body: JSON.stringify({ keep }),
+      }),
+  },
   presence: {
     heartbeat: (path: string, editing: boolean) =>
       request<{ others: { user_id: number; user_name: string; path: string; editing: number }[] }>('/presence', {
@@ -556,6 +562,7 @@ export interface LcrSyncRun {
   roster_created: number | null;
   roster_filled: number | null;
   roster_missing: string | null; // JSON-stringified string[]
+  users_unmatched: string | null; // JSON-stringified string[] — hub accounts not found in the LCR roster
   recommend_updated: number | null;
   recommend_unmatched: string | null; // JSON-stringified string[]
   stake_flagged: number | null;

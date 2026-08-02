@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type LcrSyncRun } from '../lib/api';
+import { useAuth } from '../lib/auth';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const JOB_LABELS: Record<string, string> = {
   syncConduct: 'Sacrament conducting sync',
@@ -48,11 +50,66 @@ function NameList({ label, names }: { label: string; names: string[] }) {
   );
 }
 
+// Runs shown expanded on load — the rest are archived behind a toggle.
+const RECENT_RUNS = 5;
+
+function SyncRun({ run }: { run: LcrSyncRun }) {
+  const unmatchedUsers = parseNames(run.users_unmatched);
+  return (
+    <div className="py-3 text-sm">
+      <div className="flex items-center justify-between">
+        <span className="text-gray-700 font-medium">{formatWhen(run.ran_at)}</span>
+        {run.success ? (
+          <span className="text-green-600 text-xs">✓ OK</span>
+        ) : (
+          <span className="text-red-600 text-xs" title={run.error || undefined}>✗ Failed{run.error ? `: ${run.error}` : ''}</span>
+        )}
+      </div>
+      {!!run.success && (
+        <div className="mt-1 text-xs text-gray-500 space-y-0.5">
+          <p>Roster: {run.roster_created ?? 0} created, {run.roster_filled ?? 0} filled in{parseNames(run.roster_missing).length > 0 ? `, ${parseNames(run.roster_missing).length} missing from LCR` : ''}</p>
+          <NameList label="Missing from LCR roster" names={parseNames(run.roster_missing)} />
+          {unmatchedUsers.length > 0 && (
+            <p className="text-red-600">
+              <span className="font-medium">⚠ {unmatchedUsers.length} hub account name{unmatchedUsers.length === 1 ? '' : 's'} not found in the LCR roster</span> — assignments typed from LCR names won&apos;t reach them: {unmatchedUsers.join(', ')}
+            </p>
+          )}
+          <p>Recommends: {run.recommend_updated ?? 0} changed{parseNames(run.recommend_unmatched).length > 0 ? `, ${parseNames(run.recommend_unmatched).length} unmatched` : ''}</p>
+          <NameList label="Unmatched recommends" names={parseNames(run.recommend_unmatched)} />
+          <p>Stake activations: {run.stake_flagged ?? 0} flagged, {run.stake_cleared ?? 0} cleared{parseNames(run.stake_unmatched).length > 0 ? `, ${parseNames(run.stake_unmatched).length} unmatched` : ''}</p>
+          <NameList label="Unmatched stake activations" names={parseNames(run.stake_unmatched)} />
+          <p>Callings: {run.callings_created ?? 0} created, {run.callings_updated ?? 0} updated, {run.callings_released ?? 0} released{parseNames(run.callings_unmatched).length > 0 ? `, ${parseNames(run.callings_unmatched).length} unmatched` : ''}</p>
+          <NameList label="Callings changed" names={parseChanged(run.callings_changed, 'calling')} />
+          <NameList label="Unmatched callings" names={parseNames(run.callings_unmatched)} />
+          <p>Missionary status: {run.missionary_created ?? 0} created, {run.missionary_updated ?? 0} updated{parseNames(run.missionary_unmatched).length > 0 ? `, ${parseNames(run.missionary_unmatched).length} unmatched` : ''}</p>
+          <NameList label="Missionary status changed" names={parseChanged(run.missionary_changed, 'section')} />
+          <NameList label="Unmatched missionaries" names={parseNames(run.missionary_unmatched)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LcrSyncHistory() {
+  const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const { user } = useAuth();
+  const [showArchived, setShowArchived] = useState(false);
   const { data: runs, isLoading } = useQuery({
     queryKey: ['lcr-sync-runs'],
     queryFn: () => api.list<LcrSyncRun>('lcr-sync-runs'),
   });
+
+  const clearArchived = useMutation({
+    mutationFn: () => api.lcrSyncRuns.clearArchived(RECENT_RUNS),
+    onSuccess: () => {
+      setShowArchived(false);
+      queryClient.invalidateQueries({ queryKey: ['lcr-sync-runs'] });
+    },
+  });
+
+  const recent = (runs || []).slice(0, RECENT_RUNS);
+  const archived = (runs || []).slice(RECENT_RUNS);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
@@ -62,39 +119,40 @@ function LcrSyncHistory() {
       </div>
       {isLoading ? (
         <p className="text-sm text-gray-400">Loading…</p>
-      ) : !runs || runs.length === 0 ? (
+      ) : recent.length === 0 ? (
         <p className="text-sm text-gray-400 py-2">No sync runs yet.</p>
       ) : (
-        <div className="divide-y divide-gray-100">
-          {runs.slice(0, 15).map(run => (
-            <div key={run.id} className="py-3 text-sm">
+        <>
+          <div className="divide-y divide-gray-100">
+            {recent.map(run => <SyncRun key={run.id} run={run} />)}
+          </div>
+          {archived.length > 0 && (
+            <div className="pt-1 border-t border-gray-100 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-gray-700 font-medium">{formatWhen(run.ran_at)}</span>
-                {run.success ? (
-                  <span className="text-green-600 text-xs">✓ OK</span>
-                ) : (
-                  <span className="text-red-600 text-xs" title={run.error || undefined}>✗ Failed{run.error ? `: ${run.error}` : ''}</span>
+                <button type="button" onClick={() => setShowArchived(v => !v)}
+                  className="text-xs text-blue-600 hover:text-blue-700">
+                  {showArchived ? 'Hide' : 'Show'} {archived.length} older run{archived.length === 1 ? '' : 's'}
+                </button>
+                {user?.role === 'admin' && (
+                  <button type="button" disabled={clearArchived.isPending}
+                    onClick={async () => {
+                      if (await confirm({ message: `Permanently delete ${archived.length} archived sync run${archived.length === 1 ? '' : 's'}? The ${RECENT_RUNS} most recent are kept.` })) {
+                        clearArchived.mutate();
+                      }
+                    }}
+                    className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50">
+                    Clear older runs
+                  </button>
                 )}
               </div>
-              {!!run.success && (
-                <div className="mt-1 text-xs text-gray-500 space-y-0.5">
-                  <p>Roster: {run.roster_created ?? 0} created, {run.roster_filled ?? 0} filled in{parseNames(run.roster_missing).length > 0 ? `, ${parseNames(run.roster_missing).length} missing from LCR` : ''}</p>
-                  <NameList label="Missing from LCR roster" names={parseNames(run.roster_missing)} />
-                  <p>Recommends: {run.recommend_updated ?? 0} changed{parseNames(run.recommend_unmatched).length > 0 ? `, ${parseNames(run.recommend_unmatched).length} unmatched` : ''}</p>
-                  <NameList label="Unmatched recommends" names={parseNames(run.recommend_unmatched)} />
-                  <p>Stake activations: {run.stake_flagged ?? 0} flagged, {run.stake_cleared ?? 0} cleared{parseNames(run.stake_unmatched).length > 0 ? `, ${parseNames(run.stake_unmatched).length} unmatched` : ''}</p>
-                  <NameList label="Unmatched stake activations" names={parseNames(run.stake_unmatched)} />
-                  <p>Callings: {run.callings_created ?? 0} created, {run.callings_updated ?? 0} updated, {run.callings_released ?? 0} released{parseNames(run.callings_unmatched).length > 0 ? `, ${parseNames(run.callings_unmatched).length} unmatched` : ''}</p>
-                  <NameList label="Callings changed" names={parseChanged(run.callings_changed, 'calling')} />
-                  <NameList label="Unmatched callings" names={parseNames(run.callings_unmatched)} />
-                  <p>Missionary status: {run.missionary_created ?? 0} created, {run.missionary_updated ?? 0} updated{parseNames(run.missionary_unmatched).length > 0 ? `, ${parseNames(run.missionary_unmatched).length} unmatched` : ''}</p>
-                  <NameList label="Missionary status changed" names={parseChanged(run.missionary_changed, 'section')} />
-                  <NameList label="Unmatched missionaries" names={parseNames(run.missionary_unmatched)} />
+              {showArchived && (
+                <div className="divide-y divide-gray-100">
+                  {archived.map(run => <SyncRun key={run.id} run={run} />)}
                 </div>
               )}
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -1257,6 +1257,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
 
+  // Clears archived LCR sync runs (admin only), keeping the most recent `keep` runs
+  // that the Automation page shows by default. Must be matched before the generic
+  // TABLES dispatch below, or "clear-archived" would be parsed as a record id.
+  if (routeParts[0] === 'lcr-sync-runs' && routeParts[1] === 'clear-archived' && method === 'POST') {
+    if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+    const body = await request.json().catch(() => ({})) as { keep?: number };
+    const keep = Math.max(0, Math.min(50, Number.isFinite(body.keep) ? Number(body.keep) : 5));
+    const result = await db.prepare(
+      'DELETE FROM lcr_sync_runs WHERE id NOT IN (SELECT id FROM lcr_sync_runs ORDER BY id DESC LIMIT ?)'
+    ).bind(keep).run();
+    return json({ ok: true, deleted: result.meta.changes ?? 0, kept: keep });
+  }
+
   // Bulk ward-roster import from a CSV upload (admin only). Must be matched before the
   // generic TABLES dispatch below, or "import" would be parsed as a record id.
   if (routeParts[0] === 'ward-members' && routeParts[1] === 'import' && method === 'POST') {
@@ -1367,7 +1380,24 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     ];
     if (flagStmts.length > 0) await db.batch(flagStmts);
 
-    return json({ ok: true, created, filledDetails, missingFromRoster });
+    // Everything that routes work to a person — interview setup, calling assignments,
+    // My Actions — matches a hub account's name against free-text names that ultimately
+    // come from LCR. An account name that doesn't correspond to anyone in the LCR export
+    // (a typo, a maiden name, a move-out) silently matches nothing, so report it rather
+    // than restricting anything. High councilors are stake, not ward, so they're never
+    // expected in this ward's roster.
+    const hubUsers = (await db.prepare(
+      "SELECT name, church_role FROM users WHERE hub IN ('bh', 'both') AND role <> 'guest' AND COALESCE(church_role, '') <> 'High Councilor'"
+    ).all<{ name: string; church_role: string | null }>()).results;
+    const lcrRoster: RosterMember[] = rows.map((r, i) => {
+      const { last, first } = splitLastFirstCased(toLastFirst(r.name));
+      return { id: i + 1, last_name: last, first_name: first };
+    });
+    const unmatchedHubUsers = hubUsers
+      .filter(u => u.name && !matchRosterMember(u.name, lcrRoster))
+      .map(u => `${u.name}${u.church_role ? ` (${u.church_role})` : ''}`);
+
+    return json({ ok: true, created, filledDetails, missingFromRoster, unmatchedHubUsers });
   }
 
   // Syncs the "with the stake" flag on temple-recommend interviews from LCR's
