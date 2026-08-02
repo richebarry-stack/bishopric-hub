@@ -258,12 +258,17 @@ async function run(env: Env): Promise<void> {
 
   if (newEmailsSent > 0 || newItemErrors.length > 0) {
     await recordRun(db, 'new-items', newEmailsSent, newItemsNotified, newItemErrors);
-  } else if (!live && newItemsNotified > 0) {
-    // Seed mode never emails, so without this the Automation page can't tell "the
-    // cron hasn't run yet" from "it's running and correctly sending nothing." Record
-    // the initial backlog once, so switching to live has a visible baseline to compare.
-    const seeded = await db.prepare("SELECT id FROM mailer_runs WHERE kind = 'seed' LIMIT 1").first();
-    if (!seeded) await recordRun(db, 'seed', 0, newItemsNotified, []);
+  } else if (!live) {
+    // Seed mode never emails, so without this the Automation page can't tell "the cron
+    // hasn't run yet" from "it's running and correctly sending nothing." Record the
+    // current backlog size once — checked against total open items, not just this run's
+    // fresh ones, so it still fires on the first run after this code ships even if an
+    // earlier (pre-this-code) run already seeded the ledger with nothing left "fresh."
+    const totalOpenItems = [...perUserItems.values()].reduce((n, items) => n + items.length, 0);
+    if (totalOpenItems > 0) {
+      const seeded = await db.prepare("SELECT id FROM mailer_runs WHERE kind = 'seed' LIMIT 1").first();
+      if (!seeded) await recordRun(db, 'seed', 0, totalOpenItems, []);
+    }
   }
 
   // Weekly digest — everything currently open, sent once per the admin-configured
