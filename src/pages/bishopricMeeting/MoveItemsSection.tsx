@@ -27,11 +27,18 @@ export default function MoveItemsSection({ kind, date, title, meetingDates, onAd
   date: string;
   title: string;
   meetingDates: { date: string }[];
-  onAddToSacramentAgenda?: (text: string) => void;
+  onAddToSacramentAgenda?: (text: string) => void | Promise<void>;
 }) {
   const { rows: allItems, create, update, remove } = useTable<BishopricMoveItem>('bishopric-move-items');
   const confirm = useConfirm();
   const [newItem, setNewItem] = useState('');
+  const [addedId, setAddedId] = useState<number | null>(null);
+
+  const handleAddToAgenda = async (item: BishopricMoveItem) => {
+    await onAddToSacramentAgenda?.(item.item);
+    setAddedId(item.id);
+    setTimeout(() => setAddedId(id => (id === item.id ? null : id)), 2500);
+  };
 
   const items = allItems
     .filter(i => i.meeting_date === date && i.kind === kind)
@@ -108,8 +115,12 @@ export default function MoveItemsSection({ kind, date, title, meetingDates, onAd
               <ItemText item={item} onSave={v => saveText(item, v)} />
               <div className="flex items-center gap-1 shrink-0">
                 {onAddToSacramentAgenda && (
-                  <button onClick={() => onAddToSacramentAgenda(item.item)}
-                    className="text-blue-500 hover:text-blue-700 text-xs px-1">Add to sacrament agenda</button>
+                  addedId === item.id ? (
+                    <span className="text-green-600 text-xs px-1">✓ Added to agenda</span>
+                  ) : (
+                    <button onClick={() => handleAddToAgenda(item)}
+                      className="text-blue-500 hover:text-blue-700 text-xs px-1">Add to sacrament agenda</button>
+                  )
                 )}
                 <button onClick={() => moveItem(item, -1)} disabled={idx === 0}
                   className="text-gray-400 hover:text-gray-600 disabled:opacity-30 text-xs px-1">▲</button>

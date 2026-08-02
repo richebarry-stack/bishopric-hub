@@ -564,6 +564,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Internal: the My Actions matching rules were pulled into a shared module (shared/actionItems.ts) so the new mailer computes exactly the same list of assignments as the My Actions page — no separate copy of the rules to drift out of sync.',
                 'Current Bishopric Meeting: "Add to sacrament agenda" for a move-in now phrases it as "We have received the records of the following: [name]." Adding a second move-in the same week appends to that same sentence instead of starting a new one.',
                 'Fixed Current Sacrament sometimes saying "Someone else just changed this" (or the added move-in just not showing up) after a move-in was added from the Bishopric Meeting page while the Current Sacrament page was already open. Its fields only ever read the agenda once, at page load, so they never noticed the row had changed underneath them. The page now picks up that kind of outside change automatically, as long as you don\'t have unsaved edits of your own in progress.',
+                'Current Bishopric Meeting: clicking "Add to sacrament agenda" on a move-in now shows "✓ Added to agenda" for a couple seconds, since nothing on that page previously indicated whether the click had done anything.',
               ],
             },
             {
