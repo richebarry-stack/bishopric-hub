@@ -1,3 +1,4 @@
+import { useAuth } from '../lib/auth';
 import { useAppTitle } from '../lib/wardName';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -9,8 +10,57 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+// What each hub actually stores about members — only what that hub's own pages can see.
+// See functions/api/[[route]].ts's WC_FULL_CRUD/WC_READABLE and the yc/cal route guards
+// in App.tsx for what backs this.
+const BH_MEMBER_ITEMS = [
+  'Name, birth date, and gender, synced periodically from the Church’s own membership records (LCR)',
+  'Current and past callings, and temple recommend status/expiration',
+  'Interview scheduling and completion status (temple recommend, youth, calling, and other interviews)',
+  'Missionary service status, for members currently serving',
+  'Move-in and move-out records, sacrament meeting assignments (speaking, prayers, music), and notes leaders enter about ministering or member needs',
+];
+
+const WC_MEMBER_ITEMS = [
+  'Missionary service status, for members currently serving',
+  'Baby blessing tracking (name, due/blessing date, status)',
+  'Sacrament meeting assignments (speaking, prayers, music) and ward business notes',
+  'Notes ward council members enter about ministering or member needs',
+  'Calendar events and the youth activity calendar',
+];
+
+const YC_MEMBER_ITEMS = [
+  'Youth activity calendar entries (event names, dates, and descriptions)',
+  'Youth council meeting assignments',
+];
+
+const CAL_MEMBER_ITEMS = [
+  'Calendar event details (names, dates, times, and descriptions)',
+];
+
+const LEADER_ITEMS = [
+  'Name and email address, and a securely hashed password (never stored in plain text)',
+  'Login history and IP address, kept briefly to block repeated failed login attempts',
+];
+
+const WHO_SEES: Record<'bh' | 'wc' | 'yc' | 'cal', string> = {
+  bh: 'Only accounts assigned to the bishopric can view calling, interview, temple recommend, and full membership records. Ward Council and Youth Council accounts do not have access to any of it.',
+  wc: 'This hub has no access to calling records, interview scheduling, or membership details like birth date, gender, or temple recommend status — those are visible only to the bishopric.',
+  yc: 'This hub has no access to membership, calling, interview, or other ward records — only the youth activity calendar and youth council meeting assignments.',
+  cal: 'This hub has no access to membership, calling, interview, or other ward records — only calendar events.',
+};
+
 export default function PrivacyPolicy() {
+  const { user, selectedHub } = useAuth();
   const appTitle = useAppTitle();
+
+  // hub='both' accounts see whichever hub they're currently viewing; single-hub accounts always see their own.
+  const effectiveHub = ((user?.hub === 'both' ? selectedHub : user?.hub) || 'bh') as 'bh' | 'wc' | 'yc' | 'cal';
+  const memberItems = effectiveHub === 'wc' ? WC_MEMBER_ITEMS
+    : effectiveHub === 'yc' ? YC_MEMBER_ITEMS
+    : effectiveHub === 'cal' ? CAL_MEMBER_ITEMS
+    : BH_MEMBER_ITEMS;
+  const memberItemsLabel = effectiveHub === 'cal' ? 'About events on the calendar:' : 'About ward members:';
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -21,46 +71,37 @@ export default function PrivacyPolicy() {
 
       <Section title="What this is">
         <p>
-          {appTitle} is an internal tool used by this ward's leadership — the bishopric, ward council, and youth
-          council — to organize callings, interviews, sacrament meetings, ministering, and related record-keeping.
-          It is not a public website: every page requires a login, and it isn't indexed by search engines or
-          connected to any social media or advertising service.
+          {appTitle} is an internal tool used by this ward's leadership to organize callings, interviews,
+          sacrament meetings, ministering, and related record-keeping. It is not a public website: every page
+          requires a login, and it isn't indexed by search engines or connected to any social media or
+          advertising service.
         </p>
       </Section>
 
       <Section title="Who can see what">
-        <p>
-          Access is split into separate hubs (Bishopric, Ward Council, Youth Council). An account only sees the
-          data for the hub(s) it's assigned to — for example, a Ward Council account cannot see calling or
-          interview records, which are visible only to the bishopric. Within a hub, only signed-in accounts
-          created for that ward's leaders can view anything; there is no public or guest access to member data.
-        </p>
+        <p>{WHO_SEES[effectiveHub]}</p>
       </Section>
 
       <Section title="Information this tool stores">
-        <p>Two categories of information are stored, both tied to running this ward:</p>
-        <p className="font-medium">About ward members:</p>
-        <ul className="list-disc list-inside space-y-1 pl-1">
-          <li>Name, birth date, and gender, synced periodically from the Church's own membership records (LCR)</li>
-          <li>Current and past callings, and temple recommend status/expiration</li>
-          <li>Interview scheduling and completion status (temple recommend, youth, calling, and other interviews)</li>
-          <li>Missionary service status, for members currently serving</li>
-          <li>Move-in and move-out records, sacrament meeting assignments (speaking, prayers, music), and notes
-            leaders enter about ministering or member needs</li>
-        </ul>
+        {memberItems.length > 0 && (
+          <>
+            <p className="font-medium">{memberItemsLabel}</p>
+            <ul className="list-disc list-inside space-y-1 pl-1">
+              {memberItems.map(item => <li key={item}>{item}</li>)}
+            </ul>
+          </>
+        )}
         <p className="font-medium">About leaders using the tool:</p>
         <ul className="list-disc list-inside space-y-1 pl-1">
-          <li>Name and email address, and a securely hashed password (never stored in plain text)</li>
-          <li>Login history and IP address, kept briefly to block repeated failed login attempts</li>
+          {LEADER_ITEMS.map(item => <li key={item}>{item}</li>)}
         </ul>
       </Section>
 
       <Section title="How it's used">
         <p>
-          This information exists to help the bishopric and ward council carry out their assigned
-          responsibilities — filling and tracking callings, scheduling interviews, planning meetings, and looking
-          after members' needs. It is not used for advertising, sold, or shared with any organization outside the
-          Church, and nothing here is analyzed or used for purposes beyond that.
+          This information exists to help this ward's leadership carry out their assigned responsibilities. It
+          is not used for advertising, sold, or shared with any organization outside the Church, and nothing here
+          is analyzed or used for purposes beyond that.
         </p>
       </Section>
 
