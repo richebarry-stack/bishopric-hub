@@ -387,9 +387,16 @@ function MailerStatus() {
             return (
               <div key={run.id} className="py-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-700">{formatWhen(run.ran_at)} — {run.kind === 'weekly' ? 'Weekly digest' : 'New assignments'}</span>
+                  <span className="text-gray-700">
+                    {formatWhen(run.ran_at)} — {run.kind === 'weekly' ? 'Weekly digest' : run.kind === 'seed' ? 'Initial backlog recorded' : 'New assignments'}
+                  </span>
                   <span className="text-gray-500 text-xs">{run.emails_sent} email{run.emails_sent === 1 ? '' : 's'} sent</span>
                 </div>
+                {run.kind === 'seed' && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {run.items_notified} already-open item{run.items_notified === 1 ? '' : 's'} recorded without emailing — MAILER_MODE is still "seed". Flip to "live" once this looks right.
+                  </p>
+                )}
                 {errors.length > 0 && (
                   <p className="text-xs text-red-600 mt-0.5">
                     ⚠ Failed for: {errors.map(e => `${e.recipient} (${e.error})`).join(', ')}

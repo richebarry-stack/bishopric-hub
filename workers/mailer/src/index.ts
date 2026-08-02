@@ -179,7 +179,7 @@ function localDateLabel(tz: string): string {
   return new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric' }).format(new Date());
 }
 
-async function recordRun(db: D1Database, kind: 'new-items' | 'weekly', emailsSent: number, itemsNotified: number, errors: { recipient: string; error: string }[]): Promise<void> {
+async function recordRun(db: D1Database, kind: 'new-items' | 'weekly' | 'seed', emailsSent: number, itemsNotified: number, errors: { recipient: string; error: string }[]): Promise<void> {
   await db.prepare(
     'INSERT INTO mailer_runs (ran_at, kind, emails_sent, items_notified, errors) VALUES (?, ?, ?, ?, ?)'
   ).bind(new Date().toISOString(), kind, emailsSent, itemsNotified, errors.length > 0 ? JSON.stringify(errors) : null).run();
@@ -258,6 +258,12 @@ async function run(env: Env): Promise<void> {
 
   if (newEmailsSent > 0 || newItemErrors.length > 0) {
     await recordRun(db, 'new-items', newEmailsSent, newItemsNotified, newItemErrors);
+  } else if (!live && newItemsNotified > 0) {
+    // Seed mode never emails, so without this the Automation page can't tell "the
+    // cron hasn't run yet" from "it's running and correctly sending nothing." Record
+    // the initial backlog once, so switching to live has a visible baseline to compare.
+    const seeded = await db.prepare("SELECT id FROM mailer_runs WHERE kind = 'seed' LIMIT 1").first();
+    if (!seeded) await recordRun(db, 'seed', 0, newItemsNotified, []);
   }
 
   // Weekly digest — everything currently open, sent once per the admin-configured
