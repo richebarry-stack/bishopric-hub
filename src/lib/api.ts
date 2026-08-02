@@ -91,6 +91,9 @@ export const api = {
     save: (weekday: string, hour: number) =>
       request('/mailer-settings', { method: 'PUT', body: JSON.stringify({ weekday, hour }) }),
   },
+  emailVerificationStatus: {
+    get: () => request<EmailVerificationStatus[]>('/email-verification-status'),
+  },
   wardName: {
     get: () => request<{ wardName: string }>('/ward-name'),
     save: (wardName: string) =>
@@ -171,6 +174,12 @@ export interface User {
   must_reset_password?: boolean;
   has_security_questions?: boolean;
   email_notifications?: boolean;
+  email_verified?: boolean;
+}
+
+export interface EmailVerificationStatus {
+  user_id: number;
+  verified: boolean;
 }
 
 export interface CallingPipeline {

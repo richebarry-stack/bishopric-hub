@@ -4,6 +4,8 @@ import { matchRosterMember, matchRosterMemberExact, splitLastFirstCased, toLastF
 interface Env {
   DB: D1Database;
   RECOVERY_KEY?: string;
+  CF_API_TOKEN?: string;
+  CF_ACCOUNT_ID?: string;
 }
 
 interface Session {
@@ -558,7 +560,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (method === 'GET') {
       // Guest accounts (guest_yc/guest_sac) aren't real people — they're login shortcuts
       // for the read-only guest views, so they never show up in user management.
-      const FULL_FIELDS = 'id, name, email, role, church_role, hub, last_login, last_access';
+      const FULL_FIELDS = 'id, name, email, role, church_role, hub, last_login, last_access, email_verified';
       const MINIMAL_FIELDS = 'id, name, church_role';
 
       // WC-hub users: full account detail for their own (wc) hub, but only name/calling
@@ -893,6 +895,39 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ ok: true });
     }
     return json({ error: 'Method not allowed' }, 405);
+  }
+
+  // Checks each bishopric-hub account's email address against Cloudflare's verified
+  // destination-address list (required before the mailer can send it anything).
+  // Verification is one-way — once true it stays true — so only accounts still
+  // marked unverified in our own DB are re-checked against Cloudflare each call.
+  if (routeParts[0] === 'email-verification-status' && method === 'GET') {
+    if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+
+    const users = await db.prepare(
+      "SELECT id, email, email_verified FROM users WHERE hub IN ('bh','both') AND role != 'guest'"
+    ).all<{ id: number; email: string; email_verified: number }>();
+
+    const pending = users.results.filter(u => !u.email_verified);
+    if (pending.length > 0 && env.CF_API_TOKEN && env.CF_ACCOUNT_ID) {
+      const cfRes = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/email/routing/addresses?per_page=50`,
+        { headers: { Authorization: `Bearer ${env.CF_API_TOKEN}` } }
+      );
+      if (cfRes.ok) {
+        const cfData = await cfRes.json() as { result: { email: string; verified: string | null }[] };
+        const verifiedEmails = new Set(
+          cfData.result.filter(a => a.verified).map(a => a.email.toLowerCase())
+        );
+        const newlyVerified = pending.filter(u => verifiedEmails.has(u.email.toLowerCase()));
+        for (const u of newlyVerified) {
+          await db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').bind(u.id).run();
+          u.email_verified = 1;
+        }
+      }
+    }
+
+    return json(users.results.map(u => ({ user_id: u.id, verified: !!u.email_verified })));
   }
 
   // Email preview — returns recipients + rendered data for each email type (admin only)

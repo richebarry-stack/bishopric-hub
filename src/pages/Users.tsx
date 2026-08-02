@@ -56,6 +56,15 @@ export default function Users() {
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'admin';
   const { data: users = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: fetchUsers });
+  const { data: verificationStatuses = [] } = useQuery({
+    queryKey: ['email-verification-status'],
+    queryFn: () => api.emailVerificationStatus.get(),
+    enabled: isAdmin,
+  });
+  const verifiedMap = useMemo(
+    () => new Map(verificationStatuses.map(v => [v.user_id, v.verified])),
+    [verificationStatuses],
+  );
   const confirmDialog = useConfirm();
 
   const [adding, setAdding] = useState(false);
@@ -379,7 +388,24 @@ export default function Users() {
                     {group.map(u => (
                       <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50">
                         <td className="px-3 py-2 font-medium text-gray-900">{u.name}</td>
-                        <td className="px-3 py-2 text-gray-700">{u.email}</td>
+                        <td className="px-3 py-2 text-gray-700">
+                          <div className="flex items-center gap-1.5">
+                            {u.email}
+                            {isAdmin && hub === 'both' && (
+                              verifiedMap.get(u.id) ? (
+                                <span title="This address is verified with Cloudflare and can receive assignment emails."
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700 whitespace-nowrap">
+                                  ✓ Verified
+                                </span>
+                              ) : (
+                                <span title="This address hasn't been verified with Cloudflare yet, so it can't receive assignment emails until it is."
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap">
+                                  ⏳ Pending
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </td>
                         <td className="px-3 py-2">
                           {isAdmin ? (
                             BISHOPRIC_CALLINGS.includes(u.church_role ?? '') ? (
