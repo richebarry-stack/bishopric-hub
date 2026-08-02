@@ -568,6 +568,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Added a Privacy Policy page, in every hub\'s navigation (Bishopric, Ward Council, Youth Council, and Calendar) — what this tool stores, who can see it, and how to reach the bishop with questions or a removal request. Only lists what each hub itself can actually see.',
                 'The weekly assignment email now leads with a highlighted reminder if you have a speaking, prayer, chorister, or organist assignment in this coming Sunday\'s sacrament meeting, ahead of the full list of everything else assigned to you.',
                 'Fixed Youth Activities: deleting an event from a single class\'s tab (e.g. Deacons) was deleting that whole date for every class, not just that one. A class\'s tab now has a "Clear" action that only removes that class\'s own activity/time/location for that date. Added the same option to the "All Groups" view — clicking a class\'s cell now offers a "Remove" button alongside Save. The "All Groups" row-level Delete still removes the whole date for every class, as before.',
+                'Action-item email notifications are now live. Each bishopric-hub account\'s email address needs to be verified as a Cloudflare destination address once before it can receive mail — most accounts are still pending verification, so only some leaders are receiving mail yet.',
               ],
             },
             {

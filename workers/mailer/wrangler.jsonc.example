@@ -24,6 +24,6 @@
     // "seed" computes and records the notification ledger without sending mail —
     // use this on first deploy so the entire existing backlog doesn't email at once.
     // Flip to "live" once the ledger has been checked.
-    "MAILER_MODE": "seed"
+    "MAILER_MODE": "live"
   }
 }
