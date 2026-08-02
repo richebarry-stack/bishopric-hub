@@ -144,7 +144,13 @@ async function sendNewItemsMail(env: Env, user: UserRow, items: ActionItem[]): P
   await sendMail(env, user.email, subject, text, html);
 }
 
-async function sendWeeklyMail(env: Env, user: UserRow, items: ActionItem[], dateLabel: string): Promise<void> {
+async function sendWeeklyMail(env: Env, user: UserRow, items: ActionItem[], dateLabel: string, nextMeetingDate: string): Promise<void> {
+  // Only 'Sacrament' items (speaking/prayer/chorister/organist) carry a specific meeting
+  // date at all — Calling Pipeline, Interview Setup, Clerk, and Bishopric Assignment items
+  // don't tie to one particular Sunday, so they can't be "this week's" reminder either way.
+  const upcoming = items.filter(i => i.date && i.date.slice(0, 10) === nextMeetingDate);
+  const meetingDateLabel = formatIsoDateLabel(nextMeetingDate);
+
   const bySource = new Map<string, ActionItem[]>();
   for (const item of items) {
     const list = bySource.get(item.source) || [];
@@ -158,10 +164,45 @@ async function sendWeeklyMail(env: Env, user: UserRow, items: ActionItem[], date
     textSections.push(`${source}:\n` + lines.map(l => `- ${l.text}`).join('\n'));
     htmlSections.push(`<h3>${escapeHtml(source)}</h3><ul>${lines.map(l => l.html).join('')}</ul>`);
   }
-  const subject = `Your assignments — ${dateLabel}`;
-  const text = `Here's everything currently assigned to you in Bishopric Hub:\n\n${textSections.join('\n\n')}`;
-  const html = `<p>Here's everything currently assigned to you in Bishopric Hub:</p>${htmlSections.join('')}`;
+
+  let reminderText = '';
+  let reminderHtml = '';
+  if (upcoming.length > 0) {
+    const lines = upcoming.map(i => itemLine(i, env.HUB_BASE_URL));
+    reminderText = `⚠ Reminder — this Sunday, ${meetingDateLabel}:\n` + lines.map(l => `- ${l.text}`).join('\n') + '\n\n';
+    reminderHtml = `<p style="background:#fff8e1;border:1px solid #f0d878;border-radius:6px;padding:10px 14px">` +
+      `<strong>⚠ Reminder — this Sunday, ${escapeHtml(meetingDateLabel)}:</strong><ul>${lines.map(l => l.html).join('')}</ul></p>`;
+  }
+
+  const subject = upcoming.length > 0
+    ? `Your assignments — reminder for this Sunday, ${meetingDateLabel}`
+    : `Your assignments — ${dateLabel}`;
+  const text = `${reminderText}Here's everything currently assigned to you in Bishopric Hub:\n\n${textSections.join('\n\n')}`;
+  const html = `${reminderHtml}<p>Here's everything currently assigned to you in Bishopric Hub:</p>${htmlSections.join('')}`;
   await sendMail(env, user.email, subject, text, html);
+}
+
+// Next Sunday's calendar date (or today, if today is already Sunday) in `tz` —
+// sacrament meeting is always Sunday, so this is "the next meeting."
+function upcomingSunday(tz: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
+  }).formatToParts(new Date());
+  const y = Number(parts.find(p => p.type === 'year')!.value);
+  const m = Number(parts.find(p => p.type === 'month')!.value);
+  const d = Number(parts.find(p => p.type === 'day')!.value);
+  const weekday = parts.find(p => p.type === 'weekday')!.value;
+  const add = (7 - WEEKDAYS.indexOf(weekday)) % 7;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + add);
+  return dt.toISOString().slice(0, 10);
+}
+
+// Formats a plain YYYY-MM-DD (as stored on ActionItem.date) as "Sun, Aug 9" — no time-zone
+// conversion needed since it's already a calendar date, not an instant.
+function formatIsoDateLabel(isoDate: string): string {
+  const d = new Date(isoDate + 'T12:00:00Z');
+  return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }).format(d);
 }
 
 // True at most once per matching weekday+hour in `tz` — the caller also checks a 24h
@@ -288,6 +329,7 @@ async function run(env: Env): Promise<void> {
 
     if (!alreadySentToday) {
       const dateLabel = localDateLabel(tz);
+      const nextMeetingDate = upcomingSunday(tz);
       const weeklyErrors: { recipient: string; error: string }[] = [];
       let weeklyEmailsSent = 0;
 
@@ -295,7 +337,7 @@ async function run(env: Env): Promise<void> {
         const items = perUserItems.get(user.id) || [];
         if (items.length === 0 || !live || !user.email) continue;
         try {
-          await sendWeeklyMail(env, user, items, dateLabel);
+          await sendWeeklyMail(env, user, items, dateLabel, nextMeetingDate);
           weeklyEmailsSent++;
         } catch (err) {
           weeklyErrors.push({ recipient: user.name, error: err instanceof Error ? err.message : String(err) });
