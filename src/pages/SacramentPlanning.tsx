@@ -159,7 +159,7 @@ export default function SacramentPlanning() {
                     <h3 className="font-medium text-gray-600 mb-1">Speakers</h3>
                     {dateSpeakers.length > 0 ? dateSpeakers.map(s => (
                       <p key={s.id} className="text-gray-700">
-                        {s.speaker} <span className="text-gray-400">({s.speaker_type})</span>
+                        {s.speaker || <span className="italic text-gray-400">TBD</span>} <span className="text-gray-400">({s.speaker_type})</span>
                         {s.topic && <span className="text-gray-500"> — {s.topic}</span>}
                       </p>
                     )) : <p className="text-gray-400">No speakers</p>}
@@ -536,8 +536,12 @@ function AgendaModal(props: AgendaModalProps) {
       else if (existingMusic && !musHas) await props.removeMusic(existingMusic.id);
       else if (!existingMusic && musHas) await props.createMusic(musData, { silent: true });
 
-      // Speakers (delete removed, upsert the rest, renumber by order) — none for a fast/testimony meeting
-      const keepSpeakers = isFastSunday ? [] : speakerRows.filter(r => r.speaker.trim());
+      // Speakers (delete removed, upsert the rest, renumber by order) — none for a fast/testimony meeting.
+      // Keep a row once the user has put anything into it, not just once a name is assigned —
+      // an unnamed placeholder slot (topic/type/accepted set, speaker still TBD) is real data too.
+      const speakerRowHasContent = (r: SpeakerRow) =>
+        !!(r.speaker.trim() || r.topic.trim() || r.accepted.trim() || (r.speaker_type && r.speaker_type !== 'Adult Speaker'));
+      const keepSpeakers = isFastSunday ? [] : speakerRows.filter(speakerRowHasContent);
       const keepSpeakerIds = new Set(keepSpeakers.filter(r => r.id).map(r => r.id));
       for (const s of existingSpeakers) if (!keepSpeakerIds.has(s.id)) await props.removeSpeaker(s.id);
       for (let i = 0; i < keepSpeakers.length; i++) {

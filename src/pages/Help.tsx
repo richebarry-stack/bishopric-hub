@@ -557,6 +557,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Aug 3, 2026',
+              items: [
+                'Fixed Sacrament Planning: adding a speaker slot to an upcoming meeting without assigning a name yet would silently disappear on save — the save only kept rows that already had a name typed in. A speaker slot now saves as soon as anything is filled in (type, topic, or accepted status), showing "TBD" for the name until it\'s assigned.',
+              ],
+            },
+            {
               date: 'Aug 2, 2026',
               items: [
                 'New: action-item email notifications. Bishopric leaders now get an email as soon as something new is assigned to them (a calling to approve, an interview to set up, a task, a clerk item — anything that would show up on My Actions), plus a weekly digest of everything still open. Sent from bishopric-hub@growinghomegreens.com; each email says the mailbox isn\'t monitored and links back into the site.',
