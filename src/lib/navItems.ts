@@ -26,6 +26,7 @@ export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?:
   { path: '/email-notifications', label: 'Automation & Notifications', icon: '✉', adminOnly: true },
   { path: '/hub-suggestions', label: 'Hub Suggestions', icon: '◈' },
   { path: '/help', label: 'Help', icon: '?' },
+  { path: '/privacy', label: 'Privacy Policy', icon: '🔒' },
 ];
 
 export const WC_DASHBOARD_ITEM = { path: '/', label: 'Dashboard', icon: '⌂' };
@@ -66,6 +67,7 @@ export const WC_NAV_CATEGORIES: { label: string; items: { path: string; label: s
     items: [
       { path: '/hub-suggestions', label: 'Hub Suggestions', icon: '✎' },
       { path: '/help',            label: 'Help',            icon: '?' },
+      { path: '/privacy',         label: 'Privacy Policy',  icon: '🔒' },
     ],
   },
 ];
@@ -74,11 +76,13 @@ export const YC_NAV_ITEMS = [
   { path: '/youth-activities', label: 'Youth Calendar', icon: '⬡' },
   { path: '/yc-meetings', label: 'Youth Council Meetings', icon: '▦' },
   { path: '/help', label: 'Help', icon: '?' },
+  { path: '/privacy', label: 'Privacy Policy', icon: '🔒' },
 ];
 
 export const CAL_NAV_ITEMS = [
   { path: '/calendaring', label: 'Calendar of Events', icon: '▣' },
   { path: '/help', label: 'Help', icon: '?' },
+  { path: '/privacy', label: 'Privacy Policy', icon: '🔒' },
 ];
 
 export const BH_DASHBOARD_ITEM = { path: '/', label: 'Dashboard', icon: 'ti-home' };
@@ -135,6 +139,7 @@ export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: s
       { path: '/important-links',      label: 'Important Links',     icon: 'ti-link'                      },
       { path: '/hub-suggestions',      label: 'Hub Suggestions',     icon: 'ti-bulb'                      },
       { path: '/help',                 label: 'Help',                icon: 'ti-help-circle'               },
+      { path: '/privacy',              label: 'Privacy Policy',      icon: 'ti-lock'                      },
     ],
   },
 ];

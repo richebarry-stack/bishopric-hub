@@ -33,6 +33,7 @@ const Users = lazyWithReload(() => import('./pages/Users'));
 const EmailNotifications = lazyWithReload(() => import('./pages/EmailNotifications'));
 const ImportantLinks = lazyWithReload(() => import('./pages/ImportantLinks'));
 const Help = lazyWithReload(() => import('./pages/Help'));
+const PrivacyPolicy = lazyWithReload(() => import('./pages/PrivacyPolicy'));
 const YouthActivities = lazyWithReload(() => import('./pages/YouthActivities'));
 const SacramentProgram = lazyWithReload(() => import('./pages/SacramentProgram'));
 const WardCouncilMembers = lazyWithReload(() => import('./pages/WardCouncilMembers'));
@@ -65,7 +66,7 @@ function WcGuard({ children }: { children: React.ReactNode }) {
     '/', '/my-actions', '/wc-meetings', '/wc-wins', '/wc-family-needs', '/wc-discussion-topics',
     '/current-sacrament', '/calendaring',
     '/babies', '/youth-activities', '/tasks', '/wc-members', '/hub-suggestions', '/help',
-    '/yc-meetings',
+    '/yc-meetings', '/privacy',
   ];
   if (!wcPaths.includes(location.pathname)) {
     return <Navigate to="/" replace />;
@@ -75,7 +76,7 @@ function WcGuard({ children }: { children: React.ReactNode }) {
 
 function CalGuard({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const calPaths = ['/calendaring', '/help'];
+  const calPaths = ['/calendaring', '/help', '/privacy'];
   if (!calPaths.includes(location.pathname)) {
     return <Navigate to="/calendaring" replace />;
   }
@@ -101,6 +102,7 @@ function AppRoutes() {
         <Route element={<Layout />}>
           <Route path="/calendaring" element={<Calendaring />} />
           <Route path="/help" element={<Help />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="*" element={<CalGuard><Calendaring /></CalGuard>} />
         </Route>
       </Routes>
@@ -132,6 +134,7 @@ function AppRoutes() {
           {!isYcGuest && <Route path="/yc-meetings" element={<YcMeetings />} />}
           {!isYcGuest && <Route path="/my-actions" element={<MyActions />} />}
           {!isYcGuest && <Route path="/help" element={<Help />} />}
+          {!isYcGuest && <Route path="/privacy" element={<PrivacyPolicy />} />}
           <Route path="*" element={<Navigate to="/youth-activities" replace />} />
         </Route>
       </Routes>
@@ -159,6 +162,7 @@ function AppRoutes() {
           <Route path="/hub-suggestions" element={<HubSuggestions />} />
           <Route path="/yc-meetings" element={<YcMeetings />} />
           <Route path="/help" element={<Help />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="*" element={<WcGuard><WcDashboard /></WcGuard>} />
         </Route>
       </Routes>
@@ -201,6 +205,7 @@ function AppRoutes() {
         <Route path="/yc-meetings" element={<YcMeetings />} />
         <Route path="/hub-suggestions" element={<HubSuggestions />} />
         <Route path="/help" element={<Help />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
