@@ -45,6 +45,8 @@ export const api = {
       request('/auth/reset-by-questions', { method: 'POST', body: JSON.stringify(data) }),
     guest: (type: 'yc' | 'sac') =>
       request<{ user: User }>(`/auth/guest/${type}`, { method: 'POST' }),
+    setEmailPreference: (enabled: boolean) =>
+      request('/auth/email-preference', { method: 'PUT', body: JSON.stringify({ enabled }) }),
   },
   users: {
     list: (filter?: 'wc') => request<User[]>(`/users${filter ? `?hub=${filter}` : ''}`),
@@ -83,6 +85,11 @@ export const api = {
     get: () => request<{ timeZone: string }>('/app-timezone'),
     save: (timeZone: string) =>
       request('/app-timezone', { method: 'PUT', body: JSON.stringify({ timeZone }) }),
+  },
+  mailerSettings: {
+    get: () => request<{ weekday: string; hour: number }>('/mailer-settings'),
+    save: (weekday: string, hour: number) =>
+      request('/mailer-settings', { method: 'PUT', body: JSON.stringify({ weekday, hour }) }),
   },
   wardName: {
     get: () => request<{ wardName: string }>('/ward-name'),
@@ -163,6 +170,7 @@ export interface User {
   last_access?: string;
   must_reset_password?: boolean;
   has_security_questions?: boolean;
+  email_notifications?: boolean;
 }
 
 export interface CallingPipeline {
@@ -578,6 +586,15 @@ export interface LcrSyncRun {
   missionary_changed: string | null; // JSON-stringified {name, section, action}[]
   missionary_unmatched: string | null; // JSON-stringified string[]
   updated_by: string | null;
+}
+
+export interface MailerRun {
+  id: number;
+  ran_at: string;
+  kind: string; // 'new-items' | 'weekly'
+  emails_sent: number;
+  items_notified: number;
+  errors: string | null; // JSON-stringified {recipient, error}[]
 }
 
 export interface Ordinance {

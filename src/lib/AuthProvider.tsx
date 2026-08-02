@@ -64,12 +64,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) setUser({ ...user, has_security_questions: true });
   };
 
+  const setEmailNotifications = (enabled: boolean) => {
+    if (user) setUser({ ...user, email_notifications: enabled });
+  };
+
   const isWcReadOnly = user?.hub === 'wc';
   const isGuest = user?.role === 'guest';
   const guestType = isGuest ? ((user?.church_role === 'sac' ? 'sac' : 'yc') as 'yc' | 'sac') : null;
 
   return (
-    <AuthContext.Provider value={{ user, loading, selectedHub, isWcReadOnly, isGuest, guestType, login, loginAsGuest, chooseHub, logout, clearResetFlag, markSecurityQuestionsSetup }}>
+    <AuthContext.Provider value={{ user, loading, selectedHub, isWcReadOnly, isGuest, guestType, login, loginAsGuest, chooseHub, logout, clearResetFlag, markSecurityQuestionsSetup, setEmailNotifications }}>
       {children}
     </AuthContext.Provider>
   );

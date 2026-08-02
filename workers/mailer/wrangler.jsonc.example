@@ -1,0 +1,29 @@
+{
+  "name": "bishopric-hub-mailer",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-12-01",
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "YOUR_DATABASE_NAME",
+      "database_id": "YOUR_DATABASE_ID"
+    }
+  ],
+  "send_email": [
+    {
+      "name": "EMAIL"
+    }
+  ],
+  "vars": {
+    "HUB_BASE_URL": "https://bishopric-hub.pages.dev",
+    "FROM_ADDRESS": "bishopric-hub@yourdomain.com",
+    "FROM_NAME": "Bishopric Hub",
+    // "seed" computes and records the notification ledger without sending mail —
+    // use this on first deploy so the entire existing backlog doesn't email at once.
+    // Flip to "live" once the ledger has been checked.
+    "MAILER_MODE": "seed"
+  }
+}

@@ -557,6 +557,14 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Aug 2, 2026',
+              items: [
+                'New: action-item email notifications. Bishopric leaders now get an email as soon as something new is assigned to them (a calling to approve, an interview to set up, a task, a clerk item — anything that would show up on My Actions), plus a weekly digest of everything still open. Sent from bishopric-hub@growinghomegreens.com; each email says the mailbox isn\'t monitored and links back into the site.',
+                'Automation & Notifications: added a "Weekly Assignment Email" setting (admins can change which day/time the digest goes out) and "My Email Notifications" (everyone can opt out of their own emails). A new "Action Item Emails" section shows recent sends and any delivery failures.',
+                'Internal: the My Actions matching rules were pulled into a shared module (shared/actionItems.ts) so the new mailer computes exactly the same list of assignments as the My Actions page — no separate copy of the rules to drift out of sync.',
+              ],
+            },
+            {
               date: 'Aug 1, 2026',
               items: [
                 'All Callings → LCR Callings: fixed the Actions column showing "Tracked" (with no way to act) for any calling that had ever gone through the Calling Pipeline. Because pipeline entries stay at "5. Sustained" after a call is filled, every calling the bishopric had ever filled through the pipeline could never be flagged for release from this page. The column now shows "Release pending" only when that specific calling is genuinely being released, and "Consider for release" is available otherwise.',

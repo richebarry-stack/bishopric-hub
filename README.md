@@ -162,6 +162,35 @@ npm run build
 npx wrangler pages deploy dist --branch main
 ```
 
+### The action-item mailer (separate Worker)
+
+`workers/mailer/` is a second, independent Worker — not part of the Pages app — that
+emails leaders when they're assigned an action item and sends a weekly digest on a
+cron trigger. It has its own `wrangler.jsonc` (gitignored, same reasons as the root
+one) and needs its own one-time setup:
+
+```bash
+cp workers/mailer/wrangler.jsonc.example workers/mailer/wrangler.jsonc
+```
+
+Fill in your `database_id` (same D1 database as the main app) and a `FROM_ADDRESS` on
+a domain with Cloudflare Email Routing enabled. Sending to arbitrary recipients
+requires the Workers Paid plan; on the Free plan, only recipients added as **verified
+destination addresses** on the account can receive mail (`wrangler email routing
+addresses create <email>`, then the recipient clicks the verification link Cloudflare
+sends them) — see [Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/).
+
+Deploy with `npm run deploy:mailer`. GitHub Actions deploys it automatically alongside
+the Pages app, generating `workers/mailer/wrangler.jsonc` from the committed `.example`
+on every run (it's gitignored locally, same policy as the root config) using one more
+repo secret: add `CLOUDFLARE_D1_DATABASE_ID` (the same `database_id` from your local
+`wrangler.jsonc`) alongside `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`.
+
+**First deploy is always in `seed` mode** (the `MAILER_MODE` var) — it computes and
+records what's already assigned to everyone without sending anything, so the entire
+existing backlog doesn't email at once. Flip it to `live` once you've checked
+`action_item_notifications` looks right, then redeploy.
+
 ### With Claude Code assistance
 
 This project was built and is maintained with [Claude Code](https://claude.ai/code). To continue development with AI assistance:

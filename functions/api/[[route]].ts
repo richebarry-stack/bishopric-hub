@@ -46,6 +46,7 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'important-links': { name: 'important_links', orderBy: 'id ASC' },
   'ward-members': { name: 'ward_members', orderBy: 'last_name ASC, first_name ASC' },
   'lcr-sync-runs': { name: 'lcr_sync_runs', orderBy: 'id DESC' },
+  'mailer-runs': { name: 'mailer_runs', orderBy: 'id DESC' },
   'youth-activities': { name: 'youth_activities', orderBy: 'date ASC' },
   'wc-meetings': { name: 'wc_meetings', orderBy: 'date ASC' },
   'wc-wins': { name: 'wc_wins', orderBy: 'date DESC' },
@@ -300,8 +301,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
 
       const user = await db.prepare(
-        'SELECT id, name, email, role, church_role, hub, must_reset_password, password_hash FROM users WHERE email = ?'
-      ).bind(email).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number; password_hash: string }>();
+        'SELECT id, name, email, role, church_role, hub, must_reset_password, email_notifications, password_hash FROM users WHERE email = ?'
+      ).bind(email).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number; email_notifications: number; password_hash: string }>();
       const check = user ? await verifyPassword(password, user.password_hash) : { valid: false, legacy: false };
       if (!user || !check.valid) {
         await db.prepare('INSERT INTO login_attempts (identifier) VALUES (?)').bind(emailLower).run();
@@ -322,7 +323,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       ).bind(sessionId, user.id, expiresAt).run();
 
       const sq = await db.prepare('SELECT user_id FROM security_questions WHERE user_id = ?').bind(user.id).first();
-      return new Response(JSON.stringify({ user: { id: user.id, name: user.name, email: user.email, role: user.role, church_role: user.church_role, hub: user.hub ?? 'both', must_reset_password: !!user.must_reset_password, has_security_questions: !!sq } }), {
+      return new Response(JSON.stringify({ user: { id: user.id, name: user.name, email: user.email, role: user.role, church_role: user.church_role, hub: user.hub ?? 'both', must_reset_password: !!user.must_reset_password, email_notifications: !!user.email_notifications, has_security_questions: !!sq } }), {
         headers: {
           'Content-Type': 'application/json',
           'Set-Cookie': `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`,
@@ -366,11 +367,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const session = await getSession(request, db);
       if (!session) return json({ user: null });
       const user = await db.prepare(
-        'SELECT id, name, email, role, church_role, hub, must_reset_password FROM users WHERE id = ?'
-      ).bind(session.user_id).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number }>();
+        'SELECT id, name, email, role, church_role, hub, must_reset_password, email_notifications FROM users WHERE id = ?'
+      ).bind(session.user_id).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number; email_notifications: number }>();
       if (!user) return json({ user: null });
       const sq2 = await db.prepare('SELECT user_id FROM security_questions WHERE user_id = ?').bind(user.id).first();
-      return json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, church_role: user.church_role, hub: user.hub ?? 'both', must_reset_password: !!user.must_reset_password, has_security_questions: !!sq2 } });
+      return json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, church_role: user.church_role, hub: user.hub ?? 'both', must_reset_password: !!user.must_reset_password, email_notifications: !!user.email_notifications, has_security_questions: !!sq2 } });
+    }
+
+    if (routeParts[1] === 'email-preference' && method === 'PUT') {
+      const session = await getSession(request, db);
+      if (!session) return json({ error: 'Unauthorized' }, 401);
+      const body = await request.json() as { enabled?: boolean };
+      await db.prepare('UPDATE users SET email_notifications = ? WHERE id = ?').bind(body.enabled ? 1 : 0, session.user_id).run();
+      return json({ ok: true });
     }
 
     if (routeParts[1] === 'change-password' && method === 'POST') {
@@ -858,6 +867,29 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         "INSERT INTO ui_settings (key, value, updated_at) VALUES ('app_timezone', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
       ).bind(timeZone, now).run();
       cachedTimeZone = null;
+      return json({ ok: true });
+    }
+    return json({ error: 'Method not allowed' }, 405);
+  }
+
+  // When the weekly action-item digest goes out (workers/mailer reads this each run;
+  // defaults to Saturday 08:00 in the ward's time zone if never set).
+  if (routeParts[0] === 'mailer-settings') {
+    const WEEKDAYS = new Set(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+    if (method === 'GET') {
+      const row = await db.prepare("SELECT value FROM ui_settings WHERE key = 'mailer_weekly_schedule'").first<{ value: string }>();
+      const parsed = row?.value ? JSON.parse(row.value) : null;
+      return json({ weekday: parsed?.weekday || 'Sat', hour: typeof parsed?.hour === 'number' ? parsed.hour : 8 });
+    }
+    if (method === 'PUT') {
+      if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+      const body = await request.json() as { weekday?: string; hour?: number };
+      if (!WEEKDAYS.has(body.weekday || '')) return json({ error: 'weekday must be one of Sun..Sat' }, 400);
+      if (typeof body.hour !== 'number' || body.hour < 0 || body.hour > 23) return json({ error: 'hour must be 0-23' }, 400);
+      const now = new Date().toISOString();
+      await db.prepare(
+        "INSERT INTO ui_settings (key, value, updated_at) VALUES ('mailer_weekly_schedule', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
+      ).bind(JSON.stringify({ weekday: body.weekday, hour: body.hour }), now).run();
       return json({ ok: true });
     }
     return json({ error: 'Method not allowed' }, 405);

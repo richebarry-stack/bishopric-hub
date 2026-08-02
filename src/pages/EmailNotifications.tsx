@@ -1,8 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, type LcrSyncRun } from '../lib/api';
+import { api, type LcrSyncRun, type MailerRun } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useConfirm } from '../components/ConfirmDialog';
+
+const WEEKDAYS = [
+  { value: 'Sun', label: 'Sunday' }, { value: 'Mon', label: 'Monday' }, { value: 'Tue', label: 'Tuesday' },
+  { value: 'Wed', label: 'Wednesday' }, { value: 'Thu', label: 'Thursday' }, { value: 'Fri', label: 'Friday' },
+  { value: 'Sat', label: 'Saturday' },
+];
 
 const JOB_LABELS: Record<string, string> = {
   syncConduct: 'Sacrament conducting sync',
@@ -256,6 +262,148 @@ function TimeZoneSetting() {
   );
 }
 
+function MailerScheduleSetting() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { data } = useQuery({ queryKey: ['mailer-settings'], queryFn: () => api.mailerSettings.get() });
+  const [weekday, setWeekday] = useState('Sat');
+  const [hour, setHour] = useState(8);
+  const [prevData, setPrevData] = useState(data);
+  const [saved, setSaved] = useState(false);
+
+  if (data !== prevData) {
+    setPrevData(data);
+    if (data) { setWeekday(data.weekday); setHour(data.hour); }
+  }
+
+  const mutation = useMutation({
+    mutationFn: () => api.mailerSettings.save(weekday, hour),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mailer-settings'] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    },
+  });
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+      <h2 className="font-semibold text-gray-800 text-sm">Weekly Assignment Email</h2>
+      <p className="text-xs text-gray-400">
+        When the "everything currently assigned to you" digest goes out, in the ward's time zone above.
+        New assignments also email as they happen, regardless of this schedule.
+      </p>
+      <div className="flex items-center gap-2">
+        <select
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm disabled:opacity-60"
+          value={weekday}
+          disabled={user?.role !== 'admin'}
+          onChange={(e) => setWeekday(e.target.value)}
+        >
+          {WEEKDAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+        </select>
+        <select
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm disabled:opacity-60"
+          value={hour}
+          disabled={user?.role !== 'admin'}
+          onChange={(e) => setHour(Number(e.target.value))}
+        >
+          {Array.from({ length: 24 }, (_, h) => (
+            <option key={h} value={h}>{h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`}</option>
+          ))}
+        </select>
+        {user?.role === 'admin' && (
+          <button
+            className="px-3 py-1.5 text-sm rounded-lg bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50"
+            disabled={mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
+            Save
+          </button>
+        )}
+        {saved && <span className="text-xs text-green-600">Saved</span>}
+      </div>
+    </div>
+  );
+}
+
+function EmailPreferenceSetting() {
+  const { user, setEmailNotifications } = useAuth();
+  const [saved, setSaved] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: (next: boolean) => api.auth.setEmailPreference(next),
+    onSuccess: (_result, next) => {
+      // Update the shared auth context (not just local state) so the preference
+      // stays correct if the user navigates away and back without reloading.
+      setEmailNotifications(next);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    },
+  });
+
+  const enabled = user?.email_notifications !== false;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+      <h2 className="font-semibold text-gray-800 text-sm">My Email Notifications</h2>
+      <p className="text-xs text-gray-400">
+        Email me at {user?.email} when I'm assigned a new action item, and the weekly digest of everything still open.
+      </p>
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => mutation.mutate(e.target.checked)}
+        />
+        Email me my action items
+        {saved && <span className="text-xs text-green-600 ml-1">Saved</span>}
+      </label>
+    </div>
+  );
+}
+
+function MailerStatus() {
+  const { data: runs, isLoading } = useQuery({
+    queryKey: ['mailer-runs'],
+    queryFn: () => api.list<MailerRun>('mailer-runs'),
+  });
+
+  const recent = (runs || []).slice(0, 10);
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+      <div>
+        <h2 className="font-semibold text-gray-800 text-sm">Action Item Emails</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Runs of the background mailer (workers/mailer) — only shown when it sent mail or hit an error.</p>
+      </div>
+      {isLoading ? (
+        <p className="text-sm text-gray-400">Loading…</p>
+      ) : recent.length === 0 ? (
+        <p className="text-sm text-gray-400 py-2">No notable runs yet — nothing has been sent or failed.</p>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {recent.map(run => {
+            const errors = run.errors ? (JSON.parse(run.errors) as { recipient: string; error: string }[]) : [];
+            return (
+              <div key={run.id} className="py-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-700">{formatWhen(run.ran_at)} — {run.kind === 'weekly' ? 'Weekly digest' : 'New assignments'}</span>
+                  <span className="text-gray-500 text-xs">{run.emails_sent} email{run.emails_sent === 1 ? '' : 's'} sent</span>
+                </div>
+                {errors.length > 0 && (
+                  <p className="text-xs text-red-600 mt-0.5">
+                    ⚠ Failed for: {errors.map(e => `${e.recipient} (${e.error})`).join(', ')}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EmailNotifications() {
   const { data, isLoading } = useQuery({
     queryKey: ['automation-status'],
@@ -301,13 +449,11 @@ export default function EmailNotifications() {
 
       <TimeZoneSetting />
 
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 text-amber-800 space-y-2">
-        <p className="font-semibold">Email sending not yet enabled</p>
-        <p className="text-sm">
-          Reminder emails for pending action items, spiritual thought assignments, and handbook topics
-          are planned but require a custom domain and email provider to activate.
-        </p>
-      </div>
+      <MailerScheduleSetting />
+
+      <EmailPreferenceSetting />
+
+      <MailerStatus />
     </div>
   );
 }

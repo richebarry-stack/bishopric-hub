@@ -28,3 +28,18 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist --project-name=bishopric-hub --branch=main
+
+      # workers/mailer/wrangler.jsonc is gitignored (it holds the D1 database_id, same
+      # policy as the root wrangler.jsonc — see README) so it doesn't exist in this
+      # checkout. Generate it from the committed .example here instead of committing it.
+      - name: Configure mailer Worker
+        run: |
+          sed -e "s/YOUR_DATABASE_NAME/bishopric-hub-db/" \
+              -e "s/YOUR_DATABASE_ID/${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}/" \
+              workers/mailer/wrangler.jsonc.example > workers/mailer/wrangler.jsonc
+
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config workers/mailer/wrangler.jsonc

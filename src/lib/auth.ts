@@ -16,6 +16,7 @@ export interface AuthContextType {
   logout: () => Promise<void>;
   clearResetFlag: () => void;
   markSecurityQuestionsSetup: () => void;
+  setEmailNotifications: (enabled: boolean) => void;
 }
 
 export const AuthContext = createContext<AuthContextType>(null!);
