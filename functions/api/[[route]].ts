@@ -81,11 +81,13 @@ async function checkConflict(db: D1Database, tableName: string, recordId: string
 // release tracking, the callings sync, My Actions). Resolve the typed name against the
 // roster on save, accepting either name order and preferred names. Exact variants only:
 // placeholder rows like "Replacement for Richard Talbot" must stay unlinked.
+//
+// A resolvable name wins over whatever ward_member_id came in, so retyping the Member
+// field to a different person re-points the row instead of leaving it linked to the
+// previous one. An unresolvable name leaves the incoming id untouched.
 async function linkCallingMember(db: D1Database, body: Record<string, unknown>): Promise<void> {
   const member = typeof body.member === 'string' ? body.member : '';
   if (!member.trim()) return;
-  const existingId = body.ward_member_id;
-  if (existingId !== undefined && existingId !== null && existingId !== '') return;
   const roster = (await db.prepare(
     'SELECT id, first_name, last_name, preferred_first_name, preferred_last_name FROM ward_members WHERE active = 1'
   ).all<RosterMemberNames>()).results;
