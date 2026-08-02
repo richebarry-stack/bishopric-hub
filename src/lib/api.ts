@@ -92,7 +92,7 @@ export const api = {
       request('/mailer-settings', { method: 'PUT', body: JSON.stringify({ weekday, hour }) }),
   },
   emailVerificationStatus: {
-    get: () => request<EmailVerificationStatus[]>('/email-verification-status'),
+    get: () => request<{ statuses: EmailVerificationStatus[]; cf_check_error?: string }>('/email-verification-status'),
   },
   wardName: {
     get: () => request<{ wardName: string }>('/ward-name'),

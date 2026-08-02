@@ -56,14 +56,14 @@ export default function Users() {
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'admin';
   const { data: users = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: fetchUsers });
-  const { data: verificationStatuses = [] } = useQuery({
+  const { data: verificationData } = useQuery({
     queryKey: ['email-verification-status'],
     queryFn: () => api.emailVerificationStatus.get(),
     enabled: isAdmin,
   });
   const verifiedMap = useMemo(
-    () => new Map(verificationStatuses.map(v => [v.user_id, v.verified])),
-    [verificationStatuses],
+    () => new Map((verificationData?.statuses ?? []).map(v => [v.user_id, v.verified])),
+    [verificationData],
   );
   const confirmDialog = useConfirm();
 
@@ -279,6 +279,12 @@ export default function Users() {
         </div>
       </div>
       <p className="text-sm text-gray-500 mb-4">Manage who has access to the hub and what they can do.</p>
+
+      {isAdmin && verificationData?.cf_check_error && (
+        <p className="mb-4 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+          Couldn't check email verification status with Cloudflare: {verificationData.cf_check_error}
+        </p>
+      )}
 
       {isAdmin && regRequests.length > 0 && (
         <div className="mb-6 bg-white rounded-lg border border-amber-300 overflow-x-auto">

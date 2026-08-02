@@ -909,25 +909,35 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     ).all<{ id: number; email: string; email_verified: number }>();
 
     const pending = users.results.filter(u => !u.email_verified);
-    if (pending.length > 0 && env.CF_API_TOKEN && env.CF_ACCOUNT_ID) {
-      const cfRes = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/email/routing/addresses?per_page=50`,
-        { headers: { Authorization: `Bearer ${env.CF_API_TOKEN}` } }
-      );
-      if (cfRes.ok) {
-        const cfData = await cfRes.json() as { result: { email: string; verified: string | null }[] };
-        const verifiedEmails = new Set(
-          cfData.result.filter(a => a.verified).map(a => a.email.toLowerCase())
+    let cf_check_error: string | undefined;
+    if (pending.length > 0) {
+      if (!env.CF_API_TOKEN || !env.CF_ACCOUNT_ID) {
+        cf_check_error = 'CF_API_TOKEN or CF_ACCOUNT_ID not configured';
+      } else {
+        const cfRes = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/email/routing/addresses?per_page=50`,
+          { headers: { Authorization: `Bearer ${env.CF_API_TOKEN}` } }
         );
-        const newlyVerified = pending.filter(u => verifiedEmails.has(u.email.toLowerCase()));
-        for (const u of newlyVerified) {
-          await db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').bind(u.id).run();
-          u.email_verified = 1;
+        if (cfRes.ok) {
+          const cfData = await cfRes.json() as { result: { email: string; verified: string | null }[] };
+          const verifiedEmails = new Set(
+            cfData.result.filter(a => a.verified).map(a => a.email.toLowerCase())
+          );
+          const newlyVerified = pending.filter(u => verifiedEmails.has(u.email.toLowerCase()));
+          for (const u of newlyVerified) {
+            await db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').bind(u.id).run();
+            u.email_verified = 1;
+          }
+        } else {
+          cf_check_error = `Cloudflare API returned ${cfRes.status}: ${(await cfRes.text()).slice(0, 300)}`;
         }
       }
     }
 
-    return json(users.results.map(u => ({ user_id: u.id, verified: !!u.email_verified })));
+    return json({
+      statuses: users.results.map(u => ({ user_id: u.id, verified: !!u.email_verified })),
+      cf_check_error,
+    });
   }
 
   // Email preview — returns recipients + rendered data for each email type (admin only)
