@@ -1,10 +1,13 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTable } from '../lib/useTable';
 import { legalName } from '../lib/displayName';
+import { stripBold } from '../lib/richText';
 import type { WardMember, CallingPipeline, MemberCalling, UnfilledCalling } from '../lib/api';
 
+// Matches the server's normalisation in sync-callings — pipeline calling text can
+// carry bold markers from the Calling Pipeline editor.
 function normCalling(s: string): string {
-  return s.trim().toLowerCase();
+  return stripBold(s || '').trim().toLowerCase();
 }
 
 function currentAge(birthDate: string | null): number | null {
@@ -66,7 +69,7 @@ interface CallingRow extends MemberCalling {
 export default function AllCallings() {
   const { rows: members } = useTable<WardMember>('ward-members');
   const { rows: lcrCallings } = useTable<MemberCalling>('member-callings');
-  const { rows: callings, create: createCalling } = useTable<CallingPipeline>('calling-pipeline');
+  const { rows: callings, create: createCalling, update: updateCalling } = useTable<CallingPipeline>('calling-pipeline');
   const { rows: unfilledCallings } = useTable<UnfilledCalling>('unfilled-callings');
 
   const [tab, setTab] = useState<Tab>('lcr');
@@ -77,14 +80,32 @@ export default function AllCallings() {
     return m;
   }, [members]);
 
-  // Active (not released/declined) Calling rows already tracked in the pipeline.
-  const trackedPairs = useMemo(() => {
+  // Pairs whose release is already being worked: a Calling row moved to the
+  // release statuses, or a Release row still in progress. Only these suppress the
+  // "Consider for release" button — a pair merely present in the pipeline from an
+  // earlier call (e.g. sitting at '5. Sustained') can still be released.
+  const releasePendingPairs = useMemo(() => {
     const s = new Set<string>();
     for (const c of callings) {
-      if (c.type !== 'Calling' || c.ward_member_id === null || c.status === '9. Released' || c.status === '10. Declined') continue;
-      s.add(`${c.ward_member_id}|${normCalling(c.calling)}`);
+      if (c.ward_member_id === null) continue;
+      const key = `${c.ward_member_id}|${normCalling(c.calling)}`;
+      if (c.type === 'Calling' && ['7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) s.add(key);
+      if (c.type === 'Release' && c.status !== '9. Released') s.add(key);
     }
     return s;
+  }, [callings]);
+
+  // Active (not released/declined) Calling row per pair, so "Consider for release"
+  // advances the existing entry instead of inserting a duplicate for the same pair.
+  const activeCallingRowByPair = useMemo(() => {
+    const m = new Map<string, CallingPipeline>();
+    for (const c of callings) {
+      if (c.type !== 'Calling' || c.ward_member_id === null || c.status === '9. Released' || c.status === '10. Declined') continue;
+      const key = `${c.ward_member_id}|${normCalling(c.calling)}`;
+      const prev = m.get(key);
+      if (!prev || c.id > prev.id) m.set(key, c);
+    }
+    return m;
   }, [callings]);
 
   // Members actively being considered for a NEW calling — excludes '7. Need to
@@ -114,19 +135,26 @@ export default function AllCallings() {
   const membersWithCallingIds = useMemo(() => new Set(lcrCallings.map(c => c.ward_member_id)), [lcrCallings]);
 
   const considerForRelease = useCallback((c: MemberCalling, memberName: string) => {
-    createCalling({
-      member: memberName,
-      calling: c.calling,
-      organization: c.organization,
-      status: '7. Need to release',
-      assigned_to: '',
-      sustain_recorded: 1,
-      set_apart_recorded: c.set_apart ? 1 : 0,
-      release_recorded: 0,
-      type: 'Calling',
-      ward_member_id: c.ward_member_id,
-      sustained_date: c.sustained_date,
-    } as unknown as Record<string, unknown>);
+    const existing = activeCallingRowByPair.get(`${c.ward_member_id}|${normCalling(c.calling)}`);
+    if (existing) {
+      // Already in the pipeline from when the call was made — flag that row for
+      // release rather than adding a second entry for the same person/calling.
+      updateCalling(existing.id, { status: '7. Need to release', release_recorded: 0 });
+    } else {
+      createCalling({
+        member: memberName,
+        calling: c.calling,
+        organization: c.organization,
+        status: '7. Need to release',
+        assigned_to: '',
+        sustain_recorded: 1,
+        set_apart_recorded: c.set_apart ? 1 : 0,
+        release_recorded: 0,
+        type: 'Calling',
+        ward_member_id: c.ward_member_id,
+        sustained_date: c.sustained_date,
+      } as unknown as Record<string, unknown>);
+    }
     // Also start a placeholder entry for finding this person's replacement.
     createCalling({
       member: `Replacement for ${memberName}`,
@@ -140,7 +168,7 @@ export default function AllCallings() {
       type: 'Calling',
       ward_member_id: null,
     } as unknown as Record<string, unknown>);
-  }, [createCalling]);
+  }, [createCalling, updateCalling, activeCallingRowByPair]);
 
   const addForConsideration = useCallback((m: WardMember) => {
     createCalling({
@@ -287,7 +315,7 @@ export default function AllCallings() {
             </thead>
             <tbody>
               {sortedCallingRows.map(c => {
-                const tracked = trackedPairs.has(`${c.ward_member_id}|${normCalling(c.calling)}`);
+                const releasePending = releasePendingPairs.has(`${c.ward_member_id}|${normCalling(c.calling)}`);
                 return (
                   <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="px-4 py-2 text-gray-900">{c.calling}{!!c.set_apart && <span className="ml-1.5 text-xs text-gray-400">Set apart</span>}</td>
@@ -295,11 +323,11 @@ export default function AllCallings() {
                     <td className="px-4 py-2 text-gray-600">{timeInCalling(c.sustained_date) || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-2 text-gray-700">{c.memberName}</td>
                     <td className="px-4 py-2 text-right">
-                      {tracked ? (
-                        <span className="text-xs text-gray-400">Tracked</span>
+                      {releasePending ? (
+                        <span className="text-xs text-gray-400" title="This calling is already flagged for release in the Calling Pipeline">Release pending</span>
                       ) : (
                         <button type="button" onClick={() => considerForRelease(c, c.memberName)}
-                          title="Start tracking this calling in the Calling Pipeline, flagged as needing release"
+                          title="Flag this calling for release in the Calling Pipeline and start a replacement entry"
                           className="text-xs px-2 py-1 rounded text-orange-600 hover:bg-orange-50">
                           Consider for release
                         </button>
