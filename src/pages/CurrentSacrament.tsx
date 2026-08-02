@@ -472,6 +472,32 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [dirty, setDirty]     = useState(false);
 
+  // All the theme fields above are seeded from existingTheme only once, at mount —
+  // they don't otherwise notice when the row changes underneath them (another tab's
+  // save, the 30s background poll, or "Add to sacrament agenda" on the Current
+  // Bishopric Meeting page appending to ward_business). Without this, that kind of
+  // external change is either invisible on screen, or gets silently overwritten by
+  // this page's own next autosave. Re-adopt the fresh row whenever it changes and we
+  // don't have unsaved local edits of our own to protect.
+  const themeUpdatedAt = existingTheme?.updated_at ?? null;
+  const [prevThemeUpdatedAt, setPrevThemeUpdatedAt] = useState(themeUpdatedAt);
+  if (themeUpdatedAt !== prevThemeUpdatedAt) {
+    setPrevThemeUpdatedAt(themeUpdatedAt);
+    if (!dirty) {
+      setIntroRemarks(existingTheme?.intro_remarks || DEFAULT_INTRO_REMARKS);
+      setPresiding(existingTheme?.presiding || '');
+      setConducting(existingTheme?.conducting || '');
+      setHighCouncilorName(existingTheme?.high_councilor || '');
+      setStakeReps(existingTheme?.stake_reps || '');
+      setRecognizeRows(existingTheme?.recognize ? existingTheme.recognize.split('\n').filter(Boolean) : defaultRecognizeRows);
+      setWardBusiness(existingTheme?.ward_business || '');
+      setStakeBusiness(existingTheme?.stake_business || '');
+      setClosingRemarks(existingTheme?.closing_remarks || '');
+      setIsFastSunday(!!existingTheme?.is_fast_sunday);
+      setSacramentIntro(existingTheme?.sacrament_intro || DEFAULT_SACRAMENT_INTRO);
+    }
+  }
+
   const isSavingRef   = useRef(false);
   const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSaveRef = useRef<() => Promise<void>>(async () => {});

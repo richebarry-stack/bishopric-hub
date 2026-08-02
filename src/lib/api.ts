@@ -387,6 +387,8 @@ export interface SacramentTheme {
   sacrament_intro: string;
   high_councilor: string;
   stake_reps: string;
+  updated_at?: string;
+  updated_by?: string;
 }
 
 export interface SacramentAgendaNote {

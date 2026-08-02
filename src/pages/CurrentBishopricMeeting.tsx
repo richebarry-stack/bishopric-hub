@@ -218,13 +218,28 @@ export default function CurrentBishopricMeeting() {
     saveMeetingField('updates_announcements', priorMeeting.updates_announcements || '');
   };
 
+  // Move-ins are announced as one combined sentence rather than repeating the
+  // preamble per person — a second (or third) click on the same week's agenda
+  // appends to the existing line instead of starting a new one.
+  const MOVE_IN_PREAMBLE = 'We have received the records of the following:';
+  const appendMoveIn = (current: string, name: string): string => {
+    const lines = (current || '').split('\n');
+    const idx = lines.findIndex(l => l.trim().startsWith(MOVE_IN_PREAMBLE));
+    if (idx === -1) {
+      const line = `${MOVE_IN_PREAMBLE} ${name}.`;
+      return current ? `${current}\n${line}` : line;
+    }
+    lines[idx] = `${lines[idx].trim().replace(/\.$/, '')}, ${name}.`;
+    return lines.join('\n');
+  };
+
   const handleAddToSacramentAgenda = async (text: string) => {
     const existing = themes.rows.find(t => t.meeting_date.slice(0, 10) === date);
+    const next = appendMoveIn(existing?.ward_business || '', text);
     if (existing) {
-      const next = (existing.ward_business || '') + (existing.ward_business ? '\n' : '') + text;
       await themes.update(existing.id, { ward_business: next }, { silent: true });
     } else {
-      await themes.create({ meeting_date: date, ward_business: text }, { silent: true });
+      await themes.create({ meeting_date: date, ward_business: next }, { silent: true });
     }
   };
 
