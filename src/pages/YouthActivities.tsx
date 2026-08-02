@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTable } from '../lib/useTable';
 import type { YouthActivity } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -240,19 +241,23 @@ function EventModal({ initial, onSave, onClose }: {
   );
 }
 
-function GroupCellModal({ row, groupKey, groupLabel, onSave, onClose }: {
+function GroupCellModal({ row, groupKey, groupLabel, onSave, onDelete, onClose }: {
   row: YouthActivity;
   groupKey: GroupKey;
   groupLabel: string;
   onSave: (time: string, location: string, activity: string, copyTo: GroupKey[]) => Promise<void>;
+  onDelete: () => Promise<void>;
   onClose: () => void;
 }) {
+  const confirm = useConfirm();
   const [time, setTime]     = useState(row[`${groupKey}_time` as GroupTimeKey] || '19:00');
   const [loc,  setLoc]      = useState(row[`${groupKey}_location` as GroupLocationKey] ?? '');
   const [act,  setAct]      = useState(row[groupKey] ?? '');
   const [copyTo, setCopyTo] = useState<Set<GroupKey>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
+  const hasContent = !!(act?.trim() || time?.trim() || loc?.trim());
   const otherGroups = GROUPS.filter(g => g.key !== groupKey);
 
   const toggleCopy = (key: GroupKey) =>
@@ -262,6 +267,17 @@ function GroupCellModal({ row, groupKey, groupLabel, onSave, onClose }: {
     e.preventDefault();
     setSaving(true);
     try { await onSave(time, loc, act, [...copyTo]); onClose(); } finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: 'Remove this activity?',
+      message: `Remove ${groupLabel}'s activity for ${formatDate(row.date)}? Other groups on this date are not affected.`,
+      confirmLabel: 'Remove',
+    });
+    if (!ok) return;
+    setDeleting(true);
+    try { await onDelete(); onClose(); } finally { setDeleting(false); }
   };
 
   useEffect(() => {
@@ -315,12 +331,20 @@ function GroupCellModal({ row, groupKey, groupLabel, onSave, onClose }: {
               ))}
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
-            <button type="submit" disabled={saving}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">
-              {saving ? 'Saving…' : 'Save'}
-            </button>
+          <div className="flex justify-between items-center gap-2 pt-1">
+            {hasContent ? (
+              <button type="button" onClick={handleDelete} disabled={deleting}
+                className="px-3 py-2 text-sm text-red-500 hover:text-red-700 disabled:opacity-50">
+                {deleting ? 'Removing…' : 'Remove'}
+              </button>
+            ) : <span />}
+            <div className="flex gap-2">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
+              <button type="submit" disabled={saving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -398,7 +422,9 @@ function AllGroupsTable({ rows, isPast, readOnly, onEdit, onEditCell, onDelete, 
                           <button onClick={onCancelDelete} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
                         </>
                       ) : (
-                        <button onClick={() => onConfirmDelete(row.id)} className="text-xs text-gray-400 hover:text-red-500">Delete</button>
+                        <button onClick={() => onConfirmDelete(row.id)}
+                          title="Delete this date and all groups' activities on it"
+                          className="text-xs text-gray-400 hover:text-red-500">Delete</button>
                       )}
                     </div>
                   </td>
@@ -412,13 +438,13 @@ function AllGroupsTable({ rows, isPast, readOnly, onEdit, onEditCell, onDelete, 
   );
 }
 
-function GroupTable({ rows, groupKey, isPast, readOnly, onEdit, onDelete, confirmDelete, onConfirmDelete, onCancelDelete }: {
+function GroupTable({ rows, groupKey, isPast, readOnly, onEdit, onDeleteGroup, confirmDelete, onConfirmDelete, onCancelDelete }: {
   rows: YouthActivity[];
   groupKey: GroupKey;
   isPast: boolean;
   readOnly?: boolean;
   onEdit: (row: YouthActivity) => void;
-  onDelete: (id: number) => void;
+  onDeleteGroup: (row: YouthActivity) => void;
   confirmDelete: number | null;
   onConfirmDelete: (id: number) => void;
   onCancelDelete: () => void;
@@ -460,13 +486,17 @@ function GroupTable({ rows, groupKey, isPast, readOnly, onEdit, onDelete, confir
                   <td className="px-3 py-2 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <button onClick={() => onEdit(row)} className="text-xs text-blue-600 hover:text-blue-800">Edit</button>
-                      {confirmDelete === row.id ? (
-                        <>
-                          <button onClick={() => onDelete(row.id)} className="text-xs text-red-600 hover:text-red-800">Confirm</button>
-                          <button onClick={onCancelDelete} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
-                        </>
-                      ) : (
-                        <button onClick={() => onConfirmDelete(row.id)} className="text-xs text-gray-400 hover:text-red-500">Delete</button>
+                      {hasContent && (
+                        confirmDelete === row.id ? (
+                          <>
+                            <button onClick={() => onDeleteGroup(row)} className="text-xs text-red-600 hover:text-red-800">Confirm</button>
+                            <button onClick={onCancelDelete} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                          </>
+                        ) : (
+                          <button onClick={() => onConfirmDelete(row.id)}
+                            title="Remove this class's activity for this date — other classes are not affected"
+                            className="text-xs text-gray-400 hover:text-red-500">Clear</button>
+                        )
                       )}
                     </div>
                   </td>
@@ -524,6 +554,15 @@ export default function YouthActivities() {
     await update(row.id, patch);
   };
 
+  const handleClearGroup = async (row: YouthActivity, groupKey: GroupKey) => {
+    await update(row.id, {
+      [groupKey]: '',
+      [`${groupKey}_time`]: '',
+      [`${groupKey}_location`]: '',
+    });
+    setConfirmDelete(null);
+  };
+
   const tableProps = {
     readOnly,
     onEdit: (row: YouthActivity) => setModal({ id: row.id, form: toForm(row) }),
@@ -557,6 +596,7 @@ export default function YouthActivities() {
           groupKey={cellModal.groupKey}
           groupLabel={GROUPS.find(g => g.key === cellModal.groupKey)?.label ?? cellModal.groupKey}
           onSave={handleCellSave}
+          onDelete={() => handleClearGroup(cellModal.row, cellModal.groupKey)}
           onClose={() => setCellModal(null)}
         />
       )}
@@ -593,7 +633,8 @@ export default function YouthActivities() {
         {viewTab === 'all' ? (
           <AllGroupsTable rows={upcoming} isPast={false} {...tableProps} />
         ) : (
-          <GroupTable rows={upcoming} groupKey={viewTab} isPast={false} {...tableProps} />
+          <GroupTable rows={upcoming} groupKey={viewTab} isPast={false} {...tableProps}
+            onDeleteGroup={(row) => handleClearGroup(row, viewTab)} />
         )}
       </section>
 
@@ -609,7 +650,8 @@ export default function YouthActivities() {
           viewTab === 'all' ? (
             <AllGroupsTable rows={past} isPast={true} {...tableProps} />
           ) : (
-            <GroupTable rows={past} groupKey={viewTab} isPast={true} {...tableProps} />
+            <GroupTable rows={past} groupKey={viewTab} isPast={true} {...tableProps}
+              onDeleteGroup={(row) => handleClearGroup(row, viewTab)} />
           )
         )}
       </section>
