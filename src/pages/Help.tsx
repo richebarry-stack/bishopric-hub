@@ -561,6 +561,10 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
               items: [
                 'All Callings → LCR Callings: fixed the Actions column showing "Tracked" (with no way to act) for any calling that had ever gone through the Calling Pipeline. Because pipeline entries stay at "5. Sustained" after a call is filled, every calling the bishopric had ever filled through the pipeline could never be flagged for release from this page. The column now shows "Release pending" only when that specific calling is genuinely being released, and "Consider for release" is available otherwise.',
                 'Consider for release now advances the person\'s existing Calling Pipeline entry to "7. Need to release" instead of creating a second entry for the same person and calling.',
+                'My Actions: the "Set up interview" item now stays on your list until the interview actually reaches "Scheduled for Interview" (or later), instead of disappearing as soon as the Setup column said Scheduled. Marking Setup "Done" still clears it. The item now shows the interview status alongside the setup status.',
+                'My Actions: names are now matched through the ward roster, so an assignment typed as "First Last", "Last, First", or with a preferred name (e.g. "Rich Barry" vs "Richard Barry") all find the same person.',
+                'Calling Pipeline: a member name typed free-hand as "Richard Talbot" (rather than "Talbot, Richard") is now linked to that ward member on save, so the entry is visible to All Callings\' release tracking, the LCR callings sync, and My Actions. Existing entries were linked too, including release entries, which were never linked before.',
+                'Data: corrected "Richard Humphreys" to "Richard Humpherys" across 100 records (interview setup assignments, prayer assignments, action items, hub suggestions and edit history). The misspelling meant those interview setup assignments never appeared in his My Actions.',
               ],
             },
             {

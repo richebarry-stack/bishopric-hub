@@ -43,6 +43,44 @@ function firstToken(s: string): string {
   return s.split(/\s+/)[0] || '';
 }
 
+export interface RosterMemberNames extends RosterMember {
+  preferred_first_name?: string | null;
+  preferred_last_name?: string | null;
+}
+
+/** Exact-variant resolver (src/lib/nameMatch.ts's server-side twin): matches a typed
+ * name against every spelling the roster knows for a member — legal or preferred,
+ * "First Last" or "Last, First" — and nothing looser. Unlike matchRosterMember it
+ * never guesses from a partial first name, so it's safe to run over free text that
+ * may not be a member name at all (e.g. "Replacement for Jane Doe"). Returns null
+ * when nothing matches or when two members share the same spelling. */
+export function matchRosterMemberExact(rawName: string, roster: RosterMemberNames[]): RosterMemberNames | null {
+  const key = stripBold(rawName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!key) return null;
+  const index = new Map<string, RosterMemberNames | null>();
+  const add = (variant: string, m: RosterMemberNames) => {
+    const k = variant.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!k) return;
+    const existing = index.get(k);
+    // Two different members answering to the same spelling is ambiguous — resolve to
+    // neither rather than picking whichever was loaded first.
+    if (existing === undefined) index.set(k, m);
+    else if (existing && existing.id !== m.id) index.set(k, null);
+  };
+  for (const m of roster) {
+    const pairs: [string, string][] = [[m.first_name || '', m.last_name || '']];
+    const pf = (m.preferred_first_name || '').trim() || m.first_name || '';
+    const pl = (m.preferred_last_name || '').trim() || m.last_name || '';
+    pairs.push([pf, pl]);
+    for (const [first, last] of pairs) {
+      if (!last) continue;
+      add(first ? `${first} ${last}` : last, m);
+      add(first ? `${last}, ${first}` : last, m);
+    }
+  }
+  return index.get(key) || null;
+}
+
 /** Resolves a raw LCR name string to a single roster member, or null if ambiguous/no match. */
 export function matchRosterMember(rawName: string, roster: RosterMember[]): RosterMember | null {
   const normalized = toLastFirst(rawName);

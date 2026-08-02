@@ -1,5 +1,5 @@
 import { syncConduct, runDailyJobs, syncSettingApartInterviews, syncTempleRecommendInterviews } from './jobs';
-import { matchRosterMember, splitLastFirstCased, toLastFirst, stripBold, type RosterMember } from './nameMatch';
+import { matchRosterMember, matchRosterMemberExact, splitLastFirstCased, toLastFirst, stripBold, type RosterMember, type RosterMemberNames } from './nameMatch';
 
 interface Env {
   DB: D1Database;
@@ -73,6 +73,24 @@ async function checkConflict(db: D1Database, tableName: string, recordId: string
     return json({ error: 'conflict', current }, 409);
   }
   return null;
+}
+
+// The Calling Pipeline's Member field is free text, so entries get typed as
+// "Richard Talbot" as often as "Talbot, Richard" — and an entry that isn't linked to
+// a ward_member_id is invisible to everything that matches by member (All Callings'
+// release tracking, the callings sync, My Actions). Resolve the typed name against the
+// roster on save, accepting either name order and preferred names. Exact variants only:
+// placeholder rows like "Replacement for Richard Talbot" must stay unlinked.
+async function linkCallingMember(db: D1Database, body: Record<string, unknown>): Promise<void> {
+  const member = typeof body.member === 'string' ? body.member : '';
+  if (!member.trim()) return;
+  const existingId = body.ward_member_id;
+  if (existingId !== undefined && existingId !== null && existingId !== '') return;
+  const roster = (await db.prepare(
+    'SELECT id, first_name, last_name, preferred_first_name, preferred_last_name FROM ward_members WHERE active = 1'
+  ).all<RosterMemberNames>()).results;
+  const match = matchRosterMemberExact(member, roster);
+  if (match) body.ward_member_id = match.id;
 }
 
 function isUniqueConstraintError(e: unknown): boolean {
@@ -1454,7 +1472,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const now = new Date().toISOString();
     const backfillStmts = [];
     for (const c of allCallings) {
-      if (c.type === 'Calling' && c.ward_member_id === null) {
+      // Release rows are backfilled too — they're matched by (member, calling) the same
+      // way Calling rows are, so an unlinked one is invisible to the release tracking.
+      if (c.ward_member_id === null) {
         const m = matchRosterMember(stripBold(c.member), roster);
         if (m) {
           backfillStmts.push(db.prepare('UPDATE calling_pipeline SET ward_member_id = ? WHERE id = ?').bind(m.id, c.id));
@@ -1755,6 +1775,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const body = await request.json() as Record<string, unknown>;
     delete body.updated_by;
     body.updated_by = session.name;
+    if (tableName === 'calling-pipeline') await linkCallingMember(db, body);
     const keys = Object.keys(body);
     const placeholders = keys.map(() => '?').join(', ');
     const values = keys.map(k => body[k]);
@@ -1790,6 +1811,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     body.updated_at = new Date().toISOString();
     body.updated_by = session.name;
+    if (tableName === 'calling-pipeline') await linkCallingMember(db, body);
     const keys = Object.keys(body);
     const setClause = keys.map(k => `${k} = ?`).join(', ');
     const values = keys.map(k => body[k]);
