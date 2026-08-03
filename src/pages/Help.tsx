@@ -561,6 +561,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
               items: [
                 'Fixed Sacrament Planning: adding a speaker slot to an upcoming meeting without assigning a name yet would silently disappear on save — the save only kept rows that already had a name typed in. A speaker slot now saves as soon as anything is filled in (type, topic, or accepted status), showing "TBD" for the name until it\'s assigned.',
                 'Internal: fixed the action-item mailer marking an assignment as "notified" even when the email itself failed to send, which meant a delivery failure gave up silently instead of retrying — a misconfigured sending address briefly meant a real assignment email never went out and never got another attempt. Failed sends now stay unnotified so the next run tries again.',
+                'New bishopric-hub accounts are now automatically registered with Cloudflare as a verified-email destination when created (or when their email address changes) — this is what actually sends them Cloudflare\'s verification email, which nothing did automatically before. The Users page also gets a "Resend" link next to a Pending badge, for anyone who needs another verification email sent.',
               ],
             },
             {

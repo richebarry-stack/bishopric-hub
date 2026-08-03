@@ -93,6 +93,10 @@ export const api = {
   },
   emailVerificationStatus: {
     get: () => request<{ statuses: EmailVerificationStatus[]; cf_check_error?: string }>('/email-verification-status'),
+    resend: (user_id: number) =>
+      request<{ ok: boolean; error?: string }>('/email-verification-status/resend', {
+        method: 'POST', body: JSON.stringify({ user_id }),
+      }),
   },
   wardName: {
     get: () => request<{ wardName: string }>('/ward-name'),

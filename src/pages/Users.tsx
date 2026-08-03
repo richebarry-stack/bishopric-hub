@@ -65,6 +65,17 @@ export default function Users() {
     () => new Map((verificationData?.statuses ?? []).map(v => [v.user_id, v.verified])),
     [verificationData],
   );
+  const [resendingId, setResendingId] = useState<number | null>(null);
+  const resendMutation = useMutation({
+    mutationFn: (id: number) => api.emailVerificationStatus.resend(id),
+    onMutate: (id: number) => setResendingId(id),
+    onSuccess: (result) => {
+      if (result.ok) toast.success('Verification email requested — Cloudflare will send it shortly.');
+      else toast.error(result.error || 'Failed to request verification email');
+    },
+    onError: (e: Error) => toast.error(e.message),
+    onSettled: () => setResendingId(null),
+  });
   const confirmDialog = useConfirm();
 
   const [adding, setAdding] = useState(false);
@@ -404,9 +415,16 @@ export default function Users() {
                                   ✓ Verified
                                 </span>
                               ) : (
-                                <span title="This address hasn't been verified with Cloudflare yet, so it can't receive assignment emails until it is."
-                                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap">
-                                  ⏳ Pending
+                                <span className="inline-flex items-center gap-1">
+                                  <span title="This address hasn't been verified with Cloudflare yet, so it can't receive assignment emails until it is."
+                                    className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap">
+                                    ⏳ Pending
+                                  </span>
+                                  <button type="button" onClick={() => resendMutation.mutate(u.id)} disabled={resendingId === u.id}
+                                    title="Ask Cloudflare to (re)send this address a verification email"
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 disabled:opacity-50 whitespace-nowrap">
+                                    {resendingId === u.id ? 'Sending…' : 'Resend'}
+                                  </button>
                                 </span>
                               )
                             )}

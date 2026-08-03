@@ -8,6 +8,32 @@ interface Env {
   CF_ACCOUNT_ID?: string;
 }
 
+// Registers an email as a Cloudflare Email Routing destination address, which is
+// what triggers Cloudflare's own verification email to that address — required
+// before the action-item mailer can ever send anything to it. Re-registering an
+// address that's already added (verified or not) is safe — Cloudflare treats it
+// as idempotent and, if still unverified, resends the verification email. Best
+// effort: never throws, so a missing token or a Cloudflare-side error never blocks
+// whatever caller triggered this.
+async function registerEmailDestination(env: Env, email: string): Promise<{ ok: boolean; error?: string }> {
+  if (!env.CF_API_TOKEN || !env.CF_ACCOUNT_ID) return { ok: false, error: 'CF_API_TOKEN or CF_ACCOUNT_ID not configured' };
+  try {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/email/routing/addresses`,
+      { method: 'POST', headers: { Authorization: `Bearer ${env.CF_API_TOKEN}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }
+    );
+    if (res.ok) return { ok: true };
+    const data = await res.json().catch(() => null) as { errors?: { code: number; message: string }[] } | null;
+    const cfError = data?.errors?.[0];
+    // Code 2025: a verification email for this address already went out very recently —
+    // not a real failure, just tell the admin to wait rather than showing a red error.
+    if (cfError?.code === 2025) return { ok: false, error: 'A verification email was already sent to this address recently — try again in a few minutes.' };
+    return { ok: false, error: cfError ? `Cloudflare: ${cfError.message}` : `Cloudflare API returned ${res.status}` };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 interface Session {
   id: string;
   user_id: number;
@@ -610,6 +636,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         ).bind(name, email, hash, newRole, church_role || '', newHub).run();
         const newUser = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(result.meta.last_row_id).first();
         if (church_role === 'Bishop') await resetFuturePresidingToBishop(db, name);
+        if (newHub === 'bh' || newHub === 'both') await registerEmailDestination(env, email);
         return json({ ...newUser as object, temp_password: tempPassword }, 201);
       } catch {
         return json({ error: 'User already exists' }, 400);
@@ -671,11 +698,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const updates: string[] = [];
       const vals: unknown[] = [];
       if (isAdmin && body.name !== undefined) { updates.push('name = ?'); vals.push(body.name); }
-      if (body.email !== undefined) { updates.push('email = ?'); vals.push(body.email); }
+      const changingEmail = body.email !== undefined;
+      if (changingEmail) { updates.push('email = ?'); updates.push('email_verified = 0'); vals.push(body.email); }
       if (!updates.length) return json({ error: 'Nothing to update' }, 400);
       vals.push(targetId);
       await db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...vals).run();
-      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(targetId).first();
+      const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(targetId).first<{ hub: string }>();
+      if (changingEmail && body.email && (updated?.hub === 'bh' || updated?.hub === 'both')) await registerEmailDestination(env, body.email);
       return json(updated);
     }
 
@@ -895,6 +924,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ ok: true });
     }
     return json({ error: 'Method not allowed' }, 405);
+  }
+
+  // Registers an address with Cloudflare Email Routing, which is what actually
+  // triggers the verification email — creating a user here never does this on its
+  // own. Best-effort: a missing token or a Cloudflare-side failure (e.g. the address
+  // is already registered) is swallowed so it never blocks the caller.
+  if (routeParts[0] === 'email-verification-status' && routeParts[1] === 'resend' && method === 'POST') {
+    if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
+    const { user_id } = await request.json() as { user_id: number };
+    const target = await db.prepare("SELECT email FROM users WHERE id = ? AND hub IN ('bh','both')").bind(user_id).first<{ email: string }>();
+    if (!target) return json({ error: 'User not found' }, 404);
+    const result = await registerEmailDestination(env, target.email);
+    return json(result);
   }
 
   // Checks each bishopric-hub account's email address against Cloudflare's verified
