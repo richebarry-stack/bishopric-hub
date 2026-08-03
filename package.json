@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "deploy": "npm run build && wrangler pages deploy dist --branch main",
+    "deploy:demo": "npm run build && bash deploy-demo.sh",
     "deploy:mailer": "wrangler deploy --config workers/mailer/wrangler.jsonc",
     "migrate": "wrangler d1 migrations apply bishopric-hub-db --remote"
   },

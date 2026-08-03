@@ -314,9 +314,21 @@ If the project's code changes and you want to update your demo to match:
 git checkout demo
 git pull
 npm install
-npm run build
-npx wrangler pages deploy dist --project-name=bishopric-hub-demo
+npm run deploy:demo
 ```
+
+`deploy:demo` builds the app and deploys it to the demo project safely. Use
+it instead of `wrangler pages deploy ... --project-name=bishopric-hub-demo`
+directly if your `wrangler.jsonc` file lives in the same folder as a real
+(production) checkout of this app — `wrangler pages deploy` has no way to
+point at a different config file, so it always reads whatever `wrangler.jsonc`
+is sitting in the folder. If that happens to be your *production* config at
+the moment you deploy, the demo project silently gets rebound to your real
+database. `deploy:demo` (via `deploy-demo.sh`) swaps in `wrangler.demo.jsonc`
+just for the deploy and restores your real config immediately after, so this
+can't happen. If you followed this guide in its own separate folder — not
+shared with a production checkout — this risk doesn't apply to you and the
+plain `wrangler pages deploy` command from Step 8 works fine either way.
 
 Your demo's database (the fake data) is untouched by this — only the app's
 code and appearance update. If a future update adds new database columns,
