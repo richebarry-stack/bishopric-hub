@@ -277,21 +277,27 @@ async function run(env: Env): Promise<void> {
     const freshItems = items.filter(i => !alreadyNotified.has(i.id));
 
     if (freshItems.length > 0) {
-      const now = new Date().toISOString();
-      const stmts = freshItems.map(i =>
-        db.prepare('INSERT OR IGNORE INTO action_item_notifications (user_id, item_id, sent_at) VALUES (?, ?, ?)')
-          .bind(user.id, i.id, now)
-      );
-      await db.batch(stmts);
-      newItemsNotified += freshItems.length;
-
+      // Only record an item as notified once it's actually been sent (or in seed mode,
+      // where nothing is sent at all) — a failed send must stay unnotified so the next
+      // run retries it, instead of silently giving up after one bad attempt.
+      let sendFailed = false;
       if (live && user.email) {
         try {
           await sendNewItemsMail(env, user, freshItems);
           newEmailsSent++;
         } catch (err) {
+          sendFailed = true;
           newItemErrors.push({ recipient: user.name, error: err instanceof Error ? err.message : String(err) });
         }
+      }
+      if (!sendFailed) {
+        const now = new Date().toISOString();
+        const stmts = freshItems.map(i =>
+          db.prepare('INSERT OR IGNORE INTO action_item_notifications (user_id, item_id, sent_at) VALUES (?, ?, ?)')
+            .bind(user.id, i.id, now)
+        );
+        await db.batch(stmts);
+        newItemsNotified += freshItems.length;
       }
     }
 

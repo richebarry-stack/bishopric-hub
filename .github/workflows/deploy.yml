@@ -29,20 +29,39 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist --project-name=bishopric-hub --branch=main
 
-      # workers/mailer/wrangler.jsonc is gitignored (it holds the D1 database_id, same
-      # policy as the root wrangler.jsonc — see README) so it doesn't exist in this
-      # checkout. Generate it from the committed .example here instead of committing it.
-      # Skips (rather than fails the build) until CLOUDFLARE_D1_DATABASE_ID is added as
-      # a repo secret — see README's "action-item mailer" section.
+      # workers/mailer/wrangler.jsonc is gitignored (it holds the D1 database_id and
+      # this deployment's own domain/address, same policy as the root wrangler.jsonc —
+      # see README) so it doesn't exist in this checkout. Generate it from the committed
+      # .example here instead of committing it, filling in this repo's own values from
+      # repo variables/secrets — never hardcoded, so a fork never inherits someone
+      # else's database, domain, or From address.
+      #
+      # Skips (rather than fails the build) until CLOUDFLARE_D1_DATABASE_ID,
+      # MAILER_HUB_BASE_URL, and MAILER_FROM_ADDRESS are all set (secret + repo
+      # variables respectively — see README's "action-item mailer" section).
+      # MAILER_MODE defaults to "seed" (never emails) unless the MAILER_MODE repo
+      # variable is explicitly set to "live" — a fresh fork can never accidentally
+      # email a real backlog.
       - name: Configure mailer Worker
         id: mailer_config
+        env:
+          D1_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}
+          D1_DATABASE_NAME: ${{ vars.MAILER_D1_DATABASE_NAME }}
+          HUB_BASE_URL: ${{ vars.MAILER_HUB_BASE_URL }}
+          FROM_ADDRESS: ${{ vars.MAILER_FROM_ADDRESS }}
+          FROM_NAME: ${{ vars.MAILER_FROM_NAME }}
+          MAILER_MODE: ${{ vars.MAILER_MODE }}
         run: |
-          if [ -z "${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}" ]; then
-            echo "CLOUDFLARE_D1_DATABASE_ID secret not set — skipping mailer Worker deploy."
+          if [ -z "$D1_DATABASE_ID" ] || [ -z "$HUB_BASE_URL" ] || [ -z "$FROM_ADDRESS" ]; then
+            echo "CLOUDFLARE_D1_DATABASE_ID, MAILER_HUB_BASE_URL, or MAILER_FROM_ADDRESS not set — skipping mailer Worker deploy."
             echo "ready=false" >> "$GITHUB_OUTPUT"
           else
-            sed -e "s/YOUR_DATABASE_NAME/bishopric-hub-db/" \
-                -e "s/YOUR_DATABASE_ID/${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}/" \
+            sed -e "s#YOUR_DATABASE_NAME#${D1_DATABASE_NAME:-bishopric-hub-db}#" \
+                -e "s#YOUR_DATABASE_ID#$D1_DATABASE_ID#" \
+                -e "s#YOUR_HUB_BASE_URL#$HUB_BASE_URL#" \
+                -e "s#YOUR_FROM_ADDRESS#$FROM_ADDRESS#" \
+                -e "s#\"Bishopric Hub\"#\"${FROM_NAME:-Bishopric Hub}\"#" \
+                -e "s#YOUR_MAILER_MODE#${MAILER_MODE:-seed}#" \
                 workers/mailer/wrangler.jsonc.example > workers/mailer/wrangler.jsonc
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi

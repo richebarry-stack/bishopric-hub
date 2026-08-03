@@ -18,12 +18,15 @@
     }
   ],
   "vars": {
-    "HUB_BASE_URL": "https://bishopric-hub.pages.dev",
-    "FROM_ADDRESS": "bishopric-hub@yourdomain.com",
+    "HUB_BASE_URL": "YOUR_HUB_BASE_URL",
+    "FROM_ADDRESS": "YOUR_FROM_ADDRESS",
     "FROM_NAME": "Bishopric Hub",
     // "seed" computes and records the notification ledger without sending mail —
     // use this on first deploy so the entire existing backlog doesn't email at once.
-    // Flip to "live" once the ledger has been checked.
-    "MAILER_MODE": "live"
+    // Flip to "live" once the ledger has been checked. If you deploy via CI (see
+    // .github/workflows/deploy.yml), this is driven by the MAILER_MODE repo variable
+    // instead — it always defaults to "seed" until you explicitly set that variable
+    // to "live", so a fresh fork can never accidentally email anyone's real backlog.
+    "MAILER_MODE": "YOUR_MAILER_MODE"
   }
 }
