@@ -182,13 +182,28 @@ sends them) — see [Email Service pricing](https://developers.cloudflare.com/em
 
 Deploy with `npm run deploy:mailer`. GitHub Actions deploys it automatically alongside
 the Pages app, generating `workers/mailer/wrangler.jsonc` from the committed `.example`
-on every run (it's gitignored locally, same policy as the root config) using one more
-repo secret: add `CLOUDFLARE_D1_DATABASE_ID` (the same `database_id` from your local
-`wrangler.jsonc`) alongside `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`.
+on **every** run (it's gitignored locally, same policy as the root config) — so nothing
+identity-bearing (database, domain, From address) can live in that committed file, or
+every fork would inherit whoever wrote it. Instead CI fills those in from your own
+repo's secrets/variables (Settings → Secrets and variables → Actions):
 
-**First deploy is always in `seed` mode** (the `MAILER_MODE` var) — it computes and
-records what's already assigned to everyone without sending anything, so the entire
-existing backlog doesn't email at once. Flip it to `live` once you've checked
+| Name | Kind | Value |
+|---|---|---|
+| `CLOUDFLARE_D1_DATABASE_ID` | Secret | Same `database_id` as your local `wrangler.jsonc` |
+| `MAILER_D1_DATABASE_NAME` | Variable | Optional — defaults to `bishopric-hub-db` |
+| `MAILER_HUB_BASE_URL` | Variable | Your Pages URL, e.g. `https://your-project.pages.dev` |
+| `MAILER_FROM_ADDRESS` | Variable | Your `FROM_ADDRESS`, on a domain with Email Routing enabled |
+| `MAILER_FROM_NAME` | Variable | Optional — defaults to `Bishopric Hub` |
+| `MAILER_MODE` | Variable | Optional — defaults to `seed`; set to `live` only once you've verified the ledger |
+
+If `CLOUDFLARE_D1_DATABASE_ID`, `MAILER_HUB_BASE_URL`, or `MAILER_FROM_ADDRESS` is
+unset, CI skips the mailer deploy entirely rather than deploying with a placeholder —
+better a mailer that doesn't run than one emailing links to someone else's site.
+
+**First deploy is always in `seed` mode** (the `MAILER_MODE` var/variable) — it computes
+and records what's already assigned to everyone without sending anything, so the entire
+existing backlog doesn't email at once. Flip it to `live` (locally in `wrangler.jsonc`,
+or via the `MAILER_MODE` repo variable if you deploy through CI) once you've checked
 `action_item_notifications` looks right, then redeploy.
 
 ### With Claude Code assistance

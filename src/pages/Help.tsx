@@ -478,7 +478,7 @@ const FULL_SECTIONS: Section[] = [
           <li>Redeploy so the variable takes effect.</li>
         </ol>
         <p><strong>When locked out, run this command from any terminal:</strong></p>
-        <pre className="bg-gray-100 rounded p-3 text-xs overflow-x-auto whitespace-pre-wrap">{`curl -s -X POST https://bishopric-hub.pages.dev/api/auth/emergency-reset \\
+        <pre className="bg-gray-100 rounded p-3 text-xs overflow-x-auto whitespace-pre-wrap">{`curl -s -X POST ${window.location.origin}/api/auth/emergency-reset \\
   -H "Content-Type: application/json" \\
   -d '{"email":"YOUR_EMAIL","new_password":"NEW_PASSWORD","recovery_key":"YOUR_RECOVERY_KEY"}'`}</pre>
         <p className="text-sm text-gray-500">Replace the values in caps. A <code className="bg-gray-100 px-1 rounded">{`{"ok":true}`}</code> response means success — log in with your new password.</p>
@@ -560,6 +560,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
               date: 'Aug 3, 2026',
               items: [
                 'Fixed Sacrament Planning: adding a speaker slot to an upcoming meeting without assigning a name yet would silently disappear on save — the save only kept rows that already had a name typed in. A speaker slot now saves as soon as anything is filled in (type, topic, or accepted status), showing "TBD" for the name until it\'s assigned.',
+                'Internal: fixed the action-item mailer marking an assignment as "notified" even when the email itself failed to send, which meant a delivery failure gave up silently instead of retrying — a misconfigured sending address briefly meant a real assignment email never went out and never got another attempt. Failed sends now stay unnotified so the next run tries again.',
               ],
             },
             {
