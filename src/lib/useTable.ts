@@ -24,7 +24,10 @@ export function useTable<T extends { id: number }>(tableName: string, options?: 
 
   const onError = (err: Error) => {
     console.error(`[${tableName}] mutation failed:`, err);
-    if (err instanceof ApiError && err.status === 409) {
+    // Only checkConflict() marks its 409s this way — other 409s (unique/FK constraint
+    // violations) carry their own specific message and must not be overwritten by the
+    // generic "someone else changed this" copy.
+    if (err instanceof ApiError && err.status === 409 && (err.data as { error?: string } | undefined)?.error === 'conflict') {
       queryClient.invalidateQueries({ queryKey });
       toast.error('Someone else just changed this — it has been reloaded. Please re-apply your change.');
       return;
