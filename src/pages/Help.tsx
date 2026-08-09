@@ -557,6 +557,14 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Aug 9, 2026',
+              items: [
+                'Current Bishopric Meeting: added a "Copy from last week" button on the Agenda section, matching the one already on Move-ins/Move-outs/Other Items — copies last week\'s agenda items (and their notes) into this week in one click instead of re-typing them.',
+                'Fixed a false "someone else just changed this" error that could appear on Calling Pipeline and Current Sacrament Meeting even when no one else was editing — a rapid second save on the same record could read a stale version and trip the conflict check against the user\'s own prior save.',
+                'Fixed deleting a calling from Calling Pipeline sometimes failing with a confusing browser error instead of a real message — it now explains that the calling still has an interview linked to it and needs that removed first.',
+              ],
+            },
+            {
               date: 'Aug 3, 2026',
               items: [
                 'Fixed Sacrament Planning: adding a speaker slot to an upcoming meeting without assigning a name yet would silently disappear on save — the save only kept rows that already had a name typed in. A speaker slot now saves as soon as anything is filled in (type, topic, or accepted status), showing "TBD" for the name until it\'s assigned.',

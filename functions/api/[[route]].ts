@@ -128,6 +128,10 @@ function isUniqueConstraintError(e: unknown): boolean {
   return e instanceof Error && /UNIQUE constraint failed/i.test(e.message);
 }
 
+function isForeignKeyConstraintError(e: unknown): boolean {
+  return e instanceof Error && /FOREIGN KEY constraint failed/i.test(e.message);
+}
+
 // Legacy unsalted SHA-256 — kept only to recognize old password/security-answer hashes
 // so they can be transparently upgraded to PBKDF2 the next time they're verified.
 async function hashPassword(password: string): Promise<string> {
@@ -1992,9 +1996,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   if (method === 'DELETE' && recordId) {
-    await db.prepare(
-      `DELETE FROM ${tableConfig.name} WHERE id = ?`
-    ).bind(recordId).run();
+    try {
+      await db.prepare(
+        `DELETE FROM ${tableConfig.name} WHERE id = ?`
+      ).bind(recordId).run();
+    } catch (e) {
+      if (isForeignKeyConstraintError(e)) {
+        const message = tableName === 'calling-pipeline'
+          ? 'This calling still has an interview linked to it — remove or reassign the interview first.'
+          : 'This record is still linked to other data and can\'t be deleted.';
+        return json({ error: message }, 409);
+      }
+      throw e;
+    }
     if (tableName === 'calling-pipeline') waitUntil(syncSettingApartInterviews(db).catch(() => {}));
     return json({ ok: true });
   }

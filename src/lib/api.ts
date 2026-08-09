@@ -22,8 +22,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     window.location.href = '/login';
     throw new ApiError('Unauthorized', 401);
   }
-  const data = await res.json();
-  if (!res.ok) throw new ApiError(data.error || 'Request failed', res.status, data);
+  let data: Record<string, unknown> | T;
+  try {
+    data = await res.json();
+  } catch {
+    if (!res.ok) throw new ApiError(`Request failed (${res.status})`, res.status);
+    throw new ApiError('Server returned an invalid response', res.status);
+  }
+  if (!res.ok) throw new ApiError((data as { error?: string }).error || 'Request failed', res.status, data);
   return data as T;
 }
 

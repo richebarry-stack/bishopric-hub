@@ -48,7 +48,13 @@ export function useTable<T extends { id: number }>(tableName: string, options?: 
       const baseUpdatedAt = (cached?.find(r => r.id === id) as { updated_at?: string } | undefined)?.updated_at ?? null;
       return api.update<T>(tableName, id, { ...data, _base_updated_at: baseUpdatedAt });
     },
-    onSuccess: (_result, variables) => {
+    onSuccess: (result, variables) => {
+      // Write the server's authoritative row straight into the cache instead of only
+      // invalidating — invalidateQueries' refetch lands asynchronously, and a second
+      // update for the same row fired before it lands would otherwise read the
+      // pre-update cached row and send a stale _base_updated_at, tripping a false
+      // "someone else changed this" conflict against the user's own prior save.
+      queryClient.setQueryData<T[]>(queryKey, old => old?.map(r => (r.id === variables.id ? result : r)));
       queryClient.invalidateQueries({ queryKey });
       if (!variables.silent) toast.success('Saved');
     },

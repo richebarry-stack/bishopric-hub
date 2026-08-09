@@ -212,6 +212,22 @@ export default function CurrentBishopricMeeting() {
   const priorDate = useMemo(() => priorMeetingDate(date, meetings), [date, meetings]);
   const priorMeeting = priorDate ? meetings.find(m => m.date.slice(0, 10) === priorDate) : undefined;
 
+  const priorAgendaItems = useMemo(() => {
+    if (!priorDate) return [];
+    return items.filter(i => i.meeting_date === priorDate).sort((a, b) => a.position - b.position || a.id - b.id);
+  }, [items, priorDate]);
+
+  const handleCopyAgendaFromLastWeek = async () => {
+    if (!priorAgendaItems.length) return;
+    if (!await confirm({
+      message: `Replace this week's agenda with last week's ${priorAgendaItems.length} item(s)? This week's current agenda will be deleted.`,
+    })) return;
+    for (const i of dateItems) await removeItem(i.id);
+    for (const [idx, i] of priorAgendaItems.entries()) {
+      await createItem({ meeting_date: date, item: i.item, notes: i.notes, position: idx + 1 }, { silent: true });
+    }
+  };
+
   const handleCopyUpdatesFromLastWeek = async () => {
     if (!meeting || !priorMeeting) return;
     if (!await confirm({ message: "Replace this week's Updates/Announcements with last week's? This week's current text will be lost." })) return;
@@ -329,7 +345,14 @@ export default function CurrentBishopricMeeting() {
           <InterviewsNeededSection />
 
           <section>
-            <h2 className="text-sm font-semibold text-gray-700 mb-2">Agenda</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold text-gray-700">Agenda</h2>
+              {priorAgendaItems.length > 0 && (
+                <button onClick={handleCopyAgendaFromLastWeek} className="text-xs text-gray-400 hover:text-gray-600">
+                  Copy from last week ({priorAgendaItems.length})
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-2 mb-3">
               <input value={newItem} onChange={e => setNewItem(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAddItem()}
