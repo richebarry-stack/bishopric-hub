@@ -1996,16 +1996,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   if (method === 'DELETE' && recordId) {
+    // interview_pipeline.calling_id rows are auto-created/removed shadow rows the sync
+    // jobs manage based on the calling's status (see syncSettingApartInterviews /
+    // syncCallingInterviews in jobs.ts) — the user never creates or owns that link
+    // directly, so deleting the calling should just take its shadow interviews with it
+    // rather than blocking on the FK constraint.
+    if (tableName === 'calling-pipeline') {
+      await db.prepare('DELETE FROM interview_pipeline WHERE calling_id = ?').bind(recordId).run();
+    }
     try {
       await db.prepare(
         `DELETE FROM ${tableConfig.name} WHERE id = ?`
       ).bind(recordId).run();
     } catch (e) {
       if (isForeignKeyConstraintError(e)) {
-        const message = tableName === 'calling-pipeline'
-          ? 'This calling still has an interview linked to it — remove or reassign the interview first.'
-          : 'This record is still linked to other data and can\'t be deleted.';
-        return json({ error: message }, 409);
+        return json({ error: 'This record is still linked to other data and can\'t be deleted.' }, 409);
       }
       throw e;
     }
