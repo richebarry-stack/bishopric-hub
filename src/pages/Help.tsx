@@ -562,6 +562,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Current Bishopric Meeting: added a "Copy from last week" button on the Agenda section, matching the one already on Move-ins/Move-outs/Other Items — copies last week\'s agenda items (and their notes) into this week in one click instead of re-typing them.',
                 'Fixed a false "someone else just changed this" error that could appear on Calling Pipeline and Current Sacrament Meeting even when no one else was editing — a rapid second save on the same record could read a stale version and trip the conflict check against the user\'s own prior save.',
                 'Fixed deleting a calling from Calling Pipeline sometimes failing outright (with a confusing "someone else changed this" or browser error) when it had a Setting Apart or Calling interview auto-generated for it — those interview rows are just internal bookkeeping the app manages on your behalf, so deleting the calling now removes its linked interview too instead of getting blocked by it.',
+                'Current Bishopric Meeting: added a "Copy everything from last week" button that copies Minutes, Notes, Updates/Announcements, Move-ins, Move-outs, Other Items, and Agenda from last week\'s meeting into this week in one click, replacing whatever is currently there. (Interviews Needed isn\'t tied to a specific week, so it carries forward on its own and isn\'t affected.)',
               ],
             },
             {

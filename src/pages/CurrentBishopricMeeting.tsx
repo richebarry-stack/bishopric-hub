@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useTable } from '../lib/useTable';
-import type { BishopricMeeting, BishopricAgendaItem, SacramentTheme } from '../lib/api';
+import type { BishopricMeeting, BishopricAgendaItem, BishopricMoveItem, SacramentTheme } from '../lib/api';
 import { Input, Textarea } from '../components/FormFields';
 import { useConfirm } from '../components/ConfirmDialog';
+import { toast } from '../lib/toast';
 import { priorMeetingDate } from '../lib/priorWeek';
 import MoveItemsSection from './bishopricMeeting/MoveItemsSection';
 import CalendaringBox from './bishopricMeeting/CalendaringBox';
@@ -134,6 +135,7 @@ function AgendaItemText({ item, onSave }: { item: BishopricAgendaItem; onSave: (
 export default function CurrentBishopricMeeting() {
   const { rows: meetings, isLoading: meetingsLoading, update: updateMeeting } = useTable<BishopricMeeting>('bishopric-meetings');
   const { rows: items, isLoading: itemsLoading, create: createItem, update: updateItem, remove: removeItem } = useTable<BishopricAgendaItem>('bishopric-agenda-items');
+  const { rows: allMoveItems, create: createMoveItem, remove: removeMoveItem } = useTable<BishopricMoveItem>('bishopric-move-items');
   const themes = useTable<SacramentTheme>('sacrament-themes');
   const confirm = useConfirm();
 
@@ -234,6 +236,53 @@ export default function CurrentBishopricMeeting() {
     saveMeetingField('updates_announcements', priorMeeting.updates_announcements || '');
   };
 
+  const priorMoveItems = useMemo(() => {
+    if (!priorDate) return [];
+    return allMoveItems.filter(i => i.meeting_date === priorDate);
+  }, [allMoveItems, priorDate]);
+
+  const thisWeekMoveItems = useMemo(
+    () => allMoveItems.filter(i => i.meeting_date === date),
+    [allMoveItems, date]
+  );
+
+  const hasPriorWeekData = !!priorDate && (
+    !!priorMeeting?.minutes || !!priorMeeting?.notes || !!priorMeeting?.updates_announcements
+    || priorAgendaItems.length > 0 || priorMoveItems.length > 0
+  );
+
+  const handleCopyAllFromLastWeek = async () => {
+    if (!priorDate) return;
+    if (!await confirm({
+      message: `Copy everything from last week's meeting (${formatDate(priorDate)}) into this week? ` +
+        "This will replace this week's Minutes, Notes, Updates/Announcements, Move-ins, Move-outs, Other Items, and Agenda with last week's versions. " +
+        "(Interviews Needed isn't tied to a specific week, so it isn't affected.) This cannot be undone.",
+    })) return;
+
+    if (meeting && priorMeeting) {
+      await updateMeeting(meeting.id, {
+        minutes: priorMeeting.minutes || '',
+        notes: priorMeeting.notes || '',
+        updates_announcements: priorMeeting.updates_announcements || '',
+      }, { silent: true });
+    }
+
+    for (const i of thisWeekMoveItems) await removeMoveItem(i.id);
+    for (const kind of ['move_in', 'move_out', 'other'] as const) {
+      const list = priorMoveItems.filter(i => i.kind === kind).sort((a, b) => a.position - b.position || a.id - b.id);
+      for (const [idx, i] of list.entries()) {
+        await createMoveItem({ meeting_date: date, kind, item: i.item, position: idx + 1 }, { silent: true });
+      }
+    }
+
+    for (const i of dateItems) await removeItem(i.id);
+    for (const [idx, i] of priorAgendaItems.entries()) {
+      await createItem({ meeting_date: date, item: i.item, notes: i.notes, position: idx + 1 }, { silent: true });
+    }
+
+    toast.success("Copied last week's meeting into this week");
+  };
+
   // Move-ins are announced as one combined sentence rather than repeating the
   // preamble per person — a second (or third) click on the same week's agenda
   // appends to the existing line instead of starting a new one.
@@ -275,10 +324,18 @@ export default function CurrentBishopricMeeting() {
         <div className="flex-1 text-center font-semibold text-gray-800">{formatDate(date)}</div>
         <button onClick={() => goToOffset(1)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50">Next ›</button>
       </div>
-      <div className="flex items-center gap-2 -mt-3">
-        <label className="text-xs text-gray-400">Jump to date:</label>
-        <input type="date" value={date} onChange={e => setSelectedDate(e.target.value)}
-          className="text-xs rounded border border-gray-300 px-2 py-1" />
+      <div className="flex items-center justify-between gap-2 -mt-3">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-400">Jump to date:</label>
+          <input type="date" value={date} onChange={e => setSelectedDate(e.target.value)}
+            className="text-xs rounded border border-gray-300 px-2 py-1" />
+        </div>
+        {hasPriorWeekData && (
+          <button onClick={handleCopyAllFromLastWeek}
+            className="text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-200 rounded px-2 py-1 hover:bg-blue-50">
+            Copy everything from last week
+          </button>
+        )}
       </div>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading…</p> : (

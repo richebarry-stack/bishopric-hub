@@ -17,7 +17,10 @@ export default function InterviewsNeededSection() {
 
   return (
     <section>
-      <h2 className="text-sm font-semibold text-gray-700 mb-2">Interviews Needed</h2>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold text-gray-700">Interviews Needed</h2>
+        <span className="text-xs text-gray-400">Carries over automatically until cleared — nothing to copy</span>
+      </div>
       <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-3">
         {flagged.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-2">
