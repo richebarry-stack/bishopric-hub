@@ -557,6 +557,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Aug 10, 2026',
+              items: [
+                'Fixed the LCR roster sync flagging hub accounts as unmatched when someone\'s account uses their preferred name (e.g. "Jake Jones") but LCR only knows their legal name ("Jacob Jones") — the sync now checks the ward roster\'s preferred-name field too, not just the raw LCR export text.',
+              ],
+            },
+            {
               date: 'Aug 9, 2026',
               items: [
                 'Current Bishopric Meeting: added a "Copy from last week" button on the Agenda section, matching the one already on Move-ins/Move-outs/Other Items — copies last week\'s agenda items (and their notes) into this week in one click instead of re-typing them.',

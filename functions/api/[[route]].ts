@@ -1443,8 +1443,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     const roster = (await db.prepare(
-      'SELECT id, first_name, last_name, birth_date, gender, active, out_of_ward FROM ward_members'
-    ).all<RosterMember & { birth_date: string | null; gender: string | null; active: number; out_of_ward: number }>()).results;
+      'SELECT id, first_name, last_name, preferred_first_name, preferred_last_name, birth_date, gender, active, out_of_ward FROM ward_members'
+    ).all<RosterMemberNames & { birth_date: string | null; gender: string | null; active: number; out_of_ward: number }>()).results;
 
     const now = new Date().toISOString();
     const stmts = [];
@@ -1516,8 +1516,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const { last, first } = splitLastFirstCased(toLastFirst(r.name));
       return { id: i + 1, last_name: last, first_name: first };
     });
+    // Two independent checks, either of which clears a hub account: the loose
+    // first-token/prefix match against this run's raw LCR text (handles middle
+    // names and unrecorded nicknames), or resolving through the ward roster's
+    // preferred_first_name/preferred_last_name (handles e.g. a hub account named
+    // "Jake Jones" for a legal "Jacob Jones") and confirming that member showed
+    // up in this sync.
+    const activeRoster = roster.filter(m => m.active);
     const unmatchedHubUsers = hubUsers
-      .filter(u => u.name && !matchRosterMember(u.name, lcrRoster))
+      .filter(u => {
+        if (!u.name) return false;
+        if (matchRosterMember(u.name, lcrRoster)) return false;
+        const member = matchRosterMemberExact(u.name, activeRoster);
+        return !member || !matchedIds.has(member.id);
+      })
       .map(u => `${u.name}${u.church_role ? ` (${u.church_role})` : ''}`);
 
     return json({ ok: true, created, filledDetails, missingFromRoster, unmatchedHubUsers });
