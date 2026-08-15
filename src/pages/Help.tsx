@@ -557,6 +557,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Aug 15, 2026',
+              items: [
+                'Weekly assignment emails now include a List-Unsubscribe header pointing to the Email Notifications settings page, and growinghomegreens.com now has a DMARC record — both improve inbox deliverability and reduce the chance of these emails landing in spam.',
+              ],
+            },
+            {
               date: 'Aug 10, 2026',
               items: [
                 'Fixed the LCR roster sync flagging hub accounts as unmatched when someone\'s account uses their preferred name (e.g. "Jake Jones") but LCR only knows their legal name ("Jacob Jones") — the sync now checks the ward roster\'s preferred-name field too, not just the raw LCR export text.',

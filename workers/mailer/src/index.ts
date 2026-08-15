@@ -123,7 +123,7 @@ function footer(baseUrl: string): { text: string; html: string } {
   };
 }
 
-async function sendMail(env: Env, to: string, subject: string, text: string, html: string): Promise<void> {
+async function sendMail(env: Env, to: string, subject: string, text: string, html: string, headers?: Record<string, string>): Promise<void> {
   const f = footer(env.HUB_BASE_URL);
   await env.EMAIL.send({
     from: { email: env.FROM_ADDRESS, name: env.FROM_NAME },
@@ -131,6 +131,7 @@ async function sendMail(env: Env, to: string, subject: string, text: string, htm
     subject,
     text: text + f.text,
     html: `<div style="font-family:sans-serif">${html}${f.html}</div>`,
+    ...(headers ? { headers } : {}),
   });
 }
 
@@ -179,7 +180,11 @@ async function sendWeeklyMail(env: Env, user: UserRow, items: ActionItem[], date
     : `Your assignments — ${dateLabel}`;
   const text = `${reminderText}Here's everything currently assigned to you in Bishopric Hub:\n\n${textSections.join('\n\n')}`;
   const html = `${reminderHtml}<p>Here's everything currently assigned to you in Bishopric Hub:</p>${htmlSections.join('')}`;
-  await sendMail(env, user.email, subject, text, html);
+  // Not RFC 8058 one-click (the page requires login to toggle the setting), so we
+  // only send List-Unsubscribe as a link, not List-Unsubscribe-Post.
+  await sendMail(env, user.email, subject, text, html, {
+    'List-Unsubscribe': `<${env.HUB_BASE_URL}/email-notifications>`,
+  });
 }
 
 // Next Sunday's calendar date (or today, if today is already Sunday) in `tz` —
