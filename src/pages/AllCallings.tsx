@@ -89,7 +89,7 @@ export default function AllCallings() {
     for (const c of callings) {
       if (c.ward_member_id === null) continue;
       const key = `${c.ward_member_id}|${normCalling(c.calling)}`;
-      if (c.type === 'Calling' && ['7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) s.add(key);
+      if (c.type === 'Calling' && ['6.5 In release discussion', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) s.add(key);
       if (c.type === 'Release' && c.status !== '9. Released') s.add(key);
     }
     return s;
@@ -115,7 +115,7 @@ export default function AllCallings() {
     const s = new Set<number>();
     for (const c of callings) {
       if (c.type !== 'Calling' || c.ward_member_id === null) continue;
-      if (['7. Need to release', '9. Released', '10. Declined'].includes(c.status)) continue;
+      if (['6.5 In release discussion', '7. Need to release', '9. Released', '10. Declined'].includes(c.status)) continue;
       s.add(c.ward_member_id);
     }
     return s;
@@ -137,15 +137,16 @@ export default function AllCallings() {
   const considerForRelease = useCallback((c: MemberCalling, memberName: string) => {
     const existing = activeCallingRowByPair.get(`${c.ward_member_id}|${normCalling(c.calling)}`);
     if (existing) {
-      // Already in the pipeline from when the call was made — flag that row for
-      // release rather than adding a second entry for the same person/calling.
-      updateCalling(existing.id, { status: '7. Need to release', release_recorded: 0 });
+      // Already in the pipeline from when the call was made — flag that row as
+      // being discussed for release rather than adding a second entry for the
+      // same person/calling.
+      updateCalling(existing.id, { status: '6.5 In release discussion', release_recorded: 0 });
     } else {
       createCalling({
         member: memberName,
         calling: c.calling,
         organization: c.organization,
-        status: '7. Need to release',
+        status: '6.5 In release discussion',
         assigned_to: '',
         sustain_recorded: 1,
         set_apart_recorded: c.set_apart ? 1 : 0,

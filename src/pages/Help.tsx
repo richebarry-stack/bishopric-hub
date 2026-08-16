@@ -251,7 +251,7 @@ const FULL_SECTIONS: Section[] = [
         <UL items={[
           '1. Discussion → 2. Pray about → 3. Approved and assigned',
           '4. Called & accepted → 5. Sustained → 6. Set apart',
-          '7. Need to release → 8. Need to thank at pulpit → 9. Released',
+          '6.5 In release discussion → 7. Need to release → 8. Need to thank at pulpit → 9. Released',
         ]} />
         <p>Callings at <strong>4. Called &amp; accepted</strong> appear automatically in the "To Be Sustained" section of the sacrament agenda. Callings at <strong>8. Need to thank at pulpit</strong> appear in "To Be Thanked."</p>
         <p>Three checkboxes track LCR record-keeping — sustaining, setting apart, and (once released) release — each surfaced to the clerk on My Actions until checked. Reaching <strong>5. Sustained</strong> also auto-creates a "Setting Apart" entry on Other Interviews, which clears itself once the setting apart box here is checked or the calling is deleted.</p>
@@ -556,6 +556,12 @@ function VersionHistoryList(limit?: number) {
 }
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
+            {
+              date: 'Aug 16, 2026',
+              items: [
+                'Calling Pipeline: added a "6.5 In release discussion" status. All Callings\' "Consider for release" now sets a calling to this status instead of jumping straight to "7. Need to release", since being considered isn\'t yet a firm decision to release.',
+              ],
+            },
             {
               date: 'Aug 15, 2026',
               items: [

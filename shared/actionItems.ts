@@ -163,13 +163,13 @@ export function computeActionItems(
           }
           continue;
         }
-        if (!c.sustain_recorded && ['5. Sustained', '6. Set apart', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) {
+        if (!c.sustain_recorded && ['5. Sustained', '6. Set apart', '6.5 In release discussion', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) {
           out.push({
             id: `clerk-sustain-${c.id}`, label: `Record sustaining in LCR: ${stripBold(c.member)}`,
             detail: c.calling, link: '/calling-pipeline', source: 'Clerk',
           });
         }
-        if (!c.set_apart_recorded && ['6. Set apart', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) {
+        if (!c.set_apart_recorded && ['6. Set apart', '6.5 In release discussion', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) {
           out.push({
             id: `clerk-setapart-${c.id}`, label: `Record setting apart in LCR: ${stripBold(c.member)}`,
             detail: c.calling, link: '/calling-pipeline', source: 'Clerk',

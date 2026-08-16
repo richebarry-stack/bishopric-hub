@@ -1620,7 +1620,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const CALLING_STATUS_ORDER = [
       '1. Discussion', '2. Pray about', '3. Approved and assigned', '4. Called & accepted',
       '4.5 Call & accepted, handle in class/quorum', '5. Sustained', '6. Set apart',
-      '7. Need to release', '8. Need to thank at pulpit', '9. Released', '10. Declined',
+      '6.5 In release discussion', '7. Need to release', '8. Need to thank at pulpit', '9. Released', '10. Declined',
     ];
     const statusIdx = (s: string) => { const i = CALLING_STATUS_ORDER.indexOf(s); return i === -1 ? 0 : i; };
     const normCalling = (s: string) => stripBold(s).trim().toLowerCase();
