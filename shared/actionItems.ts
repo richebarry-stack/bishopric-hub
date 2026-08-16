@@ -169,7 +169,7 @@ export function computeActionItems(
             detail: c.calling, link: '/calling-pipeline', source: 'Clerk',
           });
         }
-        if (!c.set_apart_recorded && ['6. Set apart', '7. In release discussion', '8. Need to release', '9. Need to thank at pulpit'].includes(c.status)) {
+        if (!c.set_apart_recorded && c.status === '6. Set apart') {
           out.push({
             id: `clerk-setapart-${c.id}`, label: `Record setting apart in LCR: ${stripBold(c.member)}`,
             detail: c.calling, link: '/calling-pipeline', source: 'Clerk',

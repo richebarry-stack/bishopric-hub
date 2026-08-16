@@ -561,6 +561,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
               items: [
                 'Calling Pipeline: added a "7. In release discussion" status, and renumbered the statuses after it to stay sequential integers (8. Need to release, 9. Need to thank at pulpit, 10. Released, 11. Declined). All Callings\' "Consider for release" now sets a calling to "In release discussion" instead of jumping straight to "Need to release", since being considered isn\'t yet a firm decision to release.',
                 'Member Needs: "New Need" now defaults "Share with ward council" to checked, since needs added here are usually meant to be prayed for as a council.',
+                'Clerk action items: "Record setting apart in LCR" now only appears while a calling is at "6. Set apart" — it no longer keeps showing once the calling has moved into the release track (In release discussion, Need to release, Need to thank at pulpit), since by then setting apart is moot.',
               ],
             },
             {
