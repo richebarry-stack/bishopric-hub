@@ -118,7 +118,9 @@ export default function MemberNeeds() {
     update(r.id, { pray_for: r.pray_for ? 0 : 1 });
   };
 
-  const openNew = () => setEditing({ ...EMPTY, shared_with_wc: isWcContext ? 1 : 0 });
+  // Defaults to shared with Ward Council — most needs added here are meant to be
+  // prayed for as a council, not kept bishopric-only.
+  const openNew = () => setEditing({ ...EMPTY, shared_with_wc: 1 });
 
   return (
     <div>
