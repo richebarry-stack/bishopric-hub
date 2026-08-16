@@ -53,7 +53,7 @@ const INTERVIEW_SCHEDULED_STATUSES = new Set([
   'Scheduled for Interview', 'Interviewed', 'Delivered/Complete', 'Needs to be sustained',
 ]);
 
-const CALLING_ACTION_STATUSES = new Set(['3. Approved and assigned', '7. Need to release']);
+const CALLING_ACTION_STATUSES = new Set(['3. Approved and assigned', '8. Need to release']);
 
 export interface TaskRow { id: number; task: string; assigned_to: string; due_date: string; done: number }
 export interface CallingRow {
@@ -155,7 +155,7 @@ export function computeActionItems(
         // entries (type 'Calling' vs 'Release') — sustain/set-apart only apply to a
         // calling, while release-recording only applies to a release entry.
         if (c.type === 'Release') {
-          if (!c.release_recorded && c.status === '9. Released') {
+          if (!c.release_recorded && c.status === '10. Released') {
             out.push({
               id: `clerk-release-${c.id}`, label: `Record release in LCR: ${stripBold(c.member)}`,
               detail: c.calling, link: '/calling-pipeline', source: 'Clerk',
@@ -163,13 +163,13 @@ export function computeActionItems(
           }
           continue;
         }
-        if (!c.sustain_recorded && ['5. Sustained', '6. Set apart', '6.5 In release discussion', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) {
+        if (!c.sustain_recorded && ['5. Sustained', '6. Set apart', '7. In release discussion', '8. Need to release', '9. Need to thank at pulpit'].includes(c.status)) {
           out.push({
             id: `clerk-sustain-${c.id}`, label: `Record sustaining in LCR: ${stripBold(c.member)}`,
             detail: c.calling, link: '/calling-pipeline', source: 'Clerk',
           });
         }
-        if (!c.set_apart_recorded && ['6. Set apart', '6.5 In release discussion', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) {
+        if (!c.set_apart_recorded && ['6. Set apart', '7. In release discussion', '8. Need to release', '9. Need to thank at pulpit'].includes(c.status)) {
           out.push({
             id: `clerk-setapart-${c.id}`, label: `Record setting apart in LCR: ${stripBold(c.member)}`,
             detail: c.calling, link: '/calling-pipeline', source: 'Clerk',

@@ -1028,7 +1028,7 @@ export default function CurrentSacrament() {
   // For current/upcoming dates use live calling-pipeline data.
   // For past dates use the snapshot saved when the agenda was last saved.
   const displayThanksgivings: AgendaCalling[] = isCurrentDate
-    ? callings.rows.filter(c => c.status === '8. Need to thank at pulpit' && !excludedThankIds.has(c.id)).map(toAgendaCalling)
+    ? callings.rows.filter(c => c.status === '9. Need to thank at pulpit' && !excludedThankIds.has(c.id)).map(toAgendaCalling)
     : parseSnapshot(wardBusinessForDate?.thanksgivings_snapshot ?? '[]');
 
   const displaySustainingsList: AgendaCalling[] = isCurrentDate

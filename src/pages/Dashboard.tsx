@@ -19,7 +19,7 @@ import { responsiveGridCols } from '../lib/gridCols';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const DUE_SOON_CUTOFF = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
-const ACTION_STATUSES = new Set(['3. Approved and assigned', '7. Need to release']);
+const ACTION_STATUSES = new Set(['3. Approved and assigned', '8. Need to release']);
 // Everything except still-serving/wrapped-up statuses — this is the dashboard's
 // "in progress toward serving" summary, so those are shown on Missionary Pipeline instead.
 const INACTIVE_MISSIONARY_STATUSES = new Set(['Entered the MTC', 'Entered the Mission Field', 'Released from Mission Field', 'Canceled']);

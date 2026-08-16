@@ -118,7 +118,7 @@ export default function CallingPipeline() {
     }
   };
 
-  const ACTION_STATUSES = new Set(['3. Approved and assigned', '7. Need to release']);
+  const ACTION_STATUSES = new Set(['3. Approved and assigned', '8. Need to release']);
   const actionRows = rows.filter(r => ACTION_STATUSES.has(r.status));
   const prayAboutRows = rows.filter(r => r.status === '2. Pray about');
   const callings = filtered.filter(r => r.type !== 'Release');
@@ -364,7 +364,7 @@ export default function CallingPipeline() {
             <Select label="Organization" value={editing.organization || ''} onChange={v => setEditing({ ...editing, organization: v })} options={ORGANIZATIONS} />
             <Checkbox label="Sustain recorded in LCR" checked={!!editing.sustain_recorded} onChange={v => setEditing({ ...editing, sustain_recorded: v ? 1 : 0 })} />
             <Checkbox label="Setting apart recorded in LCR" checked={!!editing.set_apart_recorded} onChange={v => setEditing({ ...editing, set_apart_recorded: v ? 1 : 0 })} />
-            {editing.status === '9. Released' && (
+            {editing.status === '10. Released' && (
               <Checkbox label="Release recorded in LCR" checked={!!editing.release_recorded} onChange={v => setEditing({ ...editing, release_recorded: v ? 1 : 0 })} />
             )}
             <LastEdited updatedBy={editing.updated_by} updatedAt={editing.updated_at} />

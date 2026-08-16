@@ -89,8 +89,8 @@ export default function AllCallings() {
     for (const c of callings) {
       if (c.ward_member_id === null) continue;
       const key = `${c.ward_member_id}|${normCalling(c.calling)}`;
-      if (c.type === 'Calling' && ['6.5 In release discussion', '7. Need to release', '8. Need to thank at pulpit'].includes(c.status)) s.add(key);
-      if (c.type === 'Release' && c.status !== '9. Released') s.add(key);
+      if (c.type === 'Calling' && ['7. In release discussion', '8. Need to release', '9. Need to thank at pulpit'].includes(c.status)) s.add(key);
+      if (c.type === 'Release' && c.status !== '10. Released') s.add(key);
     }
     return s;
   }, [callings]);
@@ -100,7 +100,7 @@ export default function AllCallings() {
   const activeCallingRowByPair = useMemo(() => {
     const m = new Map<string, CallingPipeline>();
     for (const c of callings) {
-      if (c.type !== 'Calling' || c.ward_member_id === null || c.status === '9. Released' || c.status === '10. Declined') continue;
+      if (c.type !== 'Calling' || c.ward_member_id === null || c.status === '10. Released' || c.status === '11. Declined') continue;
       const key = `${c.ward_member_id}|${normCalling(c.calling)}`;
       const prev = m.get(key);
       if (!prev || c.id > prev.id) m.set(key, c);
@@ -108,14 +108,14 @@ export default function AllCallings() {
     return m;
   }, [callings]);
 
-  // Members actively being considered for a NEW calling — excludes '7. Need to
+  // Members actively being considered for a NEW calling — excludes '8. Need to
   // release', since that's tracking a release from an existing calling, not a
   // pending new one, and shouldn't block "Add for calling consideration".
   const consideredMemberIds = useMemo(() => {
     const s = new Set<number>();
     for (const c of callings) {
       if (c.type !== 'Calling' || c.ward_member_id === null) continue;
-      if (['6.5 In release discussion', '7. Need to release', '9. Released', '10. Declined'].includes(c.status)) continue;
+      if (['7. In release discussion', '8. Need to release', '10. Released', '11. Declined'].includes(c.status)) continue;
       s.add(c.ward_member_id);
     }
     return s;
@@ -126,7 +126,7 @@ export default function AllCallings() {
     const s = new Set<string>();
     for (const c of callings) {
       if (c.type !== 'Calling' || c.ward_member_id !== null) continue;
-      if (['9. Released', '10. Declined'].includes(c.status)) continue;
+      if (['10. Released', '11. Declined'].includes(c.status)) continue;
       s.add(`${normCalling(c.calling)}|${c.organization || ''}`);
     }
     return s;
@@ -140,13 +140,13 @@ export default function AllCallings() {
       // Already in the pipeline from when the call was made — flag that row as
       // being discussed for release rather than adding a second entry for the
       // same person/calling.
-      updateCalling(existing.id, { status: '6.5 In release discussion', release_recorded: 0 });
+      updateCalling(existing.id, { status: '7. In release discussion', release_recorded: 0 });
     } else {
       createCalling({
         member: memberName,
         calling: c.calling,
         organization: c.organization,
-        status: '6.5 In release discussion',
+        status: '7. In release discussion',
         assigned_to: '',
         sustain_recorded: 1,
         set_apart_recorded: c.set_apart ? 1 : 0,

@@ -121,11 +121,11 @@ export const CALLING_STATUSES = [
   '4.5 Call & accepted, handle in class/quorum',
   '5. Sustained',
   '6. Set apart',
-  '6.5 In release discussion',
-  '7. Need to release',
-  '8. Need to thank at pulpit',
-  '9. Released',
-  '10. Declined',
+  '7. In release discussion',
+  '8. Need to release',
+  '9. Need to thank at pulpit',
+  '10. Released',
+  '11. Declined',
 ];
 
 export const CALLING_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
@@ -136,11 +136,11 @@ export const CALLING_STATUS_COLORS: Record<string, { bg: string; text: string }>
   '4.5 Call & accepted, handle in class/quorum': { bg: 'bg-green-50', text: 'text-green-700' },
   '5. Sustained': { bg: 'bg-purple-100', text: 'text-purple-800' },
   '6. Set apart': { bg: 'bg-pink-100', text: 'text-pink-800' },
-  '6.5 In release discussion': { bg: 'bg-yellow-100', text: 'text-yellow-800' },
-  '7. Need to release': { bg: 'bg-orange-100', text: 'text-orange-800' },
-  '8. Need to thank at pulpit': { bg: 'bg-red-100', text: 'text-red-800' },
-  '9. Released': { bg: 'bg-gray-100', text: 'text-gray-600' },
-  '10. Declined': { bg: 'bg-red-50', text: 'text-red-700' },
+  '7. In release discussion': { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+  '8. Need to release': { bg: 'bg-orange-100', text: 'text-orange-800' },
+  '9. Need to thank at pulpit': { bg: 'bg-red-100', text: 'text-red-800' },
+  '10. Released': { bg: 'bg-gray-100', text: 'text-gray-600' },
+  '11. Declined': { bg: 'bg-red-50', text: 'text-red-700' },
 };
 
 export const INTERVIEW_TYPES = [

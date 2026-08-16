@@ -1620,7 +1620,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const CALLING_STATUS_ORDER = [
       '1. Discussion', '2. Pray about', '3. Approved and assigned', '4. Called & accepted',
       '4.5 Call & accepted, handle in class/quorum', '5. Sustained', '6. Set apart',
-      '6.5 In release discussion', '7. Need to release', '8. Need to thank at pulpit', '9. Released', '10. Declined',
+      '7. In release discussion', '8. Need to release', '9. Need to thank at pulpit', '10. Released', '11. Declined',
     ];
     const statusIdx = (s: string) => { const i = CALLING_STATUS_ORDER.indexOf(s); return i === -1 ? 0 : i; };
     const normCalling = (s: string) => stripBold(s).trim().toLowerCase();
@@ -1652,11 +1652,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (backfillStmts.length > 0) await db.batch(backfillStmts);
 
     // A Calling row counts as "superseded" once a Release row for the same
-    // (member, calling) at status='9. Released' was created after it — id order
+    // (member, calling) at status='10. Released' was created after it — id order
     // is used as a chronology proxy since rows aren't otherwise linked.
     const isSuperseded = (c: { id: number; ward_member_id: number | null; calling: string }) =>
       allCallings.some(r => r.type === 'Release' && r.ward_member_id === c.ward_member_id &&
-        normCalling(r.calling) === normCalling(c.calling) && r.status === '9. Released' && r.id > c.id);
+        normCalling(r.calling) === normCalling(c.calling) && r.status === '10. Released' && r.id > c.id);
 
     const stmts = [];
     const changed: { name: string; calling: string; action: string }[] = [];
@@ -1716,20 +1716,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // so an unconfirmed row's absence never means "released," only "unknown."
     const activeCallings = allCallings.filter(c =>
       c.type === 'Calling' && c.ward_member_id !== null && !!c.lcr_calling_confirmed &&
-      !['9. Released', '10. Declined'].includes(c.status) && !isSuperseded(c));
+      !['10. Released', '11. Declined'].includes(c.status) && !isSuperseded(c));
     for (const c of activeCallings) {
       if (seenPairs.has(`${c.ward_member_id}|${normCalling(c.calling)}`)) continue;
 
       const inProgressRelease = allCallings.find(r =>
         r.type === 'Release' && r.ward_member_id === c.ward_member_id &&
-        normCalling(r.calling) === normCalling(c.calling) && r.status !== '9. Released' && r.id > c.id);
+        normCalling(r.calling) === normCalling(c.calling) && r.status !== '10. Released' && r.id > c.id);
 
       if (inProgressRelease) {
-        stmts.push(db.prepare('UPDATE calling_pipeline SET status = ?, release_recorded = 1, updated_at = ? WHERE id = ?').bind('9. Released', now, inProgressRelease.id));
+        stmts.push(db.prepare('UPDATE calling_pipeline SET status = ?, release_recorded = 1, updated_at = ? WHERE id = ?').bind('10. Released', now, inProgressRelease.id));
       } else {
         stmts.push(db.prepare(
           'INSERT INTO calling_pipeline (member, calling, organization, status, release_recorded, type, ward_member_id, assigned_to, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?)'
-        ).bind(c.member, c.calling, c.organization || '', '9. Released', 'Release', c.ward_member_id, '', now, now));
+        ).bind(c.member, c.calling, c.organization || '', '10. Released', 'Release', c.ward_member_id, '', now, now));
       }
       released++;
       changed.push({ name: c.member, calling: c.calling, action: 'released' });
