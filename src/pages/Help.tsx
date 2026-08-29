@@ -557,6 +557,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Aug 29, 2026',
+              items: [
+                'Ward Members: callings shown now include stake callings (e.g. High Council, Stake Young Men), not just ward ones — the weekly LCR sync tool now pulls filled callings from LCR\'s Member Callings report instead of just the ward Organizations page.',
+              ],
+            },
+            {
               date: 'Aug 16, 2026',
               items: [
                 'Calling Pipeline: added a "7. In release discussion" status, and renumbered the statuses after it to stay sequential integers (8. Need to release, 9. Need to thank at pulpit, 10. Released, 11. Declined). All Callings\' "Consider for release" now sets a calling to "In release discussion" instead of jumping straight to "Need to release", since being considered isn\'t yet a firm decision to release.',
