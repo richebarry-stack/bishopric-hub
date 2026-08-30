@@ -6,7 +6,7 @@ import { toast } from '../../lib/toast';
 import InterviewTable from './InterviewTable';
 import InterviewEditModal from './InterviewEditModal';
 import { useInterviews, EMPTY_INTERVIEW } from './useInterviews';
-import { YOUTH_TYPES, TEMPLE_TYPES, computeYouthState } from './shared';
+import { YOUTH_TYPES, TEMPLE_TYPES, computeYouthState, isFarOutRecommendExpiry } from './shared';
 
 export default function InterviewsPage({ title, description, types, showAge, showRecExpires = true, showCalling = false, mergedSectionLabel, showSyncNow = false }: {
   title: string;
@@ -41,9 +41,12 @@ export default function InterviewsPage({ title, description, types, showAge, sho
 
   // Temple-recommend interviews already with the stake get their own table
   // below, always shown, rather than being mixed into (or hidden from) the
-  // regular type sections.
-  const stakeRows = pageRows.filter(r => TEMPLE_TYPES.has(r.type_of_interview) && r.with_stake);
-  const nonStakeRows = pageRows.filter(r => !(TEMPLE_TYPES.has(r.type_of_interview) && r.with_stake));
+  // regular type sections. One that's with the stake and not expiring for
+  // over a year needs no bishopric attention yet, so it's dropped from the
+  // list entirely rather than shown in either place.
+  const isStakeRow = (r: InterviewType) => TEMPLE_TYPES.has(r.type_of_interview) && !!r.with_stake;
+  const stakeRows = pageRows.filter(r => isStakeRow(r) && !isFarOutRecommendExpiry(r.date_recommend_expires || ''));
+  const nonStakeRows = pageRows.filter(r => !isStakeRow(r));
 
   const grouped: [string, InterviewType[]][] = mergedSectionLabel
     ? [[mergedSectionLabel, nonStakeRows.filter(r => YOUTH_TYPES.has(r.type_of_interview))]]

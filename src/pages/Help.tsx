@@ -566,6 +566,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'All Tithing Declaration slots (open or reserved) now also show (hatched) on the Bishop Schedule page, so his calendar reflects that blocked-off time. And on the Tithing Declaration page, "Unreserve" clears a family\'s reservation and reopens the slot without deleting it.',
                 'Tithing Declaration signup page: location is now marked with a 📍 icon, already-booked slots show who reserved them so it\'s clear what\'s taken, and the page tells members to contact the bishopric directly to cancel or change a reservation.',
                 'The Bishop/Counselor Schedule and Tithing Declaration weekly calendars now always fill the available screen height with no scrollbar — row heights scale to fit instead of a fixed size that sometimes left empty space and sometimes forced a scrollbar.',
+                'Adult Temple Interviews: a "With the Stake" recommend that isn\'t expiring for over a year is now dropped from the list entirely, since it doesn\'t need bishopric attention yet.',
               ],
             },
             {

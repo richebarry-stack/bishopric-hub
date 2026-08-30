@@ -22,6 +22,18 @@ export function isPast(d: string): boolean {
   return !!s && s < TODAY;
 }
 
+// A "with the stake" recommend this far out doesn't need bishopric attention yet —
+// used to drop it from the Adult Temple Interviews list entirely until it's closer.
+export function isFarOutRecommendExpiry(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const [year, month] = dateStr.slice(0, 7).split('-').map(Number);
+  if (!year || !month) return false;
+  const expiry = new Date(year, month, 0); // last day of that month
+  const oneYearOut = new Date(); oneYearOut.setHours(0, 0, 0, 0);
+  oneYearOut.setFullYear(oneYearOut.getFullYear() + 1);
+  return expiry.getTime() > oneYearOut.getTime();
+}
+
 export function recommendRowClass(dateStr: string): string {
   if (!dateStr) return '';
   const [year, month] = dateStr.slice(0, 7).split('-').map(Number);
