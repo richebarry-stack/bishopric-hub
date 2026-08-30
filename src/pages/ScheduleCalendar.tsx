@@ -538,7 +538,7 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
                 const isHour = slot.endsWith(':00');
                 return (
                   <tr key={slot} className={isHour ? 'border-t border-gray-200' : ''}>
-                    <td className="px-2 py-0 text-right text-gray-400 font-mono border-r border-gray-200 sticky left-0 bg-white z-10 overflow-hidden"
+                    <td className="px-2 py-0 text-right text-gray-400 font-mono border-r border-gray-200 sticky left-0 bg-white z-10 overflow-hidden whitespace-nowrap"
                       style={{ height: rowHeight, lineHeight: `${rowHeight}px`, fontSize: Math.max(8, Math.min(11, rowHeight - 2)) }}>
                       {isHour ? formatTime12(slot) : ''}
                     </td>
