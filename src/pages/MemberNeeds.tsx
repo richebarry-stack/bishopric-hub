@@ -20,7 +20,7 @@ function addStoredType(type: string) {
   }
 }
 
-const EMPTY: Partial<MemberNeed> = { who: '', what: '', type: '', notes: '', share_with: '', next_steps: '', pray_for: 0 };
+const EMPTY: Partial<MemberNeed> = { who: '', what: '', type: '', notes: '', share_with: '', next_steps: '', pray_for: 1 };
 
 function NeedTable({ rows, onEdit, onDelete, onTogglePray }: {
   rows: MemberNeed[];

@@ -49,6 +49,8 @@ const Ordinances = lazyWithReload(() => import('./pages/Ordinances'));
 const AnnualDuties = lazyWithReload(() => import('./pages/AnnualDuties'));
 const YcMeetings = lazyWithReload(() => import('./pages/YcMeetings'));
 const MyActions = lazyWithReload(() => import('./pages/MyActions'));
+const TithingDeclarationSchedule = lazyWithReload(() => import('./pages/TithingDeclarationSchedule'));
+const TithingDeclarationPublic = lazyWithReload(() => import('./pages/TithingDeclarationPublic'));
 
 const FullScreenLoading = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -86,6 +88,13 @@ function CalGuard({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   const { user, loading, selectedHub } = useAuth();
   const [securitySkipped, setSecuritySkipped] = useState(false);
+  const location = useLocation();
+
+  // Public, unauthenticated tithing-declaration reservation page — must come before
+  // any login gate so members can reserve a slot without an account (hub suggestion #27).
+  if (location.pathname === '/declare-tithing') {
+    return <TithingDeclarationPublic />;
+  }
 
   if (loading) {
     return <FullScreenLoading />;
@@ -203,6 +212,7 @@ function AppRoutes() {
         <Route path="/ordinances" element={<Ordinances />} />
         <Route path="/annual-duties" element={<AnnualDuties />} />
         <Route path="/yc-meetings" element={<YcMeetings />} />
+        <Route path="/tithing-declarations" element={<TithingDeclarationSchedule />} />
         <Route path="/hub-suggestions" element={<HubSuggestions />} />
         <Route path="/help" element={<Help />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />

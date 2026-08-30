@@ -84,6 +84,7 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'ordinances': { name: 'ordinances', orderBy: 'status ASC, target_date ASC' },
   'annual-duties': { name: 'annual_duties', orderBy: 'sort_order ASC, id ASC' },
   'yc-meetings': { name: 'yc_meetings', orderBy: 'date ASC' },
+  'tithing-declarations': { name: 'tithing_declaration_slots', orderBy: 'date ASC, start_time ASC' },
 };
 
 function json(data: unknown, status = 200) {
@@ -562,6 +563,34 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ ok: true });
     }
     return json({ error: 'Method not allowed' }, 405);
+  }
+
+  // Public tithing-declaration slot browsing/reservation — no login required (hub
+  // suggestion #27). Only the two endpoints below bypass the session gate; managing
+  // slot definitions (create/move/delete) still goes through the generic, authenticated
+  // 'tithing-declarations' CRUD table further down.
+  if (routeParts[0] === 'tithing-declarations' && routeParts[1] === 'public' && method === 'GET') {
+    const today = new Date().toISOString().slice(0, 10);
+    const results = await db.prepare(
+      `SELECT id, date, start_time, end_time, location, notes FROM tithing_declaration_slots
+       WHERE reserved_by IS NULL AND date >= ? ORDER BY date ASC, start_time ASC`
+    ).bind(today).all();
+    return json(results.results);
+  }
+
+  if (routeParts[0] === 'tithing-declarations' && routeParts[1] && routeParts[2] === 'reserve' && method === 'POST') {
+    const id = Number(routeParts[1]);
+    if (!id) return json({ error: 'Invalid slot' }, 400);
+    const body = await request.json() as { name?: string; contact?: string };
+    const name = (body.name || '').trim();
+    if (!name) return json({ error: 'Name is required' }, 400);
+    const now = new Date().toISOString();
+    const result = await db.prepare(
+      `UPDATE tithing_declaration_slots SET reserved_by = ?, reserved_contact = ?, reserved_at = ?, updated_at = ?
+       WHERE id = ? AND reserved_by IS NULL`
+    ).bind(name, (body.contact || '').trim() || null, now, now, id).run();
+    if (result.meta.changes === 0) return json({ error: 'That slot is no longer available — please pick another.' }, 409);
+    return json({ ok: true });
   }
 
   // All other endpoints require auth

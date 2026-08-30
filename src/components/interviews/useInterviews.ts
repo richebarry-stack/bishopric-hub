@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../../lib/useTable';
 import type { InterviewPipeline as InterviewType, WardMember, User, CallingPipeline } from '../../lib/api';
@@ -15,12 +15,20 @@ export const EMPTY_INTERVIEW: Partial<InterviewType> = {
 
 export function useInterviews() {
   const { rows, isLoading, create, update, remove } = useTable<InterviewType>('interview-pipeline');
-  const { rows: wardMembers, isLoading: wardMembersLoading, update: updateWardMember } = useTable<WardMember>('ward-members');
+  const { rows: wardMembers, isLoading: wardMembersLoading, update: updateWardMember, refetch: refetchWardMembers } = useTable<WardMember>('ward-members');
   const { rows: callings } = useTable<CallingPipeline>('calling-pipeline');
   const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['users'], queryFn: () => fetch('/api/users').then(r => r.json()) });
 
   const [editing, setEditing] = useState<Partial<InterviewType> | null>(null);
-  const [preferredNameDraft, setPreferredNameDraft] = useState('');
+  const [preferredNameDraft, setPreferredNameDraftRaw] = useState('');
+  // Tracks whether the user actually edited the Preferred Name field in this modal
+  // session, so an unrelated save (e.g. notes) never overwrites ward_members.preferred_first_name
+  // with a possibly-stale draft — see hub suggestion #26 ("speaker name reverts").
+  const [preferredNameTouched, setPreferredNameTouched] = useState(false);
+  const setPreferredNameDraft = (v: string) => {
+    setPreferredNameDraftRaw(v);
+    setPreferredNameTouched(true);
+  };
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [assignedFilter, setAssignedFilter] = useState('');
@@ -175,8 +183,10 @@ export function useInterviews() {
           wardMemberUpdate.last_name = newLast;
           wardMemberUpdate.first_name = newFirst;
         }
-        const newPreferredFirst = preferredNameDraft.trim();
-        if (newPreferredFirst !== (linked.preferred_first_name || '')) wardMemberUpdate.preferred_first_name = newPreferredFirst;
+        if (preferredNameTouched) {
+          const newPreferredFirst = preferredNameDraft.trim();
+          if (newPreferredFirst !== (linked.preferred_first_name || '')) wardMemberUpdate.preferred_first_name = newPreferredFirst;
+        }
         const interviewType = (data.type_of_interview as string) || '';
         if (YOUTH_TYPES.has(interviewType) || TEMPLE_TYPES.has(interviewType)) {
           const newExpires = ((data.date_recommend_expires as string) || '').slice(0, 7);
@@ -213,8 +223,18 @@ export function useInterviews() {
   if (editingIdentity !== prevEditingIdentity) {
     setPrevEditingIdentity(editingIdentity);
     const editingLinkedMember = editing?.ward_member_id ? wardMembersById.get(editing.ward_member_id) : undefined;
-    setPreferredNameDraft(editingLinkedMember?.preferred_first_name || '');
+    setPreferredNameDraftRaw(editingLinkedMember?.preferred_first_name || '');
+    setPreferredNameTouched(false);
   }
+
+  // Refetch ward members when the modal opens on a linked member, so the preferred-name
+  // draft above is seeded from fresh data rather than a cache left stale by edits made
+  // elsewhere (e.g. the Roster page in another tab) — defense in depth alongside the
+  // touched-flag gate in handleSave.
+  useEffect(() => {
+    if (editing?.ward_member_id) refetchWardMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing?.id, editing?.ward_member_id]);
 
   const quickAssignSetup = (id: number, name: string) => update(id, { setup_assigned_to: name }, { silent: true });
   const toggleFlag = (id: number) => {

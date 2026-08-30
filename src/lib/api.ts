@@ -170,6 +170,11 @@ export const api = {
     request<T>(`/${table}/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (table: string, id: number) =>
     request(`/${table}/${id}`, { method: 'DELETE' }),
+  tithingDeclarations: {
+    listPublic: () => request<Pick<TithingDeclarationSlot, 'id' | 'date' | 'start_time' | 'end_time' | 'location' | 'notes'>[]>('/tithing-declarations/public'),
+    reserve: (id: number, data: { name: string; contact?: string }) =>
+      request<{ ok: boolean }>(`/tithing-declarations/${id}/reserve`, { method: 'POST', body: JSON.stringify(data) }),
+  },
 };
 
 export interface User {
@@ -552,6 +557,20 @@ export interface ScheduleEntry {
 export interface PrayerOther {
   id: number;
   name: string;
+}
+
+export interface TithingDeclarationSlot {
+  id: number;
+  date: string;
+  start_time: string;
+  end_time: string;
+  location: string;
+  notes: string;
+  reserved_by: string | null;
+  reserved_contact: string | null;
+  reserved_at: string | null;
+  updated_at?: string;
+  updated_by?: string;
 }
 
 export interface HubSuggestion {

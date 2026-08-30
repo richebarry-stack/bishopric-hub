@@ -105,6 +105,7 @@ export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: s
       { path: '/counselor-schedule',   label: 'Counselor Schedule',     icon: 'ti-calendar-time'   },
       { path: '/tasks',                label: 'Action Items',           icon: 'ti-checklist'       },
       { path: '/out-of-town',          label: 'Out of Town',            icon: 'ti-plane-departure' },
+      { path: '/tithing-declarations', label: 'Tithing Declaration',    icon: 'ti-calendar-dollar' },
     ],
   },
   {
