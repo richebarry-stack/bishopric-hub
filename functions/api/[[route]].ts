@@ -571,9 +571,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // 'tithing-declarations' CRUD table further down.
   if (routeParts[0] === 'tithing-declarations' && routeParts[1] === 'public' && method === 'GET') {
     const today = new Date().toISOString().slice(0, 10);
+    // Includes already-booked slots (with who booked them) so visitors can see what's
+    // taken, not just what's open — but never exposes reserved_contact (phone/email).
     const results = await db.prepare(
-      `SELECT id, date, start_time, end_time, location, notes FROM tithing_declaration_slots
-       WHERE reserved_by IS NULL AND date >= ? ORDER BY date ASC, start_time ASC`
+      `SELECT id, date, start_time, end_time, location, notes, reserved_by FROM tithing_declaration_slots
+       WHERE date >= ? ORDER BY date ASC, start_time ASC`
     ).bind(today).all();
     return json(results.results);
   }

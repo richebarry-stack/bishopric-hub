@@ -9,6 +9,7 @@ interface PublicSlot {
   end_time: string;
   location: string;
   notes: string;
+  reserved_by: string | null;
 }
 
 function formatTime12(t: string): string {
@@ -81,7 +82,8 @@ export default function TithingDeclarationPublic() {
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Tithing Declaration</h1>
-        <p className="text-sm text-gray-600 mb-6">Pick a time below to reserve your appointment. No login required.</p>
+        <p className="text-sm text-gray-600 mb-1">Pick a time below to reserve your appointment. No login required.</p>
+        <p className="text-sm text-gray-500 mb-6">Need to cancel or change your appointment? Please contact the bishopric directly — this page can't cancel a reservation.</p>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -94,7 +96,7 @@ export default function TithingDeclarationPublic() {
         {slots === null && !error ? (
           <p className="text-gray-400 text-sm">Loading available times...</p>
         ) : slots && slots.length === 0 ? (
-          <p className="text-gray-500 text-sm">No open times right now — please check back later.</p>
+          <p className="text-gray-500 text-sm">No times right now — please check back later.</p>
         ) : (
           <div className="space-y-4">
             {[...grouped.entries()].map(([date, daySlots]) => (
@@ -104,12 +106,21 @@ export default function TithingDeclarationPublic() {
                   {daySlots.map(slot => (
                     <li key={slot.id} className="px-4 py-2 flex items-center justify-between gap-2">
                       <div className="text-sm text-gray-800">
-                        {formatTime12(slot.start_time)}–{formatTime12(slot.end_time)} · {slot.location}
+                        <div>{formatTime12(slot.start_time)}–{formatTime12(slot.end_time)}</div>
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                          <span aria-hidden="true">📍</span>{slot.location}
+                        </div>
                         {slot.notes && <div className="text-xs text-gray-400">{slot.notes}</div>}
                       </div>
-                      <button onClick={() => openReserve(slot)} className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-blue-700 whitespace-nowrap">
-                        Reserve
-                      </button>
+                      {slot.reserved_by ? (
+                        <span className="text-xs font-medium text-gray-500 bg-gray-100 rounded-full px-3 py-1.5 whitespace-nowrap">
+                          Reserved — {slot.reserved_by}
+                        </span>
+                      ) : (
+                        <button onClick={() => openReserve(slot)} className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-blue-700 whitespace-nowrap">
+                          Reserve
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -123,7 +134,8 @@ export default function TithingDeclarationPublic() {
         {reserving && (
           <form onSubmit={e => { e.preventDefault(); handleReserve(); }} className="space-y-3">
             <p className="text-sm text-gray-600">
-              {formatDate(reserving.date)} at {formatTime12(reserving.start_time)} — {reserving.location}
+              {formatDate(reserving.date)} at {formatTime12(reserving.start_time)}<br />
+              <span className="text-gray-500"><span aria-hidden="true">📍</span> {reserving.location}</span>
             </p>
             <label className="block">
               <span className="text-sm font-medium text-gray-700">Name *</span>
@@ -135,6 +147,7 @@ export default function TithingDeclarationPublic() {
               <input value={contact} onChange={e => setContact(e.target.value)}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
             </label>
+            <p className="text-xs text-gray-400">To cancel or change this later, contact the bishopric directly.</p>
             {reserveError && <p className="text-sm text-red-600">{reserveError}</p>}
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setReserving(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>

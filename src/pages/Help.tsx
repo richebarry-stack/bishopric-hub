@@ -564,6 +564,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Fixed a bug where a member\'s preferred name (e.g. shown on the Speakers & Prayers page) could silently revert to the legal name after saving an unrelated interview — the Interview edit modal was overwriting it with a stale cached value.',
                 'Fixed the real cause of speaker/prayer names reverting to the legal name: saving a speaker or prayer on the Current Sacrament page (and prayers on Sacrament Planning) normalizes whatever you typed against the ward roster — that normalization was rewriting it to the legal name instead of the person\'s preferred name.',
                 'Reserved Tithing Declaration slots now also show (hatched) on the Bishop Schedule page, so his calendar reflects that blocked-off time. And on the Tithing Declaration page, "Unreserve" clears a family\'s reservation and reopens the slot without deleting it.',
+                'Tithing Declaration signup page: location is now marked with a 📍 icon, already-booked slots show who reserved them so it\'s clear what\'s taken, and the page tells members to contact the bishopric directly to cancel or change a reservation.',
               ],
             },
             {

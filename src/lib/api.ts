@@ -171,7 +171,7 @@ export const api = {
   delete: (table: string, id: number) =>
     request(`/${table}/${id}`, { method: 'DELETE' }),
   tithingDeclarations: {
-    listPublic: () => request<Pick<TithingDeclarationSlot, 'id' | 'date' | 'start_time' | 'end_time' | 'location' | 'notes'>[]>('/tithing-declarations/public'),
+    listPublic: () => request<Pick<TithingDeclarationSlot, 'id' | 'date' | 'start_time' | 'end_time' | 'location' | 'notes' | 'reserved_by'>[]>('/tithing-declarations/public'),
     reserve: (id: number, data: { name: string; contact?: string }) =>
       request<{ ok: boolean }>(`/tithing-declarations/${id}/reserve`, { method: 'POST', body: JSON.stringify(data) }),
   },
