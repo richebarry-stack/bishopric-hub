@@ -562,6 +562,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Added Tithing Declaration: bishopric can publish appointment slots (date, time, location) on a new "Tithing Declaration" admin calendar, and members reserve an open slot at /declare-tithing with no login required — one family per slot. A "Reservations" list at the top of the calendar shows who has reserved a slot at a glance, and the Bishop\'s existing calendar is overlaid (hatched) for reference when picking times — that overlay is never sent to the public reservation page.',
                 'Member Needs: "+ Add Need" now defaults "Include in prayer list" to checked, matching the Dashboard and Ward Council quick-add forms.',
                 'Fixed a bug where a member\'s preferred name (e.g. shown on the Speakers & Prayers page) could silently revert to the legal name after saving an unrelated interview — the Interview edit modal was overwriting it with a stale cached value.',
+                'Fixed the real cause of speaker/prayer names reverting to the legal name: saving a speaker or prayer on the Current Sacrament page (and prayers on Sacrament Planning) normalizes whatever you typed against the ward roster — that normalization was rewriting it to the legal name instead of the person\'s preferred name.',
               ],
             },
             {

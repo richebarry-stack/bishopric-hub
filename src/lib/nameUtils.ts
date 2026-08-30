@@ -1,4 +1,4 @@
-import { legalName } from './displayName';
+import { displayName } from './displayName';
 import { buildNameIndex, matchMember, type NameIndexMember } from './nameMatch';
 
 /**
@@ -7,7 +7,9 @@ import { buildNameIndex, matchMember, type NameIndexMember } from './nameMatch';
  *
  * Accepts "Firstname Lastname", "Lastname, Firstname", and preferred-name
  * variants of either order.
- * Returns the matched member's legal name, or the original trimmed string if
+ * Returns the matched member's display name (preferred name if set, else legal
+ * name) so typing a preferred-name variant doesn't get normalized back to the
+ * legal name — see hub suggestion #26. Returns the original trimmed string if
  * no match (e.g. missionaries, visitors).
  */
 export function resolveMemberName(raw: string, members: NameIndexMember[]): string {
@@ -15,5 +17,5 @@ export function resolveMemberName(raw: string, members: NameIndexMember[]): stri
   if (!trimmed) return trimmed;
   const index = buildNameIndex(members);
   const match = matchMember(index, trimmed);
-  return match ? legalName(match) : trimmed;
+  return match ? displayName(match) : trimmed;
 }
