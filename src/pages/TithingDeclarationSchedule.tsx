@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useLayoutEffect } from 'react';
 import { useTable } from '../lib/useTable';
 import type { TithingDeclarationSlot, ScheduleEntry } from '../lib/api';
 import { parseCalendars } from '../lib/scheduleCalendars';
@@ -90,6 +90,26 @@ export default function TithingDeclarationSchedule() {
   const [saving, setSaving] = useState(false);
   const [monthPicker, setMonthPicker] = useState(false);
   const confirm = useConfirm();
+
+  // The grid always fills its container's full height with no scrollbar: rowHeight is
+  // computed from the container's actual height (minus the header row) rather than a
+  // fixed pixel value, so all TIME_SLOTS rows exactly fill whatever space is available.
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+  const theadRef = useRef<HTMLTableSectionElement>(null);
+  const [rowHeight, setRowHeight] = useState(20);
+  useLayoutEffect(() => {
+    const el = gridContainerRef.current;
+    if (!el) return;
+    const compute = () => {
+      const headH = theadRef.current?.getBoundingClientRect().height ?? 0;
+      const available = el.clientHeight - headH;
+      if (available > 0) setRowHeight(available / TIME_SLOTS.length);
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const todayKey = toKey(new Date());
   const weekDays = useMemo(() => getWeekDays(weekStart), [weekStart]);
@@ -256,9 +276,9 @@ export default function TithingDeclarationSchedule() {
       )}
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-auto max-h-[calc(100vh-10rem)]">
-          <table className="w-full border-collapse text-xs" style={{ minWidth: 800 }}>
-            <thead className="sticky top-0 z-10">
+        <div ref={gridContainerRef} className="bg-white rounded-lg border border-gray-200 overflow-x-auto overflow-y-hidden h-[calc(100vh-10rem)]">
+          <table className="w-full h-full border-collapse text-xs" style={{ minWidth: 800 }}>
+            <thead ref={theadRef}>
               <tr className="bg-gray-50">
                 <th className="w-16 px-2 py-2 text-right text-gray-500 font-medium border-b border-r border-gray-200 sticky left-0 bg-gray-50 z-20"></th>
                 {weekDays.map(d => {
@@ -281,7 +301,7 @@ export default function TithingDeclarationSchedule() {
                 return (
                   <tr key={slot} className={isHour ? 'border-t border-gray-200' : ''}>
                     <td className={`px-2 py-0 text-right text-gray-400 font-mono border-r border-gray-200 sticky left-0 bg-white z-10 ${isHour ? 'align-top pt-0.5' : ''}`}
-                      style={{ height: 20 }}>
+                      style={{ height: rowHeight }}>
                       {isHour ? formatTime12(slot) : ''}
                     </td>
                     {weekDays.map(d => {
@@ -303,7 +323,7 @@ export default function TithingDeclarationSchedule() {
                             ${isHour ? 'border-t border-gray-200' : 'border-t border-gray-50'}
                             ${dayKey === todayKey ? 'bg-blue-50/30' : ''}
                             ${!occupiedBy && startingHere.length === 0 ? 'cursor-pointer hover:bg-blue-50/50' : ''}`}
-                          style={{ height: 20, padding: 0 }}
+                          style={{ height: rowHeight, padding: 0 }}
                           onClick={() => {
                             if (occupiedBy) return;
                             if (startingHere.length === 1) openEditor(startingHere[0]);
@@ -320,7 +340,7 @@ export default function TithingDeclarationSchedule() {
                                 className="absolute rounded overflow-hidden select-none pointer-events-none"
                                 style={{
                                   top: 0,
-                                  height: span * 20,
+                                  height: span * rowHeight,
                                   left: '1px',
                                   width: 'calc(100% - 2px)',
                                   zIndex: 1,
@@ -345,7 +365,7 @@ export default function TithingDeclarationSchedule() {
                                   ${reserved ? 'bg-green-600' : 'bg-blue-500'}`}
                                 style={{
                                   top: 0,
-                                  height: span * 20,
+                                  height: span * rowHeight,
                                   left: laneCount > 1 ? `calc(${entryIdx * laneWidth}% + 1px)` : '1px',
                                   width: laneCount > 1 ? `calc(${laneWidth}% - 2px)` : 'calc(100% - 2px)',
                                   lineHeight: '1.2',

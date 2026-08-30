@@ -565,6 +565,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Fixed the real cause of speaker/prayer names reverting to the legal name: saving a speaker or prayer on the Current Sacrament page (and prayers on Sacrament Planning) normalizes whatever you typed against the ward roster — that normalization was rewriting it to the legal name instead of the person\'s preferred name.',
                 'All Tithing Declaration slots (open or reserved) now also show (hatched) on the Bishop Schedule page, so his calendar reflects that blocked-off time. And on the Tithing Declaration page, "Unreserve" clears a family\'s reservation and reopens the slot without deleting it.',
                 'Tithing Declaration signup page: location is now marked with a 📍 icon, already-booked slots show who reserved them so it\'s clear what\'s taken, and the page tells members to contact the bishopric directly to cancel or change a reservation.',
+                'The Bishop/Counselor Schedule and Tithing Declaration weekly calendars now always fill the available screen height with no scrollbar — row heights scale to fit instead of a fixed size that sometimes left empty space and sometimes forced a scrollbar.',
               ],
             },
             {
