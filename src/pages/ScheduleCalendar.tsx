@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useTable } from '../lib/useTable';
-import type { ScheduleEntry, ScheduleCalendar as ScheduleCalendarName } from '../lib/api';
+import type { ScheduleEntry, ScheduleCalendar as ScheduleCalendarName, TithingDeclarationSlot } from '../lib/api';
 import { parseCalendars, stringifyCalendars } from '../lib/scheduleCalendars';
 import Modal from '../components/Modal';
 import { Input, Textarea, Select, Checkbox } from '../components/FormFields';
@@ -126,8 +126,22 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
   subtitle: string;
 }) {
   const { rows: allRows, isLoading, create, update, remove } = useTable<ScheduleEntry>('schedule-entries');
+  // Tithing declaration slots someone has actually reserved block the Bishop's time —
+  // shown as a read-only overlay on his calendar tab so it's obvious at a glance.
+  const { rows: tithingRows } = useTable<TithingDeclarationSlot>('tithing-declarations');
   const [activeTab, setActiveTab] = useState<ScheduleCalendarName>(availableCalendars[0]);
   const rows = useMemo(() => allRows.filter(r => parseCalendars(r.calendars).includes(activeTab)), [allRows, activeTab]);
+  const tithingEntriesByDate = useMemo(() => {
+    const map = new Map<string, TithingDeclarationSlot[]>();
+    if (activeTab !== 'Bishop') return map;
+    for (const e of tithingRows) {
+      if (!e.reserved_by) continue;
+      const key = e.date.slice(0, 10);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(e);
+    }
+    return map;
+  }, [tithingRows, activeTab]);
   const [weekStart, setWeekStart] = useState(() => defaultWeekStart());
   const [editing, setEditing] = useState<FormState | null>(null);
   const confirm = useConfirm();
@@ -434,7 +448,16 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
           </div>
         </div>
       </div>
-      <p className="text-sm text-gray-500 mb-3">{subtitle}</p>
+      <p className="text-sm text-gray-500 mb-3">
+        {subtitle}
+        {activeTab === 'Bishop' && tithingRows.some(e => e.reserved_by) && (
+          <>
+            {' '}
+            <span className="inline-block align-middle w-3 h-3 rounded-sm mr-1" style={{ background: 'repeating-linear-gradient(45deg, rgba(217,119,6,0.6), rgba(217,119,6,0.6) 2px, rgba(217,119,6,0.3) 2px, rgba(217,119,6,0.3) 4px)' }} />
+            hatched areas are reserved Tithing Declaration appointments.
+          </>
+        )}
+      </p>
 
       {availableCalendars.length > 1 && (
         <div className="flex gap-1 mb-4 border-b border-gray-200">
@@ -493,6 +516,8 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
                         && dragState.previewDate === dayKey
                         && dragState.previewStartIdx === si;
 
+                      const tithingStartingHere = (tithingEntriesByDate.get(dayKey) || []).filter(e => e.start_time === slot);
+
                       return (
                         <td
                           key={dayKey}
@@ -512,6 +537,26 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
                             else if (startingHere.length === 0) handleSlotClick(dayKey, slot);
                           }}
                         >
+                          {tithingStartingHere.map(entry => {
+                            const startIdx = slotIndex(entry.start_time);
+                            const endIdx = slotIndex(entry.end_time);
+                            const span = Math.max(1, endIdx - startIdx);
+                            return (
+                              <div
+                                key={`tithing-${entry.id}`}
+                                className="absolute rounded overflow-hidden select-none pointer-events-none"
+                                style={{
+                                  top: 0,
+                                  height: span * 20,
+                                  left: '1px',
+                                  width: 'calc(100% - 2px)',
+                                  zIndex: 1,
+                                  background: 'repeating-linear-gradient(45deg, rgba(217,119,6,0.3), rgba(217,119,6,0.3) 4px, rgba(217,119,6,0.15) 4px, rgba(217,119,6,0.15) 8px)',
+                                }}
+                                title={`Tithing Declaration: ${entry.reserved_by} — ${entry.location}`}
+                              />
+                            );
+                          })}
                           {startingHere.map((entry, entryIdx) => {
                             const isBeingMoved = dragState?.type === 'move' && dragState.entryId === entry.id;
                             const isBeingResized = dragState?.type === 'resize' && dragState.entryId === entry.id;

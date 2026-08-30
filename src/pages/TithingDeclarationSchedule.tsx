@@ -153,6 +153,19 @@ export default function TithingDeclarationSchedule() {
     setEditing(null);
   };
 
+  const handleUnreserve = async () => {
+    if (!editing?.id) return;
+    const current = rows.find(r => r.id === editing.id);
+    if (!await confirm({ message: `Remove ${current?.reserved_by || 'this family'}'s reservation? The slot stays and becomes open again.` })) return;
+    setSaving(true);
+    try {
+      await update(editing.id, { reserved_by: null, reserved_contact: null, reserved_at: null });
+      setEditing(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const goToday = () => setWeekStart(defaultWeekStart());
   const goPrev = () => setWeekStart(w => startOfWeek(addWeeks(w, -1)));
   const goNext = () => setWeekStart(w => startOfWeek(addWeeks(w, 1)));
@@ -393,9 +406,12 @@ export default function TithingDeclarationSchedule() {
             {editing.id && (() => {
               const current = rows.find(r => r.id === editing.id);
               return current?.reserved_by ? (
-                <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
-                  Reserved by {current.reserved_by}{current.reserved_contact ? ` (${current.reserved_contact})` : ''}
-                </p>
+                <div className="flex items-center justify-between gap-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+                  <span>Reserved by {current.reserved_by}{current.reserved_contact ? ` (${current.reserved_contact})` : ''}</span>
+                  <button type="button" onClick={handleUnreserve} disabled={saving} className="text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap disabled:opacity-50">
+                    Unreserve
+                  </button>
+                </div>
               ) : null;
             })()}
             <div className="flex justify-between pt-2">
