@@ -91,24 +91,33 @@ export default function TithingDeclarationSchedule() {
   const [monthPicker, setMonthPicker] = useState(false);
   const confirm = useConfirm();
 
-  // The grid always fills its container's full height with no scrollbar: rowHeight is
-  // computed from the container's actual height (minus the header row) rather than a
-  // fixed pixel value, so all TIME_SLOTS rows exactly fill whatever space is available.
+  // The grid always fills the remaining viewport height with no scrollbar: its own
+  // height is measured against where it actually sits (window height minus its
+  // distance from the top, whatever that ends up being — not a guessed constant, since
+  // that guess can undershoot the real chrome above, e.g. the Reservations list growing,
+  // and push rows below the fold with no way to reach them). rowHeight then divides that
+  // up evenly across TIME_SLOTS. overflow stays auto as a safety net so content is never
+  // unreachable even if a window gets resized smaller than one row's minimum content height.
   const gridContainerRef = useRef<HTMLDivElement>(null);
   const theadRef = useRef<HTMLTableSectionElement>(null);
   const [rowHeight, setRowHeight] = useState(20);
+  const [containerHeight, setContainerHeight] = useState<number | null>(null);
   useLayoutEffect(() => {
     const el = gridContainerRef.current;
     if (!el) return;
     const compute = () => {
+      const top = el.getBoundingClientRect().top;
+      const available = Math.max(300, window.innerHeight - top - 16);
+      setContainerHeight(available);
       const headH = theadRef.current?.getBoundingClientRect().height ?? 0;
-      const available = el.clientHeight - headH;
-      if (available > 0) setRowHeight(available / TIME_SLOTS.length);
+      const rowsAvailable = available - headH;
+      if (rowsAvailable > 0) setRowHeight(rowsAvailable / TIME_SLOTS.length);
     };
     compute();
     const ro = new ResizeObserver(compute);
-    ro.observe(el);
-    return () => ro.disconnect();
+    ro.observe(document.body);
+    window.addEventListener('resize', compute);
+    return () => { ro.disconnect(); window.removeEventListener('resize', compute); };
   }, []);
 
   const todayKey = toKey(new Date());
@@ -276,9 +285,10 @@ export default function TithingDeclarationSchedule() {
       )}
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
-        <div ref={gridContainerRef} className="bg-white rounded-lg border border-gray-200 overflow-x-auto overflow-y-hidden h-[calc(100vh-10rem)]">
+        <div ref={gridContainerRef} className="bg-white rounded-lg border border-gray-200 overflow-x-auto overflow-y-auto"
+          style={{ height: containerHeight ?? 'calc(100vh - 10rem)' }}>
           <table className="w-full h-full border-collapse text-xs" style={{ minWidth: 800 }}>
-            <thead ref={theadRef}>
+            <thead ref={theadRef} className="sticky top-0 z-10">
               <tr className="bg-gray-50">
                 <th className="w-16 px-2 py-2 text-right text-gray-500 font-medium border-b border-r border-gray-200 sticky left-0 bg-gray-50 z-20"></th>
                 {weekDays.map(d => {
