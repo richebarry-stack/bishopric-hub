@@ -126,8 +126,8 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
   subtitle: string;
 }) {
   const { rows: allRows, isLoading, create, update, remove } = useTable<ScheduleEntry>('schedule-entries');
-  // Tithing declaration slots someone has actually reserved block the Bishop's time —
-  // shown as a read-only overlay on his calendar tab so it's obvious at a glance.
+  // Every tithing declaration slot — open or reserved — sets aside time on the Bishop's
+  // calendar, so all of them show as a read-only overlay on his calendar tab.
   const { rows: tithingRows } = useTable<TithingDeclarationSlot>('tithing-declarations');
   const [activeTab, setActiveTab] = useState<ScheduleCalendarName>(availableCalendars[0]);
   const rows = useMemo(() => allRows.filter(r => parseCalendars(r.calendars).includes(activeTab)), [allRows, activeTab]);
@@ -135,7 +135,6 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
     const map = new Map<string, TithingDeclarationSlot[]>();
     if (activeTab !== 'Bishop') return map;
     for (const e of tithingRows) {
-      if (!e.reserved_by) continue;
       const key = e.date.slice(0, 10);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(e);
@@ -450,11 +449,11 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
       </div>
       <p className="text-sm text-gray-500 mb-3">
         {subtitle}
-        {activeTab === 'Bishop' && tithingRows.some(e => e.reserved_by) && (
+        {activeTab === 'Bishop' && tithingRows.length > 0 && (
           <>
             {' '}
             <span className="inline-block align-middle w-3 h-3 rounded-sm mr-1" style={{ background: 'repeating-linear-gradient(45deg, rgba(217,119,6,0.6), rgba(217,119,6,0.6) 2px, rgba(217,119,6,0.3) 2px, rgba(217,119,6,0.3) 4px)' }} />
-            hatched areas are reserved Tithing Declaration appointments.
+            hatched areas are Tithing Declaration slots (reserved or still open).
           </>
         )}
       </p>
@@ -553,7 +552,7 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
                                   zIndex: 1,
                                   background: 'repeating-linear-gradient(45deg, rgba(217,119,6,0.3), rgba(217,119,6,0.3) 4px, rgba(217,119,6,0.15) 4px, rgba(217,119,6,0.15) 8px)',
                                 }}
-                                title={`Tithing Declaration: ${entry.reserved_by} — ${entry.location}`}
+                                title={`Tithing Declaration: ${entry.reserved_by ? `Reserved — ${entry.reserved_by}` : 'Open'} — ${entry.location}`}
                               />
                             );
                           })}
