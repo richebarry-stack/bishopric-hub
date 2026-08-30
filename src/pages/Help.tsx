@@ -559,7 +559,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Aug 30, 2026',
               items: [
-                'Added Tithing Declaration: bishopric can publish appointment slots (date, time, location) on a new "Tithing Declaration" admin calendar, and members reserve an open slot at /declare-tithing with no login required — one family per slot.',
+                'Added Tithing Declaration: bishopric can publish appointment slots (date, time, location) on a new "Tithing Declaration" admin calendar, and members reserve an open slot at /declare-tithing with no login required — one family per slot. A "Reservations" list at the top of the calendar shows who has reserved a slot at a glance.',
                 'Member Needs: "+ Add Need" now defaults "Include in prayer list" to checked, matching the Dashboard and Ward Council quick-add forms.',
                 'Fixed a bug where a member\'s preferred name (e.g. shown on the Speakers & Prayers page) could silently revert to the legal name after saving an unrelated interview — the Interview edit modal was overwriting it with a stale cached value.',
               ],

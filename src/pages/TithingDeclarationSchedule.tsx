@@ -29,6 +29,15 @@ function slotIndex(t: string): number {
   return TIME_SLOTS.indexOf(t);
 }
 
+function parseDateKey(d: string): Date {
+  const [y, m, day] = d.split('-').map(Number);
+  return new Date(y, m - 1, day);
+}
+
+function formatDateShort(d: string): string {
+  return parseDateKey(d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 function addWeeks(d: Date, n: number): Date {
   const r = new Date(d);
   r.setDate(r.getDate() + n * 7);
@@ -90,6 +99,11 @@ export default function TithingDeclarationSchedule() {
     }
     return map;
   }, [rows]);
+
+  const reservations = useMemo(() =>
+    rows.filter(r => r.reserved_by)
+      .sort((a, b) => a.date === b.date ? a.start_time.localeCompare(b.start_time) : a.date.localeCompare(b.date)),
+    [rows]);
 
   const handleSlotClick = (date: string, time: string) => {
     const si = slotIndex(time);
@@ -185,6 +199,32 @@ export default function TithingDeclarationSchedule() {
         Click an open cell to add a slot. Members reserve slots without logging in at <span className="font-mono">/declare-tithing</span> — each slot holds one family.
       </p>
 
+      {!isLoading && (
+        <div className="bg-white rounded-lg border border-gray-200 mb-4">
+          <div className="bg-gray-50 px-4 py-2 font-medium text-gray-700 text-sm border-b border-gray-200">
+            Reservations {reservations.length > 0 && <span className="text-gray-400 font-normal">({reservations.length})</span>}
+          </div>
+          {reservations.length === 0 ? (
+            <p className="text-sm text-gray-400 px-4 py-3">No one has reserved a slot yet.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {reservations.map(r => (
+                <li key={r.id} className="px-4 py-2 flex items-center justify-between gap-2 hover:bg-gray-50 cursor-pointer"
+                  onClick={() => { setWeekStart(startOfWeek(parseDateKey(r.date))); openEditor(r); }}>
+                  <div>
+                    <span className="font-medium text-gray-800">{r.reserved_by}</span>
+                    {r.reserved_contact && <span className="text-gray-400 text-sm ml-2">{r.reserved_contact}</span>}
+                  </div>
+                  <div className="text-sm text-gray-500 whitespace-nowrap">
+                    {formatDateShort(r.date)} · {formatTime12(r.start_time)} · {r.location}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-auto max-h-[calc(100vh-10rem)]">
           <table className="w-full border-collapse text-xs" style={{ minWidth: 800 }}>
@@ -260,11 +300,14 @@ export default function TithingDeclarationSchedule() {
                                   zIndex: 5,
                                 }}
                                 onClick={e => { e.stopPropagation(); openEditor(entry); }}
+                                title={reserved
+                                  ? `Reserved by ${entry.reserved_by}${entry.reserved_contact ? ` (${entry.reserved_contact})` : ''} — ${entry.location}`
+                                  : `Open — ${entry.location}`}
                               >
-                                <div className="font-medium truncate">{entry.location}</div>
+                                <div className="font-medium truncate">{reserved ? entry.reserved_by : entry.location}</div>
                                 {span > 2 && (
                                   <div className="truncate text-xs text-white/80">
-                                    {reserved ? entry.reserved_by : 'Open'}
+                                    {reserved ? entry.location : 'Open'}
                                   </div>
                                 )}
                               </div>
