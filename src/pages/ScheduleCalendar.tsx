@@ -39,6 +39,11 @@ function buildSlots(): string[] {
 
 const TIME_SLOTS = buildSlots();
 
+// A 15-minute row never shrinks below this — small enough to fit more on tall
+// screens, but tall enough that an appointment's title text stays readable.
+// Below this, the grid scrolls instead of cramming everything onto the screen.
+const MIN_ROW_HEIGHT = 18;
+
 function formatTime12(t: string): string {
   const [hh, mm] = t.split(':').map(Number);
   const ampm = hh >= 12 ? 'PM' : 'AM';
@@ -174,7 +179,7 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
       setContainerHeight(available);
       const headH = theadRef.current?.getBoundingClientRect().height ?? 0;
       const rowsAvailable = available - headH;
-      if (rowsAvailable > 0) setRowHeight(Math.floor(rowsAvailable / TIME_SLOTS.length));
+      if (rowsAvailable > 0) setRowHeight(Math.max(MIN_ROW_HEIGHT, Math.floor(rowsAvailable / TIME_SLOTS.length)));
     };
     compute();
     const ro = new ResizeObserver(compute);
