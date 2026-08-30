@@ -181,7 +181,10 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
     ro.observe(document.body);
     window.addEventListener('resize', compute);
     return () => { ro.disconnect(); window.removeEventListener('resize', compute); };
-  }, []);
+    // Re-run once loading finishes and the grid (with this ref) actually mounts —
+    // on first mount it's still hidden behind "Loading...", so the ref is null and
+    // this effect would otherwise never get another chance to measure it.
+  }, [isLoading]);
 
   const todayKey = toKey(new Date());
   const weekDays = useMemo(() => getWeekDays(weekStart), [weekStart]);
@@ -530,8 +533,8 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
                 const isHour = slot.endsWith(':00');
                 return (
                   <tr key={slot} className={isHour ? 'border-t border-gray-200' : ''}>
-                    <td className={`px-2 py-0 text-right text-gray-400 font-mono border-r border-gray-200 sticky left-0 bg-white z-10 ${isHour ? 'align-top pt-0.5' : ''}`}
-                      style={{ height: rowHeight }}>
+                    <td className="px-2 py-0 text-right text-gray-400 font-mono border-r border-gray-200 sticky left-0 bg-white z-10 overflow-hidden"
+                      style={{ height: rowHeight, lineHeight: `${rowHeight}px`, fontSize: Math.max(8, Math.min(11, rowHeight - 2)) }}>
                       {isHour ? formatTime12(slot) : ''}
                     </td>
                     {weekDays.map(d => {
