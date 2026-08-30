@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useTable } from '../lib/useTable';
-import type { TithingDeclarationSlot } from '../lib/api';
+import type { TithingDeclarationSlot, ScheduleEntry } from '../lib/api';
+import { parseCalendars } from '../lib/scheduleCalendars';
 import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -81,6 +82,9 @@ interface FormState {
 
 export default function TithingDeclarationSchedule() {
   const { rows, isLoading, create, update, remove } = useTable<TithingDeclarationSlot>('tithing-declarations');
+  // Bishop's existing calendar, shown as a read-only busy overlay so the bishopric can see
+  // conflicts while adding slots — this data is never sent to the public reservation page.
+  const { rows: scheduleRows } = useTable<ScheduleEntry>('schedule-entries');
   const [weekStart, setWeekStart] = useState(() => defaultWeekStart());
   const [editing, setEditing] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -99,6 +103,17 @@ export default function TithingDeclarationSchedule() {
     }
     return map;
   }, [rows]);
+
+  const bishopEntriesByDate = useMemo(() => {
+    const map = new Map<string, ScheduleEntry[]>();
+    for (const e of scheduleRows) {
+      if (!parseCalendars(e.calendars).includes('Bishop')) continue;
+      const key = e.date.slice(0, 10);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(e);
+    }
+    return map;
+  }, [scheduleRows]);
 
   const reservations = useMemo(() =>
     rows.filter(r => r.reserved_by)
@@ -196,7 +211,9 @@ export default function TithingDeclarationSchedule() {
         </div>
       </div>
       <p className="text-sm text-gray-500 mb-3">
-        Click an open cell to add a slot. Members reserve slots without logging in at <span className="font-mono">/declare-tithing</span> — each slot holds one family.
+        Click an open cell to add a slot. Members reserve slots without logging in at <span className="font-mono">/declare-tithing</span> — each slot holds one family. The
+        {' '}<span className="inline-block align-middle w-3 h-3 rounded-sm mr-1" style={{ background: 'repeating-linear-gradient(45deg, rgba(107,114,128,0.5), rgba(107,114,128,0.5) 2px, rgba(107,114,128,0.25) 2px, rgba(107,114,128,0.25) 4px)' }} />
+        hatched areas show the Bishop's existing calendar for reference — that's for your eyes only, never shown to members reserving a slot.
       </p>
 
       {!isLoading && (
@@ -263,6 +280,8 @@ export default function TithingDeclarationSchedule() {
                         const eEnd = slotIndex(e.end_time);
                         return si > eStart && si < eEnd;
                       });
+                      const bishopDayEntries = bishopEntriesByDate.get(dayKey) || [];
+                      const bishopStartingHere = bishopDayEntries.filter(e => e.start_time === slot);
 
                       return (
                         <td
@@ -278,6 +297,26 @@ export default function TithingDeclarationSchedule() {
                             else if (startingHere.length === 0) handleSlotClick(dayKey, slot);
                           }}
                         >
+                          {bishopStartingHere.map(entry => {
+                            const startIdx = slotIndex(entry.start_time);
+                            const endIdx = slotIndex(entry.end_time);
+                            const span = Math.max(1, endIdx - startIdx);
+                            return (
+                              <div
+                                key={`bishop-${entry.id}`}
+                                className="absolute rounded overflow-hidden select-none pointer-events-none"
+                                style={{
+                                  top: 0,
+                                  height: span * 20,
+                                  left: '1px',
+                                  width: 'calc(100% - 2px)',
+                                  zIndex: 1,
+                                  background: 'repeating-linear-gradient(45deg, rgba(107,114,128,0.25), rgba(107,114,128,0.25) 4px, rgba(107,114,128,0.12) 4px, rgba(107,114,128,0.12) 8px)',
+                                }}
+                                title={`Bishop's calendar: ${entry.title}`}
+                              />
+                            );
+                          })}
                           {startingHere.map((entry, entryIdx) => {
                             const startIdx = slotIndex(entry.start_time);
                             const endIdx = slotIndex(entry.end_time);
