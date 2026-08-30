@@ -157,9 +157,10 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
   // height is measured against where it actually sits (window height minus its
   // distance from the top, whatever that ends up being — not a guessed constant, since
   // that guess can undershoot the real chrome above and push rows below the fold with
-  // no way to reach them). rowHeight then divides that up evenly across TIME_SLOTS.
-  // overflow stays auto as a safety net so content is never unreachable even if a
-  // window gets resized smaller than one row's minimum content height.
+  // no way to reach them). rowHeight then divides that up evenly across TIME_SLOTS,
+  // floored to a whole pixel so N rows can never sum to more than the container's
+  // height due to sub-pixel rounding — that's what forces a 1px scrollbar even when
+  // the math is otherwise exact.
   const gridContainerRef = useRef<HTMLDivElement>(null);
   const theadRef = useRef<HTMLTableSectionElement>(null);
   const [rowHeight, setRowHeight] = useState(20);
@@ -173,7 +174,7 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
       setContainerHeight(available);
       const headH = theadRef.current?.getBoundingClientRect().height ?? 0;
       const rowsAvailable = available - headH;
-      if (rowsAvailable > 0) setRowHeight(rowsAvailable / TIME_SLOTS.length);
+      if (rowsAvailable > 0) setRowHeight(Math.floor(rowsAvailable / TIME_SLOTS.length));
     };
     compute();
     const ro = new ResizeObserver(compute);
@@ -506,7 +507,7 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
             height: containerHeight ?? 'calc(100vh - 10rem)',
             cursor: dragState?.type === 'move' ? 'grabbing' : dragState?.type === 'resize' ? 's-resize' : 'default',
           }}>
-          <table className="w-full h-full border-collapse text-xs" style={{ minWidth: 800 }}>
+          <table className="w-full border-collapse text-xs" style={{ minWidth: 800 }}>
             <thead ref={theadRef} className="sticky top-0 z-10">
               <tr className="bg-gray-50">
                 <th className="w-16 px-2 py-2 text-right text-gray-500 font-medium border-b border-r border-gray-200 sticky left-0 bg-gray-50 z-20"></th>
