@@ -6,7 +6,7 @@ import type { CallingPipeline as CallingType, User, CallingPipelineHistoryEntry 
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Checkbox } from '../components/FormFields';
-import { CALLING_STATUSES, CALLING_STATUS_COLORS, ORGANIZATIONS } from '../lib/constants';
+import { CALLING_STATUSES, CALLING_STATUS_COLORS, CALLING_TYPE_STATUSES, RELEASE_TYPE_STATUSES, ORGANIZATIONS } from '../lib/constants';
 import { renderRichText, stripBold } from '../lib/richText';
 import LastEdited from '../components/LastEdited';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -242,6 +242,12 @@ export default function CallingPipeline() {
       );
     });
 
+  // Restrict the Status dropdown to the stages that apply to the selected Type
+  // (a calling runs 1-6/Declined, a release runs 7-10) — but keep an out-of-range
+  // legacy status selectable rather than silently hiding it.
+  const typeStatuses = (editing?.type || 'Calling') === 'Release' ? RELEASE_TYPE_STATUSES : CALLING_TYPE_STATUSES;
+  const statusOptions = editing?.status && !typeStatuses.includes(editing.status) ? [editing.status, ...typeStatuses] : typeStatuses;
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
@@ -402,18 +408,26 @@ export default function CallingPipeline() {
                   <label key={t} className="flex items-center gap-1.5 cursor-pointer">
                     <input type="radio" name="calling-type" value={t}
                       checked={(editing.type || 'Calling') === t}
-                      onChange={() => setEditing({ ...editing, type: t })}
+                      onChange={() => {
+                        const nextStatuses = t === 'Release' ? RELEASE_TYPE_STATUSES : CALLING_TYPE_STATUSES;
+                        const status = nextStatuses.includes(editing.status || '') ? editing.status : nextStatuses[0];
+                        setEditing({ ...editing, type: t, status });
+                      }}
                       className="text-blue-600" />
                     <span className="text-sm text-gray-700">{t}</span>
                   </label>
                 ))}
               </div>
             </div>
-            <Select label="Status" value={editing.status || ''} onChange={v => setEditing({ ...editing, status: v })} options={CALLING_STATUSES} />
+            <Select label="Status" value={editing.status || ''} onChange={v => setEditing({ ...editing, status: v })} options={statusOptions} />
             <AssignedToField value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} options={bishopricOptions} />
             <Select label="Organization" value={editing.organization || ''} onChange={v => setEditing({ ...editing, organization: v })} options={ORGANIZATIONS} />
-            <Checkbox label="Sustain recorded in LCR" checked={!!editing.sustain_recorded} onChange={v => setEditing({ ...editing, sustain_recorded: v ? 1 : 0 })} />
-            <Checkbox label="Setting apart recorded in LCR" checked={!!editing.set_apart_recorded} onChange={v => setEditing({ ...editing, set_apart_recorded: v ? 1 : 0 })} />
+            {editing.type !== 'Release' && (
+              <>
+                <Checkbox label="Sustain recorded in LCR" checked={!!editing.sustain_recorded} onChange={v => setEditing({ ...editing, sustain_recorded: v ? 1 : 0 })} />
+                <Checkbox label="Setting apart recorded in LCR" checked={!!editing.set_apart_recorded} onChange={v => setEditing({ ...editing, set_apart_recorded: v ? 1 : 0 })} />
+              </>
+            )}
             {editing.status === '10. Released' && (
               <Checkbox label="Release recorded in LCR" checked={!!editing.release_recorded} onChange={v => setEditing({ ...editing, release_recorded: v ? 1 : 0 })} />
             )}

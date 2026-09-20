@@ -128,6 +128,18 @@ export const CALLING_STATUSES = [
   '11. Declined',
 ];
 
+// Which of the statuses above apply to a pipeline entry of type 'Calling' vs
+// 'Release' — a calling runs 1-6 (plus a decline, which can only happen during
+// the calling process) and a release runs 7-10. Used to keep the Status dropdown
+// from offering the wrong entry's stages.
+export const CALLING_TYPE_STATUSES = [
+  '1. Discussion', '2. Pray about', '3. Approved and assigned', '4. Called & accepted',
+  '4.5 Call & accepted, handle in class/quorum', '5. Sustained', '6. Set apart', '11. Declined',
+];
+export const RELEASE_TYPE_STATUSES = [
+  '7. In release discussion', '8. Need to release', '9. Need to thank at pulpit', '10. Released',
+];
+
 export const CALLING_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   '1. Discussion': { bg: 'bg-gray-100', text: 'text-gray-700' },
   '2. Pray about': { bg: 'bg-yellow-100', text: 'text-yellow-800' },
