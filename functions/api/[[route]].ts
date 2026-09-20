@@ -1678,8 +1678,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       rows?: { organization: string | null; calling: string; person: string; sustained_date: string | null; set_apart: boolean }[];
       unfilled?: { organization: string | null; calling: string }[];
     };
-    const rows = (body.rows || []).slice(0, 2000);
-    const unfilledRows = (body.unfilled || []).slice(0, 2000).filter(r => r.calling && r.calling.trim());
+    // LCR sometimes abbreviates Young Women as "YW"; keep it one organization.
+    const normOrg = (o: string | null) => (o && o.trim().toUpperCase() === 'YW' ? 'Young Women' : o);
+    const rows = (body.rows || []).slice(0, 2000).map(r => ({ ...r, organization: normOrg(r.organization) }));
+    const unfilledRows = (body.unfilled || []).slice(0, 2000).filter(r => r.calling && r.calling.trim()).map(r => ({ ...r, organization: normOrg(r.organization) }));
     const dateRe = /^\d{4}-\d{2}-\d{2}$/;
     for (const r of rows) {
       if (!r.person || !r.person.trim()) return json({ error: 'Row missing person' }, 400);

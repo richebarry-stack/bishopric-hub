@@ -249,7 +249,6 @@ export const ORGANIZATIONS = [
   'Aaronic Priesthood Quorums',
   'Young Men',
   'Young Women',
-  'YW',
   'Primary',
   'Sunday School',
   'Young Single Adult',
