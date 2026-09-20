@@ -57,7 +57,7 @@ function SortHeader<K extends string>({ label, sortKey, current, asc, onSort, al
   );
 }
 
-type Tab = 'lcr' | 'mwc' | 'unfilled';
+type Tab = 'lcr' | 'notsetapart' | 'mwc' | 'unfilled';
 type CallingSortKey = 'calling' | 'sustained_date' | 'member' | 'time_in_calling';
 type MwcSortKey = 'name' | 'age' | 'pipeline';
 type UnfilledSortKey = 'calling' | 'organization';
@@ -281,8 +281,12 @@ export default function AllCallings() {
     });
   }, [unfilledCallings, unfilledSortKey, unfilledSortAsc]);
 
+  const notSetApartRows = useMemo(() => sortedCallingRows.filter(c => !c.set_apart), [sortedCallingRows]);
+  const visibleCallingRows = tab === 'notsetapart' ? notSetApartRows : sortedCallingRows;
+
   const TABS: { key: Tab; label: string; count: number }[] = [
     { key: 'lcr', label: 'LCR Callings', count: sortedCallingRows.length },
+    { key: 'notsetapart', label: 'Not Set Apart', count: notSetApartRows.length },
     { key: 'mwc', label: 'Members Without a Calling', count: sortedMwc.length },
     { key: 'unfilled', label: 'Unfilled Callings', count: sortedUnfilled.length },
   ];
@@ -302,7 +306,7 @@ export default function AllCallings() {
         ))}
       </div>
 
-      {tab === 'lcr' && (
+      {(tab === 'lcr' || tab === 'notsetapart') && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -311,18 +315,24 @@ export default function AllCallings() {
                 <SortHeader label="Sustain Date" sortKey="sustained_date" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-32" />
                 <SortHeader label="Time in Calling" sortKey="time_in_calling" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-36" />
                 <SortHeader label="Member Name" sortKey="member" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-56" />
+                <th className="text-center px-4 py-2 font-medium text-gray-600 w-32">Set Apart</th>
                 <th className="text-right px-4 py-2 font-medium text-gray-600 w-40">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {sortedCallingRows.map(c => {
+              {visibleCallingRows.map(c => {
                 const releasePending = releasePendingPairs.has(`${c.ward_member_id}|${normCalling(c.calling)}`);
                 return (
                   <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="px-4 py-2 text-gray-900">{c.calling}{!!c.set_apart && <span className="ml-1.5 text-xs text-gray-400">Set apart</span>}</td>
+                    <td className="px-4 py-2 text-gray-900">{c.calling}</td>
                     <td className="px-4 py-2 text-gray-600">{c.sustained_date || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-2 text-gray-600">{timeInCalling(c.sustained_date) || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-2 text-gray-700">{c.memberName}</td>
+                    <td className="px-4 py-2 text-center">
+                      {c.set_apart
+                        ? <span className="text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5">Set apart</span>
+                        : <span className="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5">Not set apart</span>}
+                    </td>
                     <td className="px-4 py-2 text-right">
                       {releasePending ? (
                         <span className="text-xs text-gray-400" title="This calling is already flagged for release in the Calling Pipeline">Release pending</span>
@@ -337,8 +347,8 @@ export default function AllCallings() {
                   </tr>
                 );
               })}
-              {sortedCallingRows.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400 text-sm">No callings yet — run the LCR sync to populate this list.</td></tr>
+              {visibleCallingRows.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400 text-sm">{tab === 'notsetapart' ? 'Everyone with a calling on record has been set apart.' : 'No callings yet — run the LCR sync to populate this list.'}</td></tr>
               )}
             </tbody>
           </table>
