@@ -559,7 +559,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Sep 20, 2026',
               items: [
-                'All Callings: the LCR Callings tab now has a Set Apart column showing, from the last LCR sync, whether each calling has been set apart, and a new "Not Set Apart" tab lists only the callings still awaiting a setting apart.',
+                'All Callings: the LCR Callings tab now has a Set Apart column showing, from the last LCR sync, whether each calling has been set apart, and a new "Not Set Apart" tab lists only the callings still awaiting a setting apart, with the member name as its first column.',
                 'My Actions (and the action-item emails) no longer list "Set up interview" items for youth interviews once the member has turned 18 (after Sep 1 of that year) or gone inactive, matching how the Youth Interviews page already hides them.',
                 'Calling Pipeline: the LCR column now shows a ✓R for a release entry once the clerk has recorded it in LCR (matching the existing ✓S/✓A indicators for sustaining/setting apart on a calling entry), so it\'s clear at a glance why a completed release no longer shows up as a clerk action item.',
                 'Calling Pipeline entries now keep a change history: opening the edit modal for an existing entry shows a collapsible "History" list with every field that changed, its old and new value, who made the change, and when.',
