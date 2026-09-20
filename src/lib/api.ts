@@ -75,6 +75,9 @@ export const api = {
     submit: (data: { name: string; email: string; church_role: string; password: string }) =>
       request('/auth/register-request', { method: 'POST', body: JSON.stringify(data) }),
   },
+  callingPipeline: {
+    history: (id: number) => request<CallingPipelineHistoryEntry[]>(`/calling-pipeline/${id}/history`),
+  },
   speakerNotes: {
     getAll: () => request<{ person_name: string; category: string; notes: string }[]>('/speaker-notes'),
     save: (person_name: string, category: string, notes: string) =>
@@ -212,6 +215,16 @@ export interface CallingPipeline {
   sustained_date: string | null;
   updated_at: string;
   updated_by?: string;
+}
+
+export interface CallingPipelineHistoryEntry {
+  id: number;
+  calling_id: number;
+  changed_at: string;
+  changed_by: string;
+  field: string;
+  old_value: string | null;
+  new_value: string;
 }
 
 export interface MemberCalling {

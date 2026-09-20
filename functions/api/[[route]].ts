@@ -125,6 +125,45 @@ async function linkCallingMember(db: D1Database, body: Record<string, unknown>):
   if (match) body.ward_member_id = match.id;
 }
 
+const CALLING_PIPELINE_HISTORY_LABELS: Record<string, string> = {
+  member: 'Member', calling: 'Calling', status: 'Status', assigned_to: 'Assigned To',
+  organization: 'Organization', type: 'Type', sustain_recorded: 'Sustain recorded in LCR',
+  set_apart_recorded: 'Setting apart recorded in LCR', release_recorded: 'Release recorded in LCR',
+};
+const CALLING_PIPELINE_HISTORY_FIELDS = Object.keys(CALLING_PIPELINE_HISTORY_LABELS);
+const CALLING_PIPELINE_BOOLEAN_FIELDS = new Set(['sustain_recorded', 'set_apart_recorded', 'release_recorded']);
+
+function formatCallingPipelineHistoryValue(field: string, value: unknown): string {
+  if (CALLING_PIPELINE_BOOLEAN_FIELDS.has(field)) return value ? 'Yes' : 'No';
+  if (value === null || value === undefined || value === '') return '—';
+  return String(value);
+}
+
+// Logs one row per changed field so the edit modal can show "what changed, by whom,
+// and when" rather than just the most recent editor. Only tracks the small set of
+// user-editable fields above — internal bookkeeping columns (ward_member_id,
+// updated_at/by, sustained_date) are deliberately excluded as noise.
+async function logCallingPipelineHistory(
+  db: D1Database, callingId: number, before: Record<string, unknown> | null,
+  after: Record<string, unknown>, changedBy: string, now: string,
+): Promise<void> {
+  const stmts = [];
+  for (const field of CALLING_PIPELINE_HISTORY_FIELDS) {
+    if (!(field in after)) continue;
+    const oldValue = before ? before[field] : undefined;
+    const newValue = after[field];
+    if (before && (oldValue ?? '') === (newValue ?? '')) continue;
+    stmts.push(db.prepare(
+      'INSERT INTO calling_pipeline_history (calling_id, changed_at, changed_by, field, old_value, new_value) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(
+      callingId, now, changedBy, CALLING_PIPELINE_HISTORY_LABELS[field],
+      before ? formatCallingPipelineHistoryValue(field, oldValue) : null,
+      formatCallingPipelineHistoryValue(field, newValue),
+    ));
+  }
+  if (stmts.length > 0) await db.batch(stmts);
+}
+
 function isUniqueConstraintError(e: unknown): boolean {
   return e instanceof Error && /UNIQUE constraint failed/i.test(e.message);
 }
@@ -1947,6 +1986,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ ok: true, matched, updated, unmatched });
   }
 
+  if (routeParts[0] === 'calling-pipeline' && routeParts[2] === 'history' && method === 'GET') {
+    const results = await db.prepare(
+      'SELECT * FROM calling_pipeline_history WHERE calling_id = ? ORDER BY changed_at DESC, id DESC'
+    ).bind(routeParts[1]).all();
+    return json(results.results);
+  }
+
   // CRUD endpoints: /api/{table} and /api/{table}/{id}
   const tableName = routeParts[0];
   const recordId = routeParts[1];
@@ -1991,7 +2037,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const newRow = await db.prepare(
       `SELECT * FROM ${tableConfig.name} WHERE id = ?`
     ).bind(result.meta.last_row_id).first();
-    if (tableName === 'calling-pipeline') waitUntil(syncSettingApartInterviews(db).catch(() => {}));
+    if (tableName === 'calling-pipeline') {
+      waitUntil(syncSettingApartInterviews(db).catch(() => {}));
+      waitUntil(logCallingPipelineHistory(db, result.meta.last_row_id as number, null, body, session.name, new Date().toISOString()).catch(() => {}));
+    }
     return json(newRow, 201);
   }
 
@@ -2006,6 +2055,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const conflictCheck = await checkConflict(db, tableConfig.name, recordId, baseUpdatedAt);
       if (conflictCheck) return conflictCheck;
     }
+
+    const beforeUpdate = tableName === 'calling-pipeline'
+      ? await db.prepare('SELECT * FROM calling_pipeline WHERE id = ?').bind(recordId).first<Record<string, unknown>>()
+      : null;
 
     body.updated_at = new Date().toISOString();
     body.updated_by = session.name;
@@ -2026,7 +2079,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const updated = await db.prepare(
       `SELECT * FROM ${tableConfig.name} WHERE id = ?`
     ).bind(recordId).first();
-    if (tableName === 'calling-pipeline') waitUntil(syncSettingApartInterviews(db).catch(() => {}));
+    if (tableName === 'calling-pipeline') {
+      waitUntil(syncSettingApartInterviews(db).catch(() => {}));
+      waitUntil(logCallingPipelineHistory(db, Number(recordId), beforeUpdate, body, session.name, body.updated_at as string).catch(() => {}));
+    }
     if (tableName === 'interview-pipeline') {
       const row = updated as { type_of_interview?: string; status?: string; calling_id?: number | null } | null;
       if (row?.type_of_interview === 'Setting Apart' && row.status === 'Complete' && row.calling_id) {

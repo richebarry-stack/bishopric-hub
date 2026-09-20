@@ -1,7 +1,8 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../lib/useTable';
-import type { CallingPipeline as CallingType, User } from '../lib/api';
+import { api } from '../lib/api';
+import type { CallingPipeline as CallingType, User, CallingPipelineHistoryEntry } from '../lib/api';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Checkbox } from '../components/FormFields';
@@ -68,6 +69,50 @@ function MemberInput({ value, onChange }: { value: string; onChange: (v: string)
   );
 }
 
+function historyTimestamp(iso: string): string {
+  return new Date(iso).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+}
+
+function HistoryList({ entries }: { entries: CallingPipelineHistoryEntry[] }) {
+  const [open, setOpen] = useState(false);
+  if (entries.length === 0) return null;
+  // One row per changed field per save — group by timestamp+editor so a single save
+  // that touched several fields (e.g. status + a checkbox) reads as one entry.
+  const groups: { changed_by: string; changed_at: string; fields: CallingPipelineHistoryEntry[] }[] = [];
+  for (const e of entries) {
+    const last = groups[groups.length - 1];
+    if (last && last.changed_by === e.changed_by && last.changed_at === e.changed_at) last.fields.push(e);
+    else groups.push({ changed_by: e.changed_by, changed_at: e.changed_at, fields: [e] });
+  }
+  return (
+    <div className="border-t border-gray-100 pt-2">
+      <button type="button" onClick={() => setOpen(o => !o)} className="text-xs text-gray-500 hover:text-gray-700 font-medium">
+        History ({entries.length}) {open ? '▲' : '▼'}
+      </button>
+      {open && (
+        <ul className="mt-2 space-y-2 max-h-48 overflow-y-auto">
+          {groups.map((g, i) => (
+            <li key={i} className="text-xs text-gray-600">
+              <span className="text-gray-400">{historyTimestamp(g.changed_at)}</span> — <span className="font-medium">{g.changed_by}</span>
+              <ul className="pl-3 list-disc list-inside text-gray-500">
+                {g.fields.map(f => (
+                  <li key={f.id}>
+                    {f.old_value === null
+                      ? <>Set <span className="font-medium text-gray-700">{f.field}</span> to "{f.new_value}"</>
+                      : <><span className="font-medium text-gray-700">{f.field}</span>: "{f.old_value}" → "{f.new_value}"</>}
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 const EMPTY: Partial<CallingType> = {
   member: '', calling: '', status: '1. Discussion', assigned_to: '',
   sustain_recorded: 0, set_apart_recorded: 0, organization: '', type: 'Calling',
@@ -87,6 +132,11 @@ export default function CallingPipeline() {
     () => new Set(CALLING_STATUSES.filter(s => s !== '5. Sustained'))
   );
   const [saving, setSaving] = useState(false);
+  const { data: history = [] } = useQuery({
+    queryKey: ['calling-pipeline-history', editing?.id],
+    queryFn: () => api.callingPipeline.history(editing!.id!),
+    enabled: !!editing?.id,
+  });
 
   const toggleOrgStatus = (s: string) =>
     setOrgStatusFilter(prev => {
@@ -368,6 +418,7 @@ export default function CallingPipeline() {
               <Checkbox label="Release recorded in LCR" checked={!!editing.release_recorded} onChange={v => setEditing({ ...editing, release_recorded: v ? 1 : 0 })} />
             )}
             <LastEdited updatedBy={editing.updated_by} updatedAt={editing.updated_at} />
+            {editing.id && <HistoryList entries={history} />}
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
               <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">Save</button>
