@@ -3,6 +3,7 @@ import {
   type ActionItem, type ActionItemSources, type NameIndexMember,
   type TaskRow, type CallingRow, type InterviewRow, type SpeakerRow, type PrayerRow, type MusicRow, type RotatingRow, type BabyRow,
 } from '../../../shared/actionItems';
+import { agedOutMemberIds } from '../../../shared/youth';
 
 export interface Env {
   DB: D1Database;
@@ -62,14 +63,16 @@ async function getSources(db: D1Database): Promise<ActionItemSources> {
   const [tasks, callings, interviews, speakers, prayers, music, rotating, babies] = await Promise.all([
     db.prepare('SELECT id, task, assigned_to, due_date, done FROM tasks').all<TaskRow>(),
     db.prepare('SELECT id, calling, member, status, assigned_to, type, release_recorded, sustain_recorded, set_apart_recorded FROM calling_pipeline').all<CallingRow>(),
-    db.prepare('SELECT id, member, setup_assigned_to, setup_status, status, type_of_interview FROM interview_pipeline').all<InterviewRow>(),
+    db.prepare('SELECT id, member, setup_assigned_to, setup_status, status, type_of_interview, ward_member_id FROM interview_pipeline').all<InterviewRow>(),
     db.prepare('SELECT id, meeting_date, speaker, topic FROM sacrament_speakers').all<SpeakerRow>(),
     db.prepare('SELECT id, meeting_date, name, opening_closing FROM prayers').all<PrayerRow>(),
     db.prepare('SELECT id, meeting_date, chorister, organist FROM sacrament_music').all<MusicRow>(),
     db.prepare('SELECT id, month, plan_conduct, primary_message FROM rotating_assignments').all<RotatingRow>(),
     db.prepare('SELECT id, name, status, church_record_created FROM babies').all<BabyRow>(),
   ]);
+  const { results: roster } = await db.prepare('SELECT id, active, birth_date FROM ward_members').all<{ id: number; active: number; birth_date: string | null }>();
   return {
+    agedOutMemberIds: agedOutMemberIds(roster),
     tasks: tasks.results, callings: callings.results, interviews: interviews.results,
     speakers: speakers.results, prayers: prayers.results, music: music.results,
     rotating: rotating.results, babies: babies.results,

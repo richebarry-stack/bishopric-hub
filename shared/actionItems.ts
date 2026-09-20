@@ -62,6 +62,7 @@ export interface CallingRow {
 }
 export interface InterviewRow {
   id: number; member: string; setup_assigned_to: string; setup_status: string; status: string; type_of_interview: string;
+  ward_member_id?: number | null;
 }
 export interface SpeakerRow { id: number; meeting_date: string; speaker: string; topic: string }
 export interface PrayerRow { id: number; meeting_date: string; name: string; opening_closing: string }
@@ -78,6 +79,9 @@ export interface ActionItemSources {
   music: MusicRow[];
   rotating: RotatingRow[];
   babies: BabyRow[];
+  /** Roster ids that are no longer current youth (see agedOutMemberIds); youth interviews
+   * linked to them are skipped. Omitted when the roster isn't available. */
+  agedOutMemberIds?: Set<number>;
 }
 
 export interface ActionItemPermissions {
@@ -140,6 +144,7 @@ export function computeActionItems(
     }
 
     for (const i of interviews) {
+      if (YOUTH_INTERVIEW_TYPES.has(i.type_of_interview) && i.ward_member_id && sources.agedOutMemberIds?.has(i.ward_member_id)) continue;
       if (sameName(i.setup_assigned_to) && i.setup_status !== 'Done' && !INTERVIEW_SCHEDULED_STATUSES.has(i.status)) {
         out.push({
           id: `interview-setup-${i.id}`, label: `Set up interview: ${i.member}`,

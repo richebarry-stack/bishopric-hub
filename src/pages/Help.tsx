@@ -559,6 +559,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Sep 20, 2026',
               items: [
+                'My Actions (and the action-item emails) no longer list "Set up interview" items for youth interviews once the member has turned 18 (after Sep 1 of that year) or gone inactive, matching how the Youth Interviews page already hides them.',
                 'Calling Pipeline: the LCR column now shows a ✓R for a release entry once the clerk has recorded it in LCR (matching the existing ✓S/✓A indicators for sustaining/setting apart on a calling entry), so it\'s clear at a glance why a completed release no longer shows up as a clerk action item.',
                 'Calling Pipeline entries now keep a change history: opening the edit modal for an existing entry shows a collapsible "History" list with every field that changed, its old and new value, who made the change, and when.',
                 'Calling Pipeline\'s Status dropdown now only offers the stages that apply to the selected Type — a calling can be set to Discussion through Set Apart (or Declined), a release to In Release Discussion through Released — so the two processes\' stages can\'t be mixed up. Switching Type also updates Status to match. The Sustain/Setting Apart LCR checkboxes, which only ever applied to a calling, no longer show up when editing a release.',

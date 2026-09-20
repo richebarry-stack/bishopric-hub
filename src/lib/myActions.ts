@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useAuth } from './auth';
 import { useTable } from './useTable';
 import { computeActionItems, buildNameIndex, type ActionItem } from '../../shared/actionItems';
+import { agedOutMemberIds } from '../../shared/youth';
 import type {
   Task, CallingPipeline, InterviewPipeline, WardMember,
   SacramentSpeaker, Prayer, SacramentMusic, RotatingAssignment, Baby,
@@ -54,12 +55,12 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
     return computeActionItems(
       user.name,
       { canBishopric, canWc, canYc, isClerk },
-      { tasks, callings, interviews, speakers, prayers, music, rotating, babies },
+      { tasks, callings, interviews, speakers, prayers, music, rotating, babies, agedOutMemberIds: canBishopric ? agedOutMemberIds(wardMembers) : undefined },
       nameIndex,
       today(),
       currentMonthAbbr,
     );
-  }, [enabled, user, isClerk, canBishopric, canWc, canYc, tasks, callings, interviews, speakers, prayers, music, rotating, babies, nameIndex]);
+  }, [enabled, user, isClerk, canBishopric, canWc, canYc, tasks, callings, interviews, speakers, prayers, music, rotating, babies, wardMembers, nameIndex]);
 
   const isLoading = enabled && (l1 || l2 || l3 || l6 || l7 || l8 || l9 || (isClerk && l10) || (canBishopric && l11));
 
