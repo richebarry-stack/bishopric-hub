@@ -8,6 +8,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import ForceResetPassword from './pages/ForceResetPassword';
 import SecurityQuestionsSetup from './pages/SecurityQuestionsSetup';
+import ErrorBoundary from './components/ErrorBoundary';
 import ToastContainer from './components/Toast';
 import { ConfirmProvider } from './components/ConfirmProvider';
 
@@ -228,9 +229,11 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <ConfirmProvider>
-            <Suspense fallback={<FullScreenLoading />}>
-              <AppRoutes />
-            </Suspense>
+            <ErrorBoundary>
+              <Suspense fallback={<FullScreenLoading />}>
+                <AppRoutes />
+              </Suspense>
+            </ErrorBoundary>
             <ToastContainer />
           </ConfirmProvider>
         </BrowserRouter>

@@ -559,6 +559,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Sep 20, 2026',
               items: [
+                'Fixed pages occasionally coming up completely blank until you reloaded: a page that fails to load now retries automatically (and reloads for a new version if needed), and if something still goes wrong you get a "Try again / Reload page" message instead of a blank screen.',
                 'Calling Pipeline: the duplicate "YW" organization is gone — existing YW entries were merged into Young Women, and the LCR sync now maps YW to Young Women too.',
                 'All Callings: the LCR Callings tab now has a Set Apart column showing, from the last LCR sync, whether each calling has been set apart, and a new "Not Set Apart" tab lists only the callings still awaiting a setting apart, with the member name as its first column.',
                 'My Actions (and the action-item emails) no longer list "Set up interview" items for youth interviews once the member has turned 18 (after Sep 1 of that year) or gone inactive, matching how the Youth Interviews page already hides them.',
