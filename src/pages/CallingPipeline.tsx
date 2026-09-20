@@ -426,7 +426,7 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
             <Th col="status" label="Status" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <Th col="assigned_to" label="Assigned To" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <Th col="organization" label="Org" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
-            <th className="text-left px-3 py-2 font-medium text-gray-600">LCR</th>
+            <th className="text-left px-3 py-2 font-medium text-gray-600" title="Sustained / Set apart / Released recorded in LCR">LCR</th>
             <th className="px-3 py-2"></th>
           </tr>
         </thead>
@@ -439,7 +439,9 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
               <td className="px-3 py-2 text-gray-600">{r.assigned_to}</td>
               <td className="px-3 py-2 text-gray-600">{r.organization}</td>
               <td className="px-3 py-2 text-gray-600">
-                {r.sustain_recorded ? '✓S' : ''}{r.set_apart_recorded ? ' ✓A' : ''}
+                {r.type === 'Release'
+                  ? (r.release_recorded ? '✓R' : '')
+                  : <>{r.sustain_recorded ? '✓S' : ''}{r.set_apart_recorded ? ' ✓A' : ''}</>}
               </td>
               <td className="px-3 py-2">
                 <button onClick={async e => { e.stopPropagation(); if (await confirm({ message: `Delete ${stripBold(r.member) || 'this entry'} — ${r.calling}?` })) onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>

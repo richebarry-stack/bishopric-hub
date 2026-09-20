@@ -557,6 +557,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Sep 20, 2026',
+              items: [
+                'Calling Pipeline: the LCR column now shows a ✓R for a release entry once the clerk has recorded it in LCR (matching the existing ✓S/✓A indicators for sustaining/setting apart on a calling entry), so it\'s clear at a glance why a completed release no longer shows up as a clerk action item.',
+              ],
+            },
+            {
               date: 'Aug 30, 2026',
               items: [
                 'Added Tithing Declaration: bishopric can publish appointment slots (date, time, location) on a new "Tithing Declaration" admin calendar, and members reserve an open slot at /declare-tithing with no login required — one family per slot. A "Reservations" list at the top of the calendar shows who has reserved a slot at a glance, and the Bishop\'s existing calendar is overlaid (hatched) for reference when picking times — that overlay is never sent to the public reservation page.',
