@@ -311,11 +311,10 @@ export default function AllCallings() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                {tab === 'notsetapart' && <SortHeader label="Member Name" sortKey="member" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-56" />}
+                <SortHeader label="Member Name" sortKey="member" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-56" />
                 <SortHeader label="Calling" sortKey="calling" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} />
                 <SortHeader label="Sustain Date" sortKey="sustained_date" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-32" />
                 <SortHeader label="Time in Calling" sortKey="time_in_calling" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-36" />
-                {tab === 'lcr' && <SortHeader label="Member Name" sortKey="member" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-56" />}
                 <th className="text-center px-4 py-2 font-medium text-gray-600 w-32">Set Apart</th>
                 <th className="text-right px-4 py-2 font-medium text-gray-600 w-40">Actions</th>
               </tr>
@@ -325,11 +324,10 @@ export default function AllCallings() {
                 const releasePending = releasePendingPairs.has(`${c.ward_member_id}|${normCalling(c.calling)}`);
                 return (
                   <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    {tab === 'notsetapart' && <td className="px-4 py-2 font-medium text-gray-900">{c.memberName}</td>}
+                    <td className="px-4 py-2 font-medium text-gray-900">{c.memberName}</td>
                     <td className="px-4 py-2 text-gray-900">{c.calling}</td>
                     <td className="px-4 py-2 text-gray-600">{c.sustained_date || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-2 text-gray-600">{timeInCalling(c.sustained_date) || <span className="text-gray-300">—</span>}</td>
-                    {tab === 'lcr' && <td className="px-4 py-2 text-gray-700">{c.memberName}</td>}
                     <td className="px-4 py-2 text-center">
                       {c.set_apart
                         ? <span className="text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5">Set apart</span>
