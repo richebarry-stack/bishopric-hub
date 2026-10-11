@@ -560,6 +560,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
               date: 'Oct 11, 2026',
               items: [
                 'My Actions (and the action-item emails) no longer list sacrament meeting agenda assignments — speaking, opening/closing prayer, chorister, and organist. Those are already on the agenda and didn\'t need a separate reminder.',
+                'Sacrament Meeting Planning and Current Sacrament Agenda: removed "Not Comfortable Speaking" from the speaker Type choices — a speaker is now just a Youth Speaker or an Adult Speaker.',
               ],
             },
             {

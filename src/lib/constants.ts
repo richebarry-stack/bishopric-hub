@@ -240,7 +240,7 @@ export const MISSIONARY_TEMPLE_STATUSES = [
 
 export const BABY_STATUSES = ['Expecting', 'Born', 'Blessed', 'Recorded'];
 
-export const SPEAKER_TYPES = ['Youth Speaker', 'Adult Speaker', 'Not Comfortable Speaking'];
+export const SPEAKER_TYPES = ['Youth Speaker', 'Adult Speaker'];
 
 export const ORGANIZATIONS = [
   'Bishopric',
