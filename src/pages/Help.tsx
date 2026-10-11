@@ -94,7 +94,7 @@ const WC_SECTIONS: Section[] = [
     icon: '⚡',
     content: (
       <div className="space-y-2">
-        <p>A personal page gathering everything currently assigned to you — action items, an upcoming prayer or speaking assignment, and more. The sidebar link shows a red count badge whenever something needs your attention.</p>
+        <p>A personal page gathering the action items currently assigned to you. The sidebar link shows a red count badge whenever something needs your attention.</p>
       </div>
     ),
   },
@@ -207,7 +207,7 @@ const FULL_SECTIONS: Section[] = [
     icon: '⚡',
     content: (
       <div className="space-y-2">
-        <p>A personal page gathering everything currently assigned to you — action items, a calling you need to extend, an interview you need to set up, an upcoming sacrament speaking/prayer/music assignment, and more. The clerk also sees a set of LCR record-keeping reminders here (sustainings, settings apart, releases, and baby church records that need recording) regardless of who they're assigned to.</p>
+        <p>A personal page gathering everything currently assigned to you — action items, a calling you need to extend, an interview you need to set up, and more. Sacrament meeting agenda assignments (speaking, prayers, chorister, organist) aren't listed here — they're already on the agenda. The clerk also sees a set of LCR record-keeping reminders here (sustainings, settings apart, releases, and baby church records that need recording) regardless of who they're assigned to.</p>
         <p>The <strong>My Actions</strong> link in the sidebar shows a red count badge whenever something needs your attention, so you don't have to open the page to know. Click it to see the details and jump straight to the relevant page.</p>
         <p>Matching is by name, so an assignment only shows up here if it was assigned to your exact account name — use the "Select or type name…" list on Action Items, Calling Pipeline, and the interview pages to pick your name from the list of accounts rather than typing it, so it matches reliably. Note that conducting an interview isn't itself a My Actions item — only setting one up is.</p>
       </div>
@@ -556,6 +556,12 @@ function VersionHistoryList(limit?: number) {
 }
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
+            {
+              date: 'Oct 11, 2026',
+              items: [
+                'My Actions (and the action-item emails) no longer list sacrament meeting agenda assignments — speaking, opening/closing prayer, chorister, and organist. Those are already on the agenda and didn\'t need a separate reminder.',
+              ],
+            },
             {
               date: 'Sep 20, 2026',
               items: [

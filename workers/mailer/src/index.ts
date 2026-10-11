@@ -1,7 +1,7 @@
 import {
   computeActionItems, buildNameIndex,
   type ActionItem, type ActionItemSources, type NameIndexMember,
-  type TaskRow, type CallingRow, type InterviewRow, type SpeakerRow, type PrayerRow, type MusicRow, type RotatingRow, type BabyRow,
+  type TaskRow, type CallingRow, type InterviewRow, type RotatingRow, type BabyRow,
 } from '../../../shared/actionItems';
 import { agedOutMemberIds } from '../../../shared/youth';
 
@@ -60,13 +60,10 @@ async function getRecipients(db: D1Database): Promise<UserRow[]> {
 }
 
 async function getSources(db: D1Database): Promise<ActionItemSources> {
-  const [tasks, callings, interviews, speakers, prayers, music, rotating, babies] = await Promise.all([
+  const [tasks, callings, interviews, rotating, babies] = await Promise.all([
     db.prepare('SELECT id, task, assigned_to, due_date, done FROM tasks').all<TaskRow>(),
     db.prepare('SELECT id, calling, member, status, assigned_to, type, release_recorded, sustain_recorded, set_apart_recorded FROM calling_pipeline').all<CallingRow>(),
     db.prepare('SELECT id, member, setup_assigned_to, setup_status, status, type_of_interview, ward_member_id FROM interview_pipeline').all<InterviewRow>(),
-    db.prepare('SELECT id, meeting_date, speaker, topic FROM sacrament_speakers').all<SpeakerRow>(),
-    db.prepare('SELECT id, meeting_date, name, opening_closing FROM prayers').all<PrayerRow>(),
-    db.prepare('SELECT id, meeting_date, chorister, organist FROM sacrament_music').all<MusicRow>(),
     db.prepare('SELECT id, month, plan_conduct, primary_message FROM rotating_assignments').all<RotatingRow>(),
     db.prepare('SELECT id, name, status, church_record_created FROM babies').all<BabyRow>(),
   ]);
@@ -74,7 +71,6 @@ async function getSources(db: D1Database): Promise<ActionItemSources> {
   return {
     agedOutMemberIds: agedOutMemberIds(roster),
     tasks: tasks.results, callings: callings.results, interviews: interviews.results,
-    speakers: speakers.results, prayers: prayers.results, music: music.results,
     rotating: rotating.results, babies: babies.results,
   };
 }
@@ -149,9 +145,9 @@ async function sendNewItemsMail(env: Env, user: UserRow, items: ActionItem[]): P
 }
 
 async function sendWeeklyMail(env: Env, user: UserRow, items: ActionItem[], dateLabel: string, nextMeetingDate: string): Promise<void> {
-  // Only 'Sacrament' items (speaking/prayer/chorister/organist) carry a specific meeting
-  // date at all — Calling Pipeline, Interview Setup, Clerk, and Bishopric Assignment items
-  // don't tie to one particular Sunday, so they can't be "this week's" reminder either way.
+  // Only Action Items with a due date carry a date at all — Calling Pipeline, Interview
+  // Setup, Clerk, and Bishopric Assignment items don't tie to one particular Sunday, so
+  // they can't be "this week's" reminder either way.
   const upcoming = items.filter(i => i.date && i.date.slice(0, 10) === nextMeetingDate);
   const meetingDateLabel = formatIsoDateLabel(nextMeetingDate);
 
@@ -264,7 +260,6 @@ async function run(env: Env): Promise<void> {
     notifiedByUser.set(row.user_id, list);
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10);
   const currentMonthAbbr = new Date().toLocaleDateString('en-US', { month: 'short' }).toLowerCase();
 
   const newItemErrors: { recipient: string; error: string }[] = [];
@@ -275,7 +270,7 @@ async function run(env: Env): Promise<void> {
 
   for (const user of recipients) {
     const permissions = permissionsFor(user);
-    const items = computeActionItems(user.name, permissions, sources, nameIndex, todayStr, currentMonthAbbr);
+    const items = computeActionItems(user.name, permissions, sources, nameIndex, currentMonthAbbr);
     perUserItems.set(user.id, items);
 
     const existingIds = notifiedByUser.get(user.id) || [];

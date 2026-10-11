@@ -5,12 +5,10 @@ import { computeActionItems, buildNameIndex, type ActionItem } from '../../share
 import { agedOutMemberIds } from '../../shared/youth';
 import type {
   Task, CallingPipeline, InterviewPipeline, WardMember,
-  SacramentSpeaker, Prayer, SacramentMusic, RotatingAssignment, Baby,
+  RotatingAssignment, Baby,
 } from './api';
 
 export type { ActionItem };
-
-const today = () => new Date().toISOString().slice(0, 10);
 
 /** Aggregates everything currently assigned to the logged-in user across the app.
  * The matching rules live in shared/actionItems.ts (computeActionItems) so the mailer
@@ -34,9 +32,6 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
   const { rows: tasks, isLoading: l1 } = useTable<Task>('tasks', { enabled: canWc || canYc });
   const { rows: callings, isLoading: l2 } = useTable<CallingPipeline>('calling-pipeline', { enabled: canBishopric });
   const { rows: interviews, isLoading: l3 } = useTable<InterviewPipeline>('interview-pipeline', { enabled: canBishopric });
-  const { rows: speakers, isLoading: l6 } = useTable<SacramentSpeaker>('sacrament-speakers', { enabled: canWc });
-  const { rows: prayers, isLoading: l7 } = useTable<Prayer>('prayers', { enabled: canWc });
-  const { rows: music, isLoading: l8 } = useTable<SacramentMusic>('sacrament-music', { enabled: canWc });
   const { rows: rotating, isLoading: l9 } = useTable<RotatingAssignment>('rotating-assignments', { enabled: canBishopric });
   const { rows: babies, isLoading: l10 } = useTable<Baby>('babies', { enabled: isClerk });
   // Only the bishopric hub can read the roster (see WC_READABLE in the API); without it
@@ -55,14 +50,13 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
     return computeActionItems(
       user.name,
       { canBishopric, canWc, canYc, isClerk },
-      { tasks, callings, interviews, speakers, prayers, music, rotating, babies, agedOutMemberIds: canBishopric ? agedOutMemberIds(wardMembers) : undefined },
+      { tasks, callings, interviews, rotating, babies, agedOutMemberIds: canBishopric ? agedOutMemberIds(wardMembers) : undefined },
       nameIndex,
-      today(),
       currentMonthAbbr,
     );
-  }, [enabled, user, isClerk, canBishopric, canWc, canYc, tasks, callings, interviews, speakers, prayers, music, rotating, babies, wardMembers, nameIndex]);
+  }, [enabled, user, isClerk, canBishopric, canWc, canYc, tasks, callings, interviews, rotating, babies, wardMembers, nameIndex]);
 
-  const isLoading = enabled && (l1 || l2 || l3 || l6 || l7 || l8 || l9 || (isClerk && l10) || (canBishopric && l11));
+  const isLoading = enabled && (l1 || l2 || l3 || l9 || (isClerk && l10) || (canBishopric && l11));
 
   return { items, count: items.length, isLoading };
 }

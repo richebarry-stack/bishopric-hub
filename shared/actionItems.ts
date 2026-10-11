@@ -64,9 +64,6 @@ export interface InterviewRow {
   id: number; member: string; setup_assigned_to: string; setup_status: string; status: string; type_of_interview: string;
   ward_member_id?: number | null;
 }
-export interface SpeakerRow { id: number; meeting_date: string; speaker: string; topic: string }
-export interface PrayerRow { id: number; meeting_date: string; name: string; opening_closing: string }
-export interface MusicRow { id: number; meeting_date: string; chorister: string; organist: string }
 export interface RotatingRow { id: number; month: string; plan_conduct: string; primary_message: string }
 export interface BabyRow { id: number; name: string; status: string; church_record_created: number }
 
@@ -74,9 +71,6 @@ export interface ActionItemSources {
   tasks: TaskRow[];
   callings: CallingRow[];
   interviews: InterviewRow[];
-  speakers: SpeakerRow[];
-  prayers: PrayerRow[];
-  music: MusicRow[];
   rotating: RotatingRow[];
   babies: BabyRow[];
   /** Roster ids that are no longer current youth (see agedOutMemberIds); youth interviews
@@ -95,18 +89,20 @@ export interface ActionItemPermissions {
  * the free-text assignment fields each table already has (order-flip and roster-aware
  * via `nameIndex` — see buildNameIndex). Pure and framework-free so it can run both in
  * the browser (src/lib/myActions.ts) and in the mailer Worker (workers/mailer) from one
- * implementation. `todayStr` and `currentMonthAbbr` are passed in rather than computed
- * from `new Date()` so callers can test with a fixed clock. */
+ * implementation. `currentMonthAbbr` is passed in rather than computed from `new Date()`
+ * so callers can test with a fixed clock.
+ *
+ * Sacrament meeting agenda assignments (speaking, prayers, chorister, organist) are
+ * deliberately not action items — they're already on the agenda, not a separate to-do. */
 export function computeActionItems(
   recipientName: string,
   permissions: ActionItemPermissions,
   sources: ActionItemSources,
   nameIndex: Map<string, NameIndexMember>,
-  todayStr: string,
   currentMonthAbbr: string,
 ): ActionItem[] {
   const { canBishopric, canWc, canYc, isClerk } = permissions;
-  const { tasks, callings, interviews, speakers, prayers, music, rotating, babies } = sources;
+  const { tasks, callings, interviews, rotating, babies } = sources;
   const out: ActionItem[] = [];
 
   // Free-text assignment fields get typed however the person felt like typing them —
@@ -189,32 +185,6 @@ export function computeActionItems(
           });
         }
       }
-    }
-  }
-
-  if (canWc) {
-    for (const s of speakers) {
-      if (s.meeting_date.slice(0, 10) >= todayStr && sameName(s.speaker)) {
-        out.push({
-          id: `speaker-${s.id}`, label: `Speaking assignment${s.topic ? `: ${s.topic}` : ''}`,
-          date: s.meeting_date, link: '/current-sacrament', source: 'Sacrament',
-        });
-      }
-    }
-
-    for (const p of prayers) {
-      if (p.meeting_date.slice(0, 10) >= todayStr && sameName(p.name)) {
-        out.push({
-          id: `prayer-${p.id}`, label: `${p.opening_closing || 'Prayer'} — Sacrament Meeting`,
-          date: p.meeting_date, link: '/current-sacrament', source: 'Sacrament',
-        });
-      }
-    }
-
-    for (const mu of music) {
-      if (mu.meeting_date.slice(0, 10) < todayStr) continue;
-      if (sameName(mu.chorister)) out.push({ id: `music-cho-${mu.id}`, label: 'Chorister — Sacrament Meeting', date: mu.meeting_date, link: '/current-sacrament', source: 'Sacrament' });
-      if (sameName(mu.organist)) out.push({ id: `music-org-${mu.id}`, label: 'Organist — Sacrament Meeting', date: mu.meeting_date, link: '/current-sacrament', source: 'Sacrament' });
     }
   }
 
