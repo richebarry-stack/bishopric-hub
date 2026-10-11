@@ -537,11 +537,9 @@ function AgendaModal(props: AgendaModalProps) {
       else if (!existingMusic && musHas) await props.createMusic(musData, { silent: true });
 
       // Speakers (delete removed, upsert the rest, renumber by order) — none for a fast/testimony meeting.
-      // Keep a row once the user has put anything into it, not just once a name is assigned —
-      // an unnamed placeholder slot (topic/type/accepted set, speaker still TBD) is real data too.
-      const speakerRowHasContent = (r: SpeakerRow) =>
-        !!(r.speaker.trim() || r.topic.trim() || r.accepted.trim() || (r.speaker_type && r.speaker_type !== 'Adult Speaker'));
-      const keepSpeakers = isFastSunday ? [] : speakerRows.filter(speakerRowHasContent);
+      // Every row on screen is kept, named or not: an unnamed row is a placeholder slot
+      // ("an adult speaker, TBD"), and the only way to drop one is its Remove button.
+      const keepSpeakers = isFastSunday ? [] : speakerRows;
       const keepSpeakerIds = new Set(keepSpeakers.filter(r => r.id).map(r => r.id));
       for (const s of existingSpeakers) if (!keepSpeakerIds.has(s.id)) await props.removeSpeaker(s.id);
       for (let i = 0; i < keepSpeakers.length; i++) {

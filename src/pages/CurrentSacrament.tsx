@@ -596,16 +596,22 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       await syncPrayer('Opening', openingPrayer, openingExisting);
       await syncPrayer('Closing', closingPrayer, closingExisting);
 
-      // Sort speakers by position to assign speaking_order and persist position — none for a fast/testimony meeting
-      const keepSpk = (isFastSunday ? [] : speakerRows.filter(r => r.speaker.trim()))
+      // Sort speakers by position to assign speaking_order and persist position — none for a fast/testimony meeting.
+      // Every row on screen is kept, named or not: an unnamed row is a placeholder slot
+      // ("a youth speaker, TBD"), and the only way to drop one is its Remove button.
+      const keepSpk = (isFastSunday ? [] : [...speakerRows])
         .sort((a, b) => a.position - b.position);
       const keepSpkIds = new Set(keepSpk.filter(r => r.id).map(r => r.id));
       for (const s of existingSpeakers) if (!keepSpkIds.has(s.id)) await speakers.remove(s.id);
+      const createdSpkIds = new Map<SpeakerRow, number>();
       for (let i = 0; i < keepSpk.length; i++) {
         const r = keepSpk[i];
         const d = { meeting_date: date, speaker: resolveMemberName(r.speaker, wardMembers), speaker_type: r.speaker_type || 'Adult Speaker', topic: r.topic, accepted: r.accepted, speaking_order: i + 1, position: r.position };
-        if (r.id) await speakers.update(r.id, d, { silent: true }); else await speakers.create(d, { silent: true });
+        if (r.id) await speakers.update(r.id, d, { silent: true }); else createdSpkIds.set(r, (await speakers.create(d, { silent: true })).id);
       }
+      // Give newly created rows their id, so the next autosave updates them in place
+      // instead of creating them a second time.
+      if (createdSpkIds.size > 0) setSpeakerRows(rs => rs.map(r => createdSpkIds.has(r) ? { ...r, id: createdSpkIds.get(r) } : r));
 
       const keepAnn = announceRows.filter(r => r.title.trim());
       const keepAnnIds = new Set(keepAnn.filter(r => r.id).map(r => r.id));

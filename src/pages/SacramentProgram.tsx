@@ -134,7 +134,7 @@ export default function SacramentProgram() {
                   </div>
                 ) : (
                   <div key={item.speaker!.id} className="pt-2">
-                    <span className="font-medium text-gray-800">{item.speaker!.speaker}</span>
+                    <span className="font-medium text-gray-800">{item.speaker!.speaker || <span className="italic font-normal text-gray-400">Speaker TBD</span>}</span>
                     {item.speaker!.speaker_type && item.speaker!.speaker_type !== 'Adult Speaker' && (
                       <span className="text-gray-500 ml-2">({item.speaker!.speaker_type})</span>
                     )}

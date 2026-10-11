@@ -561,6 +561,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
               items: [
                 'My Actions (and the action-item emails) no longer list sacrament meeting agenda assignments — speaking, opening/closing prayer, chorister, and organist. Those are already on the agenda and didn\'t need a separate reminder.',
                 'Sacrament Meeting Planning and Current Sacrament Agenda: removed "Not Comfortable Speaking" from the speaker Type choices — a speaker is now just a Youth Speaker or an Adult Speaker.',
+                'Fixed: Current Sacrament Meeting deleted every speaker slot that had no name yet whenever it autosaved, so placeholder speakers (e.g. "a youth speaker, to be decided") vanished after you moved to another week and back. Unnamed speaker slots are now kept on both the Current Sacrament Meeting and Sacrament Meeting Planning pages until you remove them, and the Sacrament Program shows them as "Speaker TBD".',
               ],
             },
             {
