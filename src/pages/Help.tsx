@@ -221,6 +221,7 @@ const FULL_SECTIONS: Section[] = [
         <p>Plan the upcoming sacrament meeting agenda. Changes auto-save a few seconds after you stop typing.</p>
         <UL items={[
           'Navigate between Sundays with the ‹ › arrows or click Next Sunday.',
+          'For a Sunday with no sacrament meeting, set the meeting type at the top to Stake Conference or General Conference — the agenda is hidden for that week (nothing already entered is deleted).',
           'Add speakers with "+ Add speaker". Use the ↑↓ arrows to reorder them.',
           'Add extra agenda notes with "+ Add agenda item".',
           'Add optional items (Child Blessing, Confirmation, Priesthood Advancement) with the buttons at the bottom of the agenda.',
@@ -559,6 +560,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Oct 11, 2026',
               items: [
+                'Sacrament agenda: a Sunday can now be marked as Stake Conference or General Conference, meaning there is no sacrament meeting. Pick it from the meeting type list at the top of Current Sacrament Meeting (or in the Sacrament Meeting Planning agenda pop-up); the agenda is hidden for that week, and Sacrament Meeting Planning and the Sacrament Program show "no sacrament meeting" instead. Anything already entered for that Sunday is kept and comes back if you switch it to a regular meeting again.',
                 'My Actions (and the action-item emails) no longer list sacrament meeting agenda assignments — speaking, opening/closing prayer, chorister, and organist. Those are already on the agenda and didn\'t need a separate reminder.',
                 'Sacrament Meeting Planning and Current Sacrament Agenda: removed "Not Comfortable Speaking" from the speaker Type choices — a speaker is now just a Youth Speaker or an Adult Speaker.',
                 'Fixed: Current Sacrament Meeting deleted every speaker slot that had no name yet whenever it autosaved, so placeholder speakers (e.g. "a youth speaker, to be decided") vanished after you moved to another week and back. Unnamed speaker slots are now kept on both the Current Sacrament Meeting and Sacrament Meeting Planning pages until you remove them, and the Sacrament Program shows them as "Speaker TBD".',

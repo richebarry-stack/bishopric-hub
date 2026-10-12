@@ -421,6 +421,8 @@ export interface SacramentTheme {
   recognize: string;
   closing_remarks: string;
   is_fast_sunday: number;
+  /** '' for a normal meeting, otherwise why there's none ('Stake Conference' / 'General Conference'). */
+  no_meeting?: string;
   sacrament_intro: string;
   high_councilor: string;
   stake_reps: string;

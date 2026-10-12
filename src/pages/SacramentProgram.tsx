@@ -100,6 +100,11 @@ export default function SacramentProgram() {
 
       {isLoading ? (
         <p className="text-gray-400 text-sm text-center py-8">Loading…</p>
+      ) : theme?.no_meeting ? (
+        <div className="text-center py-12 text-gray-500">
+          <p className="text-lg font-semibold text-gray-700">{theme.no_meeting}</p>
+          <p className="text-sm mt-1">No sacrament meeting this Sunday.</p>
+        </div>
       ) : !hasContent ? (
         <div className="text-center py-12 text-gray-400">
           <p className="text-lg">Nothing planned yet for this Sunday.</p>

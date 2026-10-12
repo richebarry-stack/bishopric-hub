@@ -1270,12 +1270,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (tbl === 'sacrament-themes') {
         if (!routeParts[1]) {
           const results = await db.prepare(
-            'SELECT id, meeting_date, theme, references_text, conducting, meeting_link, updated_at FROM sacrament_themes ORDER BY meeting_date DESC'
+            'SELECT id, meeting_date, theme, references_text, conducting, meeting_link, no_meeting, updated_at FROM sacrament_themes ORDER BY meeting_date DESC'
           ).all();
           return json(results.results);
         }
         const row = await db.prepare(
-          'SELECT id, meeting_date, theme, references_text, conducting, meeting_link, updated_at FROM sacrament_themes WHERE id = ?'
+          'SELECT id, meeting_date, theme, references_text, conducting, meeting_link, no_meeting, updated_at FROM sacrament_themes WHERE id = ?'
         ).bind(routeParts[1]).first();
         if (!row) return json({ error: 'Not found' }, 404);
         return json(row);
@@ -1301,12 +1301,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         if (tbl === 'sacrament-themes') {
           if (!routeParts[1]) {
             const results = await db.prepare(
-              'SELECT id, meeting_date, theme, references_text, conducting, meeting_link, updated_at FROM sacrament_themes ORDER BY meeting_date DESC'
+              'SELECT id, meeting_date, theme, references_text, conducting, meeting_link, no_meeting, updated_at FROM sacrament_themes ORDER BY meeting_date DESC'
             ).all();
             return json(results.results);
           }
           const row = await db.prepare(
-            'SELECT id, meeting_date, theme, references_text, conducting, meeting_link, updated_at FROM sacrament_themes WHERE id = ?'
+            'SELECT id, meeting_date, theme, references_text, conducting, meeting_link, no_meeting, updated_at FROM sacrament_themes WHERE id = ?'
           ).bind(routeParts[1]).first();
           if (!row) return json({ error: 'Not found' }, 404);
           return json(row);

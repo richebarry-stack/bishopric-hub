@@ -242,6 +242,9 @@ export const BABY_STATUSES = ['Expecting', 'Born', 'Blessed', 'Recorded'];
 
 export const SPEAKER_TYPES = ['Youth Speaker', 'Adult Speaker'];
 
+// Sundays with no sacrament meeting at all — stored as-is in sacrament_themes.no_meeting.
+export const NO_MEETING_TYPES = ['Stake Conference', 'General Conference'];
+
 export const ORGANIZATIONS = [
   'Bishopric',
   'Elders Quorum',

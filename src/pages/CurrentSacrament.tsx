@@ -6,7 +6,7 @@ import type {
   CallingPipeline, SacramentWardBusiness, SacramentAgendaExclusion, User, WardMember,
 } from '../lib/api';
 // CallingPipeline is used only in the page shell (toAgendaCalling); SacramentWardBusiness for snapshot table
-import { SPEAKER_TYPES } from '../lib/constants';
+import { SPEAKER_TYPES, NO_MEETING_TYPES } from '../lib/constants';
 import { renderRichText } from '../lib/richText';
 import { resolveMemberName } from '../lib/nameUtils';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -406,6 +406,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   const [stakeBusiness,  setStakeBusiness]  = useState(existingTheme?.stake_business  || '');
   const [closingRemarks, setClosingRemarks] = useState(existingTheme?.closing_remarks || '');
   const [isFastSunday,   setIsFastSunday]   = useState(!!existingTheme?.is_fast_sunday);
+  const [noMeeting,      setNoMeeting]      = useState(existingTheme?.no_meeting || '');
   const [sacramentIntro, setSacramentIntro] = useState(existingTheme?.sacrament_intro || DEFAULT_SACRAMENT_INTRO);
   const [chorister,     setChorister]     = useState(existingMusic?.chorister     || '');
   const [organist,      setOrganist]      = useState(existingMusic?.organist      || '');
@@ -494,6 +495,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       setStakeBusiness(existingTheme?.stake_business || '');
       setClosingRemarks(existingTheme?.closing_remarks || '');
       setIsFastSunday(!!existingTheme?.is_fast_sunday);
+      setNoMeeting(existingTheme?.no_meeting || '');
       setSacramentIntro(existingTheme?.sacrament_intro || DEFAULT_SACRAMENT_INTRO);
     }
   }
@@ -577,10 +579,10 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         meeting_date: date, presiding, conducting, ward_business: wardBusiness, stake_business: stakeBusiness,
         intro_remarks: introRemarks, recognize: recognizeValue, closing_remarks: closingRemarks,
         is_fast_sunday: isFastSunday ? 1 : 0, sacrament_intro: sacramentIntro, high_councilor: highCouncilorName,
-        stake_reps: stakeReps,
+        stake_reps: stakeReps, no_meeting: noMeeting,
       };
       if (existingTheme) await themes.update(existingTheme.id, themeFields, { silent: true });
-      else if (presiding || conducting || wardBusiness || stakeBusiness || introRemarks || recognizeValue || closingRemarks || isFastSunday || sacramentIntro || highCouncilorName || stakeReps) await themes.create(themeFields, { silent: true });
+      else if (presiding || conducting || wardBusiness || stakeBusiness || introRemarks || recognizeValue || closingRemarks || isFastSunday || noMeeting || sacramentIntro || highCouncilorName || stakeReps) await themes.create(themeFields, { silent: true });
 
       const musicFields = { meeting_date: date, chorister, organist, opening_hymn: openingHymn, sacrament_hymn: sacramentHymn, rest_special: restSpecial, closing_hymn: closingHymn, child_blessing: childBlessing, confirmation, ordination };
       const hasMusic = !!(chorister || organist || openingHymn || sacramentHymn || restSpecial || closingHymn || childBlessing !== null || confirmation !== null || ordination !== null);
@@ -673,6 +675,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
       weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
     });
     const lines: string[] = [`Sacrament Meeting — ${dateLabel}`, ''];
+    if (noMeeting) return [...lines, `${noMeeting} — no sacrament meeting.`].join('\n');
     for (const item of merged) {
       if (item.kind === 'speaker') {
         const r = speakerRows[item.speakerIndex];
@@ -803,14 +806,28 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
     <div className="max-w-3xl">
       <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6" onBlur={triggerAutoSave}>
         {!viewerMode && (
-          <label className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100 text-sm text-gray-700 cursor-pointer select-none">
-            <input type="checkbox" checked={isFastSunday}
-              onChange={e => { setIsFastSunday(e.target.checked); triggerAutoSave(); }}
-              className="rounded border-gray-300" />
-            Fast &amp; Testimony Meeting (no assigned speakers)
-          </label>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4 pb-4 border-b border-gray-100 text-sm text-gray-700">
+            <select value={noMeeting} aria-label="Meeting type"
+              onChange={e => { setNoMeeting(e.target.value); triggerAutoSave(); }}
+              className="rounded-md border border-gray-300 px-2 py-1 text-sm">
+              <option value="">Sacrament meeting</option>
+              {NO_MEETING_TYPES.map(t => <option key={t} value={t}>{t} (no sacrament meeting)</option>)}
+            </select>
+            {!noMeeting && (
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={isFastSunday}
+                  onChange={e => { setIsFastSunday(e.target.checked); triggerAutoSave(); }}
+                  className="rounded border-gray-300" />
+                Fast &amp; Testimony Meeting (no assigned speakers)
+              </label>
+            )}
+          </div>
         )}
-        {visibleMerged.map((item, mi) => {
+        {noMeeting ? (
+          <p className="py-8 text-center text-gray-500">
+            <span className="font-semibold text-gray-700">{noMeeting}</span> — no sacrament meeting this Sunday.
+          </p>
+        ) : visibleMerged.map((item, mi) => {
           if (item.kind === 'speaker') {
             const si = item.speakerIndex;
             const row = speakerRows[si];
@@ -944,7 +961,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
 
           }
         })}
-        {!viewerMode && (
+        {!viewerMode && !noMeeting && (
           <div className="pt-3 flex flex-wrap gap-x-4 gap-y-2">
             {!isFastSunday && <button type="button" onClick={addSpeaker} className="text-sm text-blue-600 hover:text-blue-800">+ Add speaker</button>}
             <button type="button" onClick={addNote}    className="text-sm text-blue-600 hover:text-blue-800">+ Add agenda item</button>

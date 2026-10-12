@@ -4,7 +4,7 @@ import { useTable } from '../lib/useTable';
 import type { SacramentSpeaker, Prayer, SacramentMusic, SacramentTheme, SacramentAnnouncement, WardMember } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Select, Textarea } from '../components/FormFields';
-import { SPEAKER_TYPES } from '../lib/constants';
+import { SPEAKER_TYPES, NO_MEETING_TYPES } from '../lib/constants';
 import { useAuth } from '../lib/auth';
 import { resolveMemberName } from '../lib/nameUtils';
 import { toast } from '../lib/toast';
@@ -134,6 +134,9 @@ export default function SacramentPlanning() {
                   <h2 className="font-bold text-gray-900 text-lg">{new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h2>
                   <span className="text-xs text-blue-500">Click to edit ✎</span>
                 </div>
+                {dateTheme?.no_meeting ? (
+                  <p className="text-sm text-gray-500 italic">{dateTheme.no_meeting} — no sacrament meeting.</p>
+                ) : (<>
                 {dateTheme && (
                   <div className="mb-3">
                     <span className="text-sm font-medium text-gray-500">Theme:</span>
@@ -184,6 +187,7 @@ export default function SacramentPlanning() {
                     </ul>
                   </div>
                 )}
+                </>)}
               </div>
             );
           })}
@@ -487,6 +491,7 @@ function AgendaModal(props: AgendaModalProps) {
 
   const [theme, setTheme] = useState({ theme: existingTheme?.theme || '', presiding: existingTheme?.presiding || '', conducting: existingTheme?.conducting || '', references_text: existingTheme?.references_text || '' });
   const [isFastSunday, setIsFastSunday] = useState(!!existingTheme?.is_fast_sunday);
+  const [noMeeting, setNoMeeting] = useState(existingTheme?.no_meeting || '');
   const [mus, setMus] = useState({
     opening_hymn: existingMusic?.opening_hymn || '', sacrament_hymn: existingMusic?.sacrament_hymn || '',
     rest_special: existingMusic?.rest_special || '', closing_hymn: existingMusic?.closing_hymn || '',
@@ -523,8 +528,8 @@ function AgendaModal(props: AgendaModalProps) {
     setSaving(true);
     try {
       // Theme
-      const themeHas = !!(theme.theme || theme.presiding || theme.conducting || theme.references_text || isFastSunday);
-      const themeData = { meeting_date: date, theme: theme.theme, presiding: theme.presiding, conducting: theme.conducting, references_text: theme.references_text, is_fast_sunday: isFastSunday ? 1 : 0 };
+      const themeHas = !!(theme.theme || theme.presiding || theme.conducting || theme.references_text || isFastSunday || noMeeting);
+      const themeData = { meeting_date: date, theme: theme.theme, presiding: theme.presiding, conducting: theme.conducting, references_text: theme.references_text, is_fast_sunday: isFastSunday ? 1 : 0, no_meeting: noMeeting };
       if (existingTheme && themeHas) await props.updateTheme(existingTheme.id, themeData, { silent: true });
       else if (existingTheme && !themeHas) await props.removeTheme(existingTheme.id);
       else if (!existingTheme && themeHas) await props.createTheme(themeData, { silent: true });
@@ -580,6 +585,18 @@ function AgendaModal(props: AgendaModalProps) {
     <Modal open onClose={handleClose} title={title}>
       <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-5">
 
+        <label className="block">
+          <span className="text-sm font-medium text-gray-700">Meeting type</span>
+          <select value={noMeeting} onChange={e => { setNoMeeting(e.target.value); mark(); }}
+            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            <option value="">Sacrament meeting</option>
+            {NO_MEETING_TYPES.map(t => <option key={t} value={t}>{t} (no sacrament meeting)</option>)}
+          </select>
+        </label>
+
+        {noMeeting ? (
+          <p className="text-sm text-gray-500 italic">{noMeeting} — no sacrament meeting this Sunday.</p>
+        ) : (<>
         {/* Theme */}
         <section className="space-y-3">
           <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Theme</h3>
@@ -662,6 +679,7 @@ function AgendaModal(props: AgendaModalProps) {
             </div>
           ))}
         </section>
+        </>)}
 
         {confirmDiscard ? (
           <div className="border-t border-amber-200 bg-amber-50 rounded-lg p-4 flex flex-col gap-3">
