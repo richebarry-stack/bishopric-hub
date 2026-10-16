@@ -558,6 +558,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Oct 16, 2026',
+              items: [
+                'Fixed: the automated LCR sync had stopped updating the ward roster, temple recommend status, and "with the stake" flags. LCR\'s pages changed how they load, and the sync gave up waiting for them. They update again, and a recommend number containing a letter no longer merges two people\'s names on the stake activation list.',
+              ],
+            },
+            {
               date: 'Oct 15, 2026',
               items: [
                 'Fixed: the automated missionary-status sync was missing most missionaries. It read the church\'s missionary site before the "Entered the Mission Field" list had finished loading, and never opened the collapsed "Released from Mission Field" and "Canceled" lists, so returned missionaries (e.g. Dylan Thatcher) were never marked Released. It now waits for every list and reads each one. Released and Canceled entries only update missionaries already in the Missionary Pipeline (no records are added for people who served years ago), and a release date no longer overwrites a missionary\'s start date.',
