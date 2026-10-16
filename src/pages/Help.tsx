@@ -558,6 +558,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Oct 15, 2026',
+              items: [
+                'Fixed: the automated missionary-status sync was missing most missionaries. It read the church\'s missionary site before the "Entered the Mission Field" list had finished loading, and never opened the collapsed "Released from Mission Field" and "Canceled" lists, so returned missionaries (e.g. Dylan Thatcher) were never marked Released. It now waits for every list and reads each one. Released and Canceled entries only update missionaries already in the Missionary Pipeline (no records are added for people who served years ago), and a release date no longer overwrites a missionary\'s start date.',
+              ],
+            },
+            {
               date: 'Oct 11, 2026',
               items: [
                 'Sacrament agenda: a Sunday can now be marked as Stake Conference or General Conference, meaning there is no sacrament meeting. Pick it from the meeting type list at the top of Current Sacrament Meeting (or in the Sacrament Meeting Planning agenda pop-up); the agenda is hidden for that week, and Sacrament Meeting Planning and the Sacrament Program show "no sacrament meeting" instead. Anything already entered for that Sunday is kept and comes back if you switch it to a regular meeting again.',

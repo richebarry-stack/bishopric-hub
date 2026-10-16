@@ -1909,11 +1909,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     let created = 0, updated = 0;
 
     for (const row of rows) {
-      const member = matchRosterMember(row.name, roster);
-      if (!member) { unmatched.push(row.name); continue; }
       const targetStatus = SECTION_TO_STATUS[row.section];
+      // Released/Canceled list every past missionary (years back), so they only
+      // close out records already in the pipeline — never create new ones, and
+      // their date column (release/cancel date) must not overwrite report_date.
+      const isTerminal = targetStatus === 'Released from Mission Field' || targetStatus === 'Canceled';
+      const member = matchRosterMember(row.name, roster);
+      if (!member) { if (!isTerminal) unmatched.push(row.name); continue; }
       const legalName = `${member.last_name}, ${member.first_name}`;
-      const reportDate = row.mission_start || row.received_date || row.assignment_made_date || null;
+      const sectionDate = row.mission_start || row.received_date || row.assignment_made_date || null;
+      const reportDate = isTerminal ? null : sectionDate;
 
       const existing = allMissionaries.find(m => m.ward_member_id === member.id && m.status !== 'Released from Mission Field')
         || allMissionaries.filter(m => m.ward_member_id === member.id).sort((a, b) => b.id - a.id)[0];
@@ -1924,7 +1929,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         if (row.mission && row.mission !== existing.mission_call) updates.mission_call = row.mission;
         if (reportDate && reportDate !== existing.report_date) updates.report_date = reportDate;
         if (row.mission_end && row.mission_end !== existing.mission_end_estimated) updates.mission_end_estimated = row.mission_end;
-        if (targetStatus === 'Released from Mission Field' && !existing.release_date) updates.release_date = reportDate || now.slice(0, 10);
+        if (targetStatus === 'Released from Mission Field' && !existing.release_date) updates.release_date = sectionDate || now.slice(0, 10);
         if (Object.keys(updates).length > 0) {
           const setClause = Object.keys(updates).map(k => `${k} = ?`).join(', ');
           stmts.push(db.prepare(`UPDATE missionary_pipeline SET ${setClause}, updated_at = ? WHERE id = ?`)
@@ -1932,10 +1937,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           updated++;
           changed.push({ name: legalName, section: row.section, action: 'updated' });
         }
-      } else {
+      } else if (!isTerminal) {
         stmts.push(db.prepare(
           'INSERT INTO missionary_pipeline (who, status, ward_member_id, mission_call, report_date, mission_end_estimated, release_date, notes, next_steps, temple_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        ).bind(legalName, targetStatus, member.id, row.mission, reportDate, row.mission_end, targetStatus === 'Released from Mission Field' ? reportDate : null, '', '', '', now, now));
+        ).bind(legalName, targetStatus, member.id, row.mission, reportDate, row.mission_end, null, '', '', '', now, now));
         created++;
         changed.push({ name: legalName, section: row.section, action: 'created' });
       }
