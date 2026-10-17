@@ -558,6 +558,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Oct 17, 2026',
+              items: [
+                'Tithing Declaration Slots: the reservation list now sits below the calendar, is renamed "Upcoming Reservations", and only shows reservations that haven\'t happened yet.',
+              ],
+            },
+            {
               date: 'Oct 16, 2026',
               items: [
                 'Fixed: the automated LCR sync had stopped updating the ward roster, temple recommend status, and "with the stake" flags. LCR\'s pages changed how they load, and the sync gave up waiting for them. They update again, and a recommend number containing a letter no longer merges two people\'s names on the stake activation list.',

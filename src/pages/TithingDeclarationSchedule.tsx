@@ -99,7 +99,7 @@ export default function TithingDeclarationSchedule() {
   // The grid always fills the remaining viewport height with no scrollbar: its own
   // height is measured against where it actually sits (window height minus its
   // distance from the top, whatever that ends up being — not a guessed constant, since
-  // that guess can undershoot the real chrome above, e.g. the Reservations list growing,
+  // that guess can undershoot the real chrome above, e.g. the header wrapping on narrow screens,
   // and push rows below the fold with no way to reach them). rowHeight then divides that
   // up evenly across TIME_SLOTS, floored to a whole pixel so N rows can never sum to
   // more than the container's height due to sub-pixel rounding — that's what forces a
@@ -155,10 +155,17 @@ export default function TithingDeclarationSchedule() {
     return map;
   }, [scheduleRows]);
 
+  // Only reservations that haven't ended yet — past declarations drop off the list.
+  const now = new Date();
+  const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   const reservations = useMemo(() =>
-    rows.filter(r => r.reserved_by)
+    rows.filter(r => {
+      if (!r.reserved_by) return false;
+      const d = r.date.slice(0, 10);
+      return d > todayKey || (d === todayKey && r.end_time > nowTime);
+    })
       .sort((a, b) => a.date === b.date ? a.start_time.localeCompare(b.start_time) : a.date.localeCompare(b.date)),
-    [rows]);
+    [rows, todayKey, nowTime]);
 
   const handleSlotClick = (date: string, time: string) => {
     const si = slotIndex(time);
@@ -268,32 +275,6 @@ export default function TithingDeclarationSchedule() {
         {' '}<span className="inline-block align-middle w-3 h-3 rounded-sm mr-1" style={{ background: 'repeating-linear-gradient(45deg, rgba(107,114,128,0.5), rgba(107,114,128,0.5) 2px, rgba(107,114,128,0.25) 2px, rgba(107,114,128,0.25) 4px)' }} />
         hatched areas show the Bishop's existing calendar for reference — that's for your eyes only, never shown to members reserving a slot.
       </p>
-
-      {!isLoading && (
-        <div className="bg-white rounded-lg border border-gray-200 mb-4">
-          <div className="bg-gray-50 px-4 py-2 font-medium text-gray-700 text-sm border-b border-gray-200">
-            Reservations {reservations.length > 0 && <span className="text-gray-400 font-normal">({reservations.length})</span>}
-          </div>
-          {reservations.length === 0 ? (
-            <p className="text-sm text-gray-400 px-4 py-3">No one has reserved a slot yet.</p>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {reservations.map(r => (
-                <li key={r.id} className="px-4 py-2 flex items-center justify-between gap-2 hover:bg-gray-50 cursor-pointer"
-                  onClick={() => { setWeekStart(startOfWeek(parseDateKey(r.date))); openEditor(r); }}>
-                  <div>
-                    <span className="font-medium text-gray-800">{r.reserved_by}</span>
-                    {r.reserved_contact && <span className="text-gray-400 text-sm ml-2">{r.reserved_contact}</span>}
-                  </div>
-                  <div className="text-sm text-gray-500 whitespace-nowrap">
-                    {formatDateShort(r.date)} · {formatTime12(r.start_time)} · {r.location}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div ref={gridContainerRef} className="bg-white rounded-lg border border-gray-200 overflow-x-auto overflow-y-auto"
@@ -414,6 +395,32 @@ export default function TithingDeclarationSchedule() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!isLoading && (
+        <div className="bg-white rounded-lg border border-gray-200 mt-4">
+          <div className="bg-gray-50 px-4 py-2 font-medium text-gray-700 text-sm border-b border-gray-200">
+            Upcoming Reservations {reservations.length > 0 && <span className="text-gray-400 font-normal">({reservations.length})</span>}
+          </div>
+          {reservations.length === 0 ? (
+            <p className="text-sm text-gray-400 px-4 py-3">No upcoming reservations.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {reservations.map(r => (
+                <li key={r.id} className="px-4 py-2 flex items-center justify-between gap-2 hover:bg-gray-50 cursor-pointer"
+                  onClick={() => { setWeekStart(startOfWeek(parseDateKey(r.date))); openEditor(r); }}>
+                  <div>
+                    <span className="font-medium text-gray-800">{r.reserved_by}</span>
+                    {r.reserved_contact && <span className="text-gray-400 text-sm ml-2">{r.reserved_contact}</span>}
+                  </div>
+                  <div className="text-sm text-gray-500 whitespace-nowrap">
+                    {formatDateShort(r.date)} · {formatTime12(r.start_time)} · {r.location}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
