@@ -4,6 +4,28 @@ body {
   margin: 0;
 }
 
+/* Safari on macOS hides scrollbars until you scroll, so scrollable areas
+   (e.g. the Bishop's calendar) gave no hint they scroll. Styling the
+   scrollbar makes WebKit draw it all the time. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+::-webkit-scrollbar-thumb {
+  background: #c4c8ce;
+  border-radius: 9999px;
+  border: 2px solid #f3f4f6;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+::-webkit-scrollbar-corner {
+  background: #f3f4f6;
+}
+
 @media print {
   /* Expand textareas so all content is visible */
   textarea {

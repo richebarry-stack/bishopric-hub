@@ -243,7 +243,7 @@ export default function CallingPipeline() {
     });
 
   // Restrict the Status dropdown to the stages that apply to the selected Type
-  // (a calling runs 1-6/Declined, a release runs 7-10) — but keep an out-of-range
+  // (a calling runs 1-6/Declined, a release runs 7, Pray about, 8-10) — but keep an out-of-range
   // legacy status selectable rather than silently hiding it.
   const typeStatuses = (editing?.type || 'Calling') === 'Release' ? RELEASE_TYPE_STATUSES : CALLING_TYPE_STATUSES;
   const statusOptions = editing?.status && !typeStatuses.includes(editing.status) ? [editing.status, ...typeStatuses] : typeStatuses;
@@ -444,7 +444,7 @@ export default function CallingPipeline() {
   );
 }
 
-type SortKey = 'member' | 'calling' | 'status' | 'assigned_to' | 'organization';
+type SortKey = 'member' | 'calling' | 'type' | 'status' | 'assigned_to' | 'organization';
 
 function Th({ col, label, sortKey, sortAsc, onSort }: {
   col: SortKey; label: string; sortKey: SortKey; sortAsc: boolean; onSort: (col: SortKey) => void;
@@ -488,6 +488,7 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
           <tr className="border-b border-gray-100 bg-gray-50">
             <Th col="member" label="Member" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <Th col="calling" label="Calling" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="type" label="Action" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <Th col="status" label="Status" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <Th col="assigned_to" label="Assigned To" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <Th col="organization" label="Org" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
@@ -500,6 +501,11 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
             <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => onEdit(r)}>
               <td className="px-3 py-2 font-medium text-gray-900">{renderRichText(r.member)}</td>
               <td className="px-3 py-2 text-gray-700">{r.calling}</td>
+              <td className="px-3 py-2">
+                {r.type === 'Release'
+                  ? <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-50 text-red-700">Release</span>
+                  : <span className="text-xs font-semibold px-2 py-0.5 rounded bg-green-50 text-green-700">Call</span>}
+              </td>
               <td className="px-3 py-2"><StatusBadge status={r.status} colors={CALLING_STATUS_COLORS} /></td>
               <td className="px-3 py-2 text-gray-600">{r.assigned_to}</td>
               <td className="px-3 py-2 text-gray-600">{r.organization}</td>

@@ -90,7 +90,11 @@ export default function TithingDeclarationSchedule() {
   // Bishop's existing calendar, shown as a read-only busy overlay so the bishopric can see
   // conflicts while adding slots — this data is never sent to the public reservation page.
   const { rows: scheduleRows } = useTable<ScheduleEntry>('schedule-entries');
-  const [weekStart, setWeekStart] = useState(() => defaultWeekStart());
+  // ?date=YYYY-MM-DD (from clicking a tithing block on the Bishop's Schedule) opens that week.
+  const [weekStart, setWeekStart] = useState(() => {
+    const d = new URLSearchParams(window.location.search).get('date');
+    return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? startOfWeek(new Date(d + 'T12:00:00')) : defaultWeekStart();
+  });
   const [editing, setEditing] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [monthPicker, setMonthPicker] = useState(false);

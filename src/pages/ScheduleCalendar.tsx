@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useLayoutEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTable } from '../lib/useTable';
 import type { ScheduleEntry, ScheduleCalendar as ScheduleCalendarName, TithingDeclarationSlot } from '../lib/api';
 import { parseCalendars, stringifyCalendars } from '../lib/scheduleCalendars';
@@ -149,6 +150,7 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
   const [weekStart, setWeekStart] = useState(() => defaultWeekStart());
   const [editing, setEditing] = useState<FormState | null>(null);
   const confirm = useConfirm();
+  const navigate = useNavigate();
   const [repeatEnabled, setRepeatEnabled] = useState(false);
   const [repeatFrequency, setRepeatFrequency] = useState<RecurrenceFrequency>('weekly');
   const [repeatInterval, setRepeatInterval] = useState(1);
@@ -491,7 +493,7 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
           <>
             {' '}
             <span className="inline-block align-middle w-3 h-3 rounded-sm mr-1" style={{ background: 'repeating-linear-gradient(45deg, rgba(217,119,6,0.6), rgba(217,119,6,0.6) 2px, rgba(217,119,6,0.3) 2px, rgba(217,119,6,0.3) 4px)' }} />
-            hatched areas are Tithing Declaration slots (reserved or still open).
+            hatched areas are Tithing Declaration slots (reserved or still open) — click one to open the Tithing Declaration page.
           </>
         )}
       </p>
@@ -584,17 +586,24 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
                             return (
                               <div
                                 key={`tithing-${entry.id}`}
-                                className="absolute rounded overflow-hidden select-none pointer-events-none"
+                                role="link"
+                                className="absolute rounded overflow-hidden select-none px-1 py-0.5 text-amber-900 font-medium cursor-pointer hover:ring-1 hover:ring-amber-600"
                                 style={{
                                   top: 0,
                                   height: span * rowHeight,
                                   left: '1px',
                                   width: 'calc(100% - 2px)',
                                   zIndex: 1,
+                                  lineHeight: '1.2',
+                                  // Let drags pass through to the cells underneath.
+                                  pointerEvents: dragState ? 'none' : 'auto',
                                   background: 'repeating-linear-gradient(45deg, rgba(217,119,6,0.3), rgba(217,119,6,0.3) 4px, rgba(217,119,6,0.15) 4px, rgba(217,119,6,0.15) 8px)',
                                 }}
-                                title={`Tithing Declaration: ${entry.reserved_by ? `Reserved — ${entry.reserved_by}` : 'Open'} — ${entry.location}`}
-                              />
+                                title={`Tithing Declaration: ${entry.reserved_by ? `Reserved — ${entry.reserved_by}` : 'Open'} — ${entry.location} (click to open Tithing Declaration)`}
+                                onClick={e => { e.stopPropagation(); navigate(`/tithing-declarations?date=${dayKey}`); }}
+                              >
+                                <span className="truncate block">Tithing: {entry.reserved_by || 'Open'}</span>
+                              </div>
                             );
                           })}
                           {startingHere.map((entry, entryIdx) => {

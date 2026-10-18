@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useTable } from '../../lib/useTable';
 import type { BishopricMoveItem } from '../../lib/api';
 import { useConfirm } from '../../components/ConfirmDialog';
-import { priorMeetingDate } from '../../lib/priorWeek';
+import { priorMeetingDate, missingItems } from '../../lib/priorWeek';
+import { toast } from '../../lib/toast';
 
 function ItemText({ item, onSave }: { item: BishopricMoveItem; onSave: (v: string) => void }) {
   const [editing, setEditing] = useState(false);
@@ -72,14 +73,13 @@ export default function MoveItemsSection({ kind, date, title, meetingDates, onAd
   };
 
   const handleCopyFromLastWeek = async () => {
-    if (!priorItems.length) return;
-    if (!await confirm({
-      message: `Replace this week's "${title}" list with last week's ${priorItems.length} item(s)? This week's current list will be deleted.`,
-    })) return;
-    for (const i of items) await remove(i.id);
-    for (const [idx, i] of priorItems.entries()) {
-      await create({ meeting_date: date, kind, item: i.item, position: idx + 1 }, { silent: true });
+    const toAdd = missingItems(priorItems, items);
+    if (!toAdd.length) { toast.success(`Everything from last week's "${title}" is already here`); return; }
+    let pos = items.length ? Math.max(...items.map(i => i.position)) : 0;
+    for (const i of toAdd) {
+      await create({ meeting_date: date, kind, item: i.item, position: ++pos }, { silent: true });
     }
+    toast.success(`Added ${toAdd.length} item(s) from last week`);
   };
 
   return (

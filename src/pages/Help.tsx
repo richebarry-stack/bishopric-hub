@@ -558,6 +558,15 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Oct 18, 2026',
+              items: [
+                'Calling Pipeline: tables now have an "Action" column showing Call or Release, so the Pray About list makes clear whether each person is being called or released. Releases can now be set to "2. Pray about" too (between In Release Discussion and Need to Release).',
+                'Current Bishopric Meeting: "Copy from last week" (Agenda, Move-ins, Move-outs, Other Items, Updates/Announcements) and "Copy everything from last week" now add to this week instead of replacing it. Anything already there is kept, and items or lines already present aren\'t duplicated.',
+                'Bishop\'s Schedule: Tithing Declaration blocks now show the name of who reserved them (or "Open"), and clicking one opens the Tithing Declaration page on that week.',
+                'Scrollbars are now always visible in Safari on Mac (e.g. on the Bishop\'s calendar), instead of staying hidden until you start scrolling.',
+              ],
+            },
+            {
               date: 'Oct 17, 2026',
               items: [
                 'Fixed: dismissing a suggested ordinance on the Ordinances page now sticks. Dismissed suggestions used to reappear after a page reload; they are now saved and stay hidden for everyone in the bishopric.',

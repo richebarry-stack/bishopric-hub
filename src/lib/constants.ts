@@ -136,8 +136,10 @@ export const CALLING_TYPE_STATUSES = [
   '1. Discussion', '2. Pray about', '3. Approved and assigned', '4. Called & accepted',
   '4.5 Call & accepted, handle in class/quorum', '5. Sustained', '6. Set apart', '11. Declined',
 ];
+// '2. Pray about' sits between discussion and decision for releases too, so a
+// release can show on the Pray About list alongside callings.
 export const RELEASE_TYPE_STATUSES = [
-  '7. In release discussion', '8. Need to release', '9. Need to thank at pulpit', '10. Released',
+  '7. In release discussion', '2. Pray about', '8. Need to release', '9. Need to thank at pulpit', '10. Released',
 ];
 
 export const CALLING_STATUS_COLORS: Record<string, { bg: string; text: string }> = {

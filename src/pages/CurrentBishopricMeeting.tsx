@@ -4,7 +4,7 @@ import type { BishopricMeeting, BishopricAgendaItem, BishopricMoveItem, Sacramen
 import { Input, Textarea } from '../components/FormFields';
 import { useConfirm } from '../components/ConfirmDialog';
 import { toast } from '../lib/toast';
-import { priorMeetingDate } from '../lib/priorWeek';
+import { priorMeetingDate, missingItems, mergeLines } from '../lib/priorWeek';
 import MoveItemsSection from './bishopricMeeting/MoveItemsSection';
 import CalendaringBox from './bishopricMeeting/CalendaringBox';
 import InterviewsNeededSection from './bishopricMeeting/InterviewsNeededSection';
@@ -135,7 +135,7 @@ function AgendaItemText({ item, onSave }: { item: BishopricAgendaItem; onSave: (
 export default function CurrentBishopricMeeting() {
   const { rows: meetings, isLoading: meetingsLoading, update: updateMeeting } = useTable<BishopricMeeting>('bishopric-meetings');
   const { rows: items, isLoading: itemsLoading, create: createItem, update: updateItem, remove: removeItem } = useTable<BishopricAgendaItem>('bishopric-agenda-items');
-  const { rows: allMoveItems, create: createMoveItem, remove: removeMoveItem } = useTable<BishopricMoveItem>('bishopric-move-items');
+  const { rows: allMoveItems, create: createMoveItem } = useTable<BishopricMoveItem>('bishopric-move-items');
   const themes = useTable<SacramentTheme>('sacrament-themes');
   const confirm = useConfirm();
 
@@ -219,21 +219,27 @@ export default function CurrentBishopricMeeting() {
     return items.filter(i => i.meeting_date === priorDate).sort((a, b) => a.position - b.position || a.id - b.id);
   }, [items, priorDate]);
 
+  const appendPriorAgenda = async () => {
+    const toAdd = missingItems(priorAgendaItems, dateItems);
+    let pos = dateItems.length ? Math.max(...dateItems.map(i => i.position)) : 0;
+    for (const i of toAdd) {
+      await createItem({ meeting_date: date, item: i.item, notes: i.notes, position: ++pos }, { silent: true });
+    }
+    return toAdd.length;
+  };
+
   const handleCopyAgendaFromLastWeek = async () => {
     if (!priorAgendaItems.length) return;
-    if (!await confirm({
-      message: `Replace this week's agenda with last week's ${priorAgendaItems.length} item(s)? This week's current agenda will be deleted.`,
-    })) return;
-    for (const i of dateItems) await removeItem(i.id);
-    for (const [idx, i] of priorAgendaItems.entries()) {
-      await createItem({ meeting_date: date, item: i.item, notes: i.notes, position: idx + 1 }, { silent: true });
-    }
+    const added = await appendPriorAgenda();
+    toast.success(added ? `Added ${added} agenda item(s) from last week` : "Everything from last week's agenda is already here");
   };
 
   const handleCopyUpdatesFromLastWeek = async () => {
     if (!meeting || !priorMeeting) return;
-    if (!await confirm({ message: "Replace this week's Updates/Announcements with last week's? This week's current text will be lost." })) return;
-    saveMeetingField('updates_announcements', priorMeeting.updates_announcements || '');
+    const current = meeting.updates_announcements || '';
+    const merged = mergeLines(current, priorMeeting.updates_announcements || '');
+    if (merged === current) { toast.success("Everything from last week's Updates/Announcements is already here"); return; }
+    saveMeetingField('updates_announcements', merged);
   };
 
   const priorMoveItems = useMemo(() => {
@@ -255,30 +261,28 @@ export default function CurrentBishopricMeeting() {
     if (!priorDate) return;
     if (!await confirm({
       message: `Copy everything from last week's meeting (${formatDate(priorDate)}) into this week? ` +
-        "This will replace this week's Minutes, Notes, Updates/Announcements, Move-ins, Move-outs, Other Items, and Agenda with last week's versions. " +
-        "(Interviews Needed isn't tied to a specific week, so it isn't affected.) This cannot be undone.",
+        "Last week's Minutes, Notes, Updates/Announcements, Move-ins, Move-outs, Other Items, and Agenda will be added to this week's. " +
+        "Nothing already here is removed, and items already here aren't duplicated.",
     })) return;
 
     if (meeting && priorMeeting) {
       await updateMeeting(meeting.id, {
-        minutes: priorMeeting.minutes || '',
-        notes: priorMeeting.notes || '',
-        updates_announcements: priorMeeting.updates_announcements || '',
+        minutes: mergeLines(meeting.minutes || '', priorMeeting.minutes || ''),
+        notes: mergeLines(meeting.notes || '', priorMeeting.notes || ''),
+        updates_announcements: mergeLines(meeting.updates_announcements || '', priorMeeting.updates_announcements || ''),
       }, { silent: true });
     }
 
-    for (const i of thisWeekMoveItems) await removeMoveItem(i.id);
     for (const kind of ['move_in', 'move_out', 'other'] as const) {
-      const list = priorMoveItems.filter(i => i.kind === kind).sort((a, b) => a.position - b.position || a.id - b.id);
-      for (const [idx, i] of list.entries()) {
-        await createMoveItem({ meeting_date: date, kind, item: i.item, position: idx + 1 }, { silent: true });
+      const current = thisWeekMoveItems.filter(i => i.kind === kind);
+      const prior = priorMoveItems.filter(i => i.kind === kind).sort((a, b) => a.position - b.position || a.id - b.id);
+      let pos = current.length ? Math.max(...current.map(i => i.position)) : 0;
+      for (const i of missingItems(prior, current)) {
+        await createMoveItem({ meeting_date: date, kind, item: i.item, position: ++pos }, { silent: true });
       }
     }
 
-    for (const i of dateItems) await removeItem(i.id);
-    for (const [idx, i] of priorAgendaItems.entries()) {
-      await createItem({ meeting_date: date, item: i.item, notes: i.notes, position: idx + 1 }, { silent: true });
-    }
+    await appendPriorAgenda();
 
     toast.success("Copied last week's meeting into this week");
   };
