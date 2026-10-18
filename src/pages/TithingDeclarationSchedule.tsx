@@ -87,6 +87,8 @@ interface FormState {
   end_time: string;
   location: string;
   notes: string;
+  reservedBy: string;
+  reservedContact: string;
 }
 
 export default function TithingDeclarationSchedule() {
@@ -145,13 +147,14 @@ export default function TithingDeclarationSchedule() {
   const handleSlotClick = (date: string, time: string) => {
     const si = slotIndex(time);
     const endIdx = Math.min(si + 1, TIME_SLOTS.length - 1);
-    setEditing({ date, start_time: time, end_time: TIME_SLOTS[endIdx], location: '', notes: '' });
+    setEditing({ date, start_time: time, end_time: TIME_SLOTS[endIdx], location: '', notes: '', reservedBy: '', reservedContact: '' });
   };
 
   const openEditor = (entry: TithingDeclarationSlot) => {
     setEditing({
       id: entry.id, date: entry.date.slice(0, 10), start_time: entry.start_time, end_time: entry.end_time,
       location: entry.location, notes: entry.notes || '',
+      reservedBy: entry.reserved_by || '', reservedContact: entry.reserved_contact || '',
     });
   };
 
@@ -159,7 +162,19 @@ export default function TithingDeclarationSchedule() {
     if (!editing || !editing.location.trim()) return;
     setSaving(true);
     try {
-      const data = { date: editing.date, start_time: editing.start_time, end_time: editing.end_time, location: editing.location, notes: editing.notes };
+      // Typing a name in "Reserved by" books the slot the same way a member reserving it
+      // online does; clearing the name opens it back up.
+      const reservedBy = editing.reservedBy.trim() || null;
+      const current = editing.id ? rows.find(r => r.id === editing.id) : undefined;
+      const reservedAt = !reservedBy ? null
+        : current?.reserved_by && current.reserved_at ? current.reserved_at
+        : new Date().toISOString();
+      const data = {
+        date: editing.date, start_time: editing.start_time, end_time: editing.end_time, location: editing.location, notes: editing.notes,
+        reserved_by: reservedBy,
+        reserved_contact: reservedBy ? (editing.reservedContact.trim() || null) : null,
+        reserved_at: reservedAt,
+      };
       if (editing.id) await update(editing.id, data);
       else await create(data);
       setEditing(null);
@@ -424,17 +439,17 @@ export default function TithingDeclarationSchedule() {
             </div>
             <Input label="Location" value={editing.location} onChange={v => setEditing({ ...editing, location: v })} placeholder="e.g. Bishop's Office" required />
             <Textarea label="Notes" value={editing.notes} onChange={v => setEditing({ ...editing, notes: v })} />
-            {editing.id && (() => {
-              const current = rows.find(r => r.id === editing.id);
-              return current?.reserved_by ? (
-                <div className="flex items-center justify-between gap-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
-                  <span>Reserved by {current.reserved_by}{current.reserved_contact ? ` (${current.reserved_contact})` : ''}</span>
-                  <button type="button" onClick={handleUnreserve} disabled={saving} className="text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap disabled:opacity-50">
-                    Unreserve
-                  </button>
-                </div>
-              ) : null;
-            })()}
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Reserved by" value={editing.reservedBy} onChange={v => setEditing({ ...editing, reservedBy: v })} placeholder="Leave blank if open" />
+              <Input label="Contact" value={editing.reservedContact} onChange={v => setEditing({ ...editing, reservedContact: v })} placeholder="Phone or email (optional)" />
+            </div>
+            {editing.id && rows.find(r => r.id === editing.id)?.reserved_by && (
+              <div className="text-right -mt-1">
+                <button type="button" onClick={handleUnreserve} disabled={saving} className="text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50">
+                  Unreserve
+                </button>
+              </div>
+            )}
             <div className="flex justify-between pt-2">
               <div>
                 {editing.id && (

@@ -560,6 +560,12 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Oct 18, 2026',
               items: [
+                'Tithing Declaration Slots: the slot editor now has "Reserved by" and "Contact" fields. Typing a family\'s name books the slot (it turns green and shows on Upcoming Reservations and the Bishop\'s Schedule), and clearing the name opens it back up.',
+              ],
+            },
+            {
+              date: 'Oct 18, 2026',
+              items: [
                 'Fixed renamed sidebar links (e.g. "Speakers & Prayers History", "Bishopric Action Items") briefly flashing back to their default names whenever you clicked a link. The sidebar no longer reloads on every page change.',
                 'Current Bishopric Meeting: the "Copy everything from last week" confirmation now has a green "Copy" button instead of a red "Delete" button, since copying only adds to this week and never removes anything.',
               ],
