@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useTable } from '../lib/useTable';
-import type { Ordinance, WardMember } from '../lib/api';
+import type { Ordinance, OrdinanceSuggestionDismissal, WardMember } from '../lib/api';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Textarea } from '../components/FormFields';
@@ -16,6 +16,10 @@ function toDateOnly(v: string): string {
 }
 
 interface Suggestion { name: string; ordinance_type: string; age: number; }
+
+function suggestionKey(name: string, ordinanceType: string): string {
+  return `${name.trim().toLowerCase()}|${ordinanceType}`;
+}
 
 // Baptism candidates: any child turning 8 this calendar year. Aaronic Priesthood
 // advancement (young men only): 12 -> Deacon, 14 -> Teacher, 16 -> Priest, in the
@@ -48,13 +52,16 @@ export default function Ordinances() {
   const { rows, isLoading, create, update, remove } = useTable<Ordinance>('ordinances');
   const { rows: wardMembers } = useTable<WardMember>('ward-members');
   const [editing, setEditing] = useState<Partial<Ordinance> | null>(null);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const { rows: dismissals, create: createDismissal } = useTable<OrdinanceSuggestionDismissal>('ordinance-suggestion-dismissals');
+  // Hides a dismissed suggestion immediately while the save is in flight.
+  const [pendingDismissed, setPendingDismissed] = useState<Set<string>>(new Set());
   const confirm = useConfirm();
 
-  const suggestions = useMemo(
-    () => suggestionsFromRoster(wardMembers, rows).filter(s => !dismissed.has(`${s.name.toLowerCase()}|${s.ordinance_type}`)),
-    [wardMembers, rows, dismissed]
-  );
+  const suggestions = useMemo(() => {
+    const dismissed = new Set(pendingDismissed);
+    for (const d of dismissals) dismissed.add(suggestionKey(d.member_name, d.ordinance_type));
+    return suggestionsFromRoster(wardMembers, rows).filter(s => !dismissed.has(suggestionKey(s.name, s.ordinance_type)));
+  }, [wardMembers, rows, dismissals, pendingDismissed]);
 
   const rosterHasBirthDates = useMemo(() => wardMembers.some(m => m.birth_date), [wardMembers]);
 
@@ -72,7 +79,11 @@ export default function Ordinances() {
   };
 
   const dismissSuggestion = (s: Suggestion) => {
-    setDismissed(prev => new Set(prev).add(`${s.name.toLowerCase()}|${s.ordinance_type}`));
+    const key = suggestionKey(s.name, s.ordinance_type);
+    setPendingDismissed(prev => new Set(prev).add(key));
+    createDismissal({ member_name: s.name, ordinance_type: s.ordinance_type }, { silent: true }).catch(() => {
+      setPendingDismissed(prev => { const next = new Set(prev); next.delete(key); return next; });
+    });
   };
 
   return (

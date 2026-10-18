@@ -664,6 +664,14 @@ export interface Ordinance {
   updated_by?: string;
 }
 
+export interface OrdinanceSuggestionDismissal {
+  id: number;
+  member_name: string;
+  ordinance_type: string;
+  updated_at?: string;
+  updated_by?: string;
+}
+
 export interface AnnualDuty {
   id: number;
   title: string;

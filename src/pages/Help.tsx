@@ -560,6 +560,12 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Oct 17, 2026',
               items: [
+                'Fixed: dismissing a suggested ordinance on the Ordinances page now sticks. Dismissed suggestions used to reappear after a page reload; they are now saved and stay hidden for everyone in the bishopric.',
+              ],
+            },
+            {
+              date: 'Oct 17, 2026',
+              items: [
                 'Tithing Declaration Slots: the reservation list now sits below the calendar, is renamed "Upcoming Reservations", and only shows reservations that haven\'t happened yet.',
               ],
             },

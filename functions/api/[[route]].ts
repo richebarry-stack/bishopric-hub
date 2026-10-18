@@ -82,6 +82,7 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'wc-discussion-topics': { name: 'wc_discussion_topics', orderBy: 'meeting_date DESC, organization ASC' },
   'hub-suggestions': { name: 'hub_suggestions', orderBy: 'id DESC' },
   'ordinances': { name: 'ordinances', orderBy: 'status ASC, target_date ASC' },
+  'ordinance-suggestion-dismissals': { name: 'ordinance_suggestion_dismissals', orderBy: 'id ASC' },
   'annual-duties': { name: 'annual_duties', orderBy: 'sort_order ASC, id ASC' },
   'yc-meetings': { name: 'yc_meetings', orderBy: 'date ASC' },
   'tithing-declarations': { name: 'tithing_declaration_slots', orderBy: 'date ASC, start_time ASC' },
