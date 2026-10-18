@@ -492,12 +492,12 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
           <table className="w-full border-collapse text-xs" style={{ minWidth: 800 }}>
             <thead className="sticky top-0 z-[15]">
               <tr className="bg-gray-50">
-                <th className="w-16 px-2 py-2 text-right text-gray-500 font-medium border-b border-r border-gray-200 sticky left-0 bg-gray-50 z-20"></th>
+                <th className="w-16 px-2 py-2 text-right text-gray-500 font-medium border-r border-gray-200 shadow-[inset_0_-1px_0_#e5e7eb] sticky left-0 bg-gray-50 z-20"></th>
                 {weekDays.map(d => {
                   const key = toKey(d);
                   const isToday = key === todayKey;
                   return (
-                    <th key={key} className={`px-2 py-2 text-center font-medium border-b border-r border-gray-200 ${isToday ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}>
+                    <th key={key} className={`px-2 py-2 text-center font-medium border-r border-gray-200 shadow-[inset_0_-1px_0_#e5e7eb] ${isToday ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}>
                       <div>{DAY_NAMES[d.getDay()]}</div>
                       <div className={`text-lg ${isToday ? 'bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto' : ''}`}>
                         {d.getDate()}
