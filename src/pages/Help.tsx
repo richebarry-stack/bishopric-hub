@@ -567,6 +567,13 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
               ],
             },
             {
+              date: 'Oct 18, 2026',
+              items: [
+                'Bishop\'s Schedule, Counselor Schedule, and Tithing Declaration calendars now show the whole 7 AM–10 PM day at once with no separate scrollbar inside the calendar — the page scrolls instead, and on wide screens the day headings stay pinned at the top as you scroll.',
+                'Fixed calendar appointments drawing slightly too short when they crossed an hour line (up to several pixels by evening). Every appointment now lines up exactly with its start and end times.',
+              ],
+            },
+            {
               date: 'Oct 17, 2026',
               items: [
                 'Fixed: dismissing a suggested ordinance on the Ordinances page now sticks. Dismissed suggestions used to reappear after a page reload; they are now saved and stay hidden for everyone in the bishopric.',

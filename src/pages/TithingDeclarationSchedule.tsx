@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useLayoutEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useTable } from '../lib/useTable';
 import type { TithingDeclarationSlot, ScheduleEntry } from '../lib/api';
 import { parseCalendars } from '../lib/scheduleCalendars';
@@ -19,10 +19,14 @@ function buildSlots(): string[] {
 
 const TIME_SLOTS = buildSlots();
 
-// A 15-minute row never shrinks below this — small enough to fit more on tall
-// screens, but tall enough that a slot's title text stays readable. Below
-// this, the grid scrolls instead of cramming everything onto the screen.
-const MIN_ROW_HEIGHT = 18;
+// Fixed height of one 15-minute row. The calendar always shows its full
+// 7 AM–10 PM range (the page scrolls, not the calendar), and every row is
+// exactly this tall so an appointment block of N slots is N * ROW_HEIGHT.
+const ROW_HEIGHT = 20;
+// Grid lines are inset shadows rather than borders: a border adds height to
+// its row, which made blocks spanning hour lines come out a little short.
+const HOUR_LINE = 'inset 0 1px 0 #e5e7eb';
+const QUARTER_LINE = 'inset 0 1px 0 #f3f4f6';
 
 function formatTime12(t: string): string {
   const [hh, mm] = t.split(':').map(Number);
@@ -100,40 +104,7 @@ export default function TithingDeclarationSchedule() {
   const [monthPicker, setMonthPicker] = useState(false);
   const confirm = useConfirm();
 
-  // The grid always fills the remaining viewport height with no scrollbar: its own
-  // height is measured against where it actually sits (window height minus its
-  // distance from the top, whatever that ends up being — not a guessed constant, since
-  // that guess can undershoot the real chrome above, e.g. the header wrapping on narrow screens,
-  // and push rows below the fold with no way to reach them). rowHeight then divides that
-  // up evenly across TIME_SLOTS, floored to a whole pixel so N rows can never sum to
-  // more than the container's height due to sub-pixel rounding — that's what forces a
-  // 1px scrollbar even when the math is otherwise exact. overflow stays auto as a
-  // safety net so content is never unreachable even if a window gets resized smaller
-  // than one row's minimum content height.
-  const gridContainerRef = useRef<HTMLDivElement>(null);
-  const theadRef = useRef<HTMLTableSectionElement>(null);
-  const [rowHeight, setRowHeight] = useState(20);
-  const [containerHeight, setContainerHeight] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    const el = gridContainerRef.current;
-    if (!el) return;
-    const compute = () => {
-      const top = el.getBoundingClientRect().top;
-      const available = Math.max(300, window.innerHeight - top - 16);
-      setContainerHeight(available);
-      const headH = theadRef.current?.getBoundingClientRect().height ?? 0;
-      const rowsAvailable = available - headH;
-      if (rowsAvailable > 0) setRowHeight(Math.max(MIN_ROW_HEIGHT, Math.floor(rowsAvailable / TIME_SLOTS.length)));
-    };
-    compute();
-    const ro = new ResizeObserver(compute);
-    ro.observe(document.body);
-    window.addEventListener('resize', compute);
-    return () => { ro.disconnect(); window.removeEventListener('resize', compute); };
-    // Re-run once loading finishes and the grid (with this ref) actually mounts —
-    // on first mount it's still hidden behind "Loading...", so the ref is null and
-    // this effect would otherwise never get another chance to measure it.
-  }, [isLoading]);
+  const rowHeight = ROW_HEIGHT;
 
   const todayKey = toKey(new Date());
   const weekDays = useMemo(() => getWeekDays(weekStart), [weekStart]);
@@ -281,10 +252,9 @@ export default function TithingDeclarationSchedule() {
       </p>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
-        <div ref={gridContainerRef} className="bg-white rounded-lg border border-gray-200 overflow-x-auto overflow-y-auto"
-          style={{ height: containerHeight ?? 'calc(100vh - 10rem)' }}>
+        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto xl:overflow-visible">
           <table className="w-full border-collapse text-xs" style={{ minWidth: 800 }}>
-            <thead ref={theadRef} className="sticky top-0 z-10">
+            <thead className="sticky top-0 z-[15]">
               <tr className="bg-gray-50">
                 <th className="w-16 px-2 py-2 text-right text-gray-500 font-medium border-b border-r border-gray-200 sticky left-0 bg-gray-50 z-20"></th>
                 {weekDays.map(d => {
@@ -305,9 +275,9 @@ export default function TithingDeclarationSchedule() {
               {TIME_SLOTS.map((slot, si) => {
                 const isHour = slot.endsWith(':00');
                 return (
-                  <tr key={slot} className={isHour ? 'border-t border-gray-200' : ''}>
+                  <tr key={slot}>
                     <td className="px-2 py-0 text-right text-gray-400 font-mono border-r border-gray-200 sticky left-0 bg-white z-10 overflow-hidden whitespace-nowrap"
-                      style={{ height: rowHeight, lineHeight: `${rowHeight}px`, fontSize: Math.max(8, Math.min(11, rowHeight - 2)) }}>
+                      style={{ height: rowHeight, lineHeight: `${rowHeight}px`, fontSize: 11, boxShadow: isHour ? HOUR_LINE : undefined }}>
                       {isHour ? formatTime12(slot) : ''}
                     </td>
                     {weekDays.map(d => {
@@ -326,10 +296,9 @@ export default function TithingDeclarationSchedule() {
                         <td
                           key={dayKey}
                           className={`border-r border-gray-100 relative
-                            ${isHour ? 'border-t border-gray-200' : 'border-t border-gray-50'}
                             ${dayKey === todayKey ? 'bg-blue-50/30' : ''}
                             ${!occupiedBy && startingHere.length === 0 ? 'cursor-pointer hover:bg-blue-50/50' : ''}`}
-                          style={{ height: rowHeight, padding: 0 }}
+                          style={{ height: rowHeight, padding: 0, boxShadow: isHour ? HOUR_LINE : QUARTER_LINE }}
                           onClick={() => {
                             if (occupiedBy) return;
                             if (startingHere.length === 1) openEditor(startingHere[0]);
