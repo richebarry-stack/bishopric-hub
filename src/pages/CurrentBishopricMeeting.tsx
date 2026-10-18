@@ -263,6 +263,9 @@ export default function CurrentBishopricMeeting() {
       message: `Copy everything from last week's meeting (${formatDate(priorDate)}) into this week? ` +
         "Last week's Minutes, Notes, Updates/Announcements, Move-ins, Move-outs, Other Items, and Agenda will be added to this week's. " +
         "Nothing already here is removed, and items already here aren't duplicated.",
+      title: "Copy last week's meeting",
+      confirmLabel: 'Copy',
+      destructive: false,
     })) return;
 
     if (meeting && priorMeeting) {

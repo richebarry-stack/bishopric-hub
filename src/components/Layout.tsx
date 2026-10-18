@@ -6,6 +6,7 @@ import { SECURITY_QUESTIONS } from '../lib/constants';
 import { usePresence, type PresenceUser } from '../lib/usePresence';
 import { useMyActionItems } from '../lib/myActions';
 import { useAppTitle } from '../lib/wardName';
+import { PageErrorBoundary } from './ErrorBoundary';
 import {
   NAV_ITEMS, WC_DASHBOARD_ITEM, WC_NAV_CATEGORIES, YC_NAV_ITEMS, CAL_NAV_ITEMS,
   BH_DASHBOARD_ITEM, BH_NAV_CATEGORIES, BH_ALL_ITEMS, pathLabel, NAV_ORDER_KEY, LAST_VISITED_KEY, loadOrder,
@@ -566,9 +567,11 @@ export default function Layout() {
         </header>
         <main className="p-4 lg:p-6">
           <PresenceBanner others={othersOnline} path={location.pathname} />
-          <Suspense fallback={<p className="text-gray-400 text-sm">Loading…</p>}>
-            <Outlet />
-          </Suspense>
+          <PageErrorBoundary>
+            <Suspense fallback={<p className="text-gray-400 text-sm">Loading…</p>}>
+              <Outlet />
+            </Suspense>
+          </PageErrorBoundary>
         </main>
       </div>
     </div>

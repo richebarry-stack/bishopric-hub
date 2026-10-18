@@ -2,7 +2,7 @@ import { Component, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { reloadedRecently, reloadForNewBuild } from '../lib/lazyWithReload';
 
-interface Props { children: ReactNode }
+interface Props { children: ReactNode; page?: boolean }
 interface State { error: Error | null }
 
 const CHUNK_ERROR = /dynamically imported module|Importing a module script failed|Failed to fetch dynamically|error loading dynamically|Unable to preload/i;
@@ -23,7 +23,7 @@ class Boundary extends Component<Props, State> {
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+      <div className={`${this.props.page ? 'min-h-[50vh]' : 'min-h-screen bg-gray-50'} flex items-center justify-center p-6`}>
         <div className="max-w-sm text-center">
           <p className="text-gray-700 font-medium mb-1">This page didn't load correctly.</p>
           <p className="text-gray-500 text-sm mb-4">{this.state.error.message}</p>
@@ -37,8 +37,16 @@ class Boundary extends Component<Props, State> {
   }
 }
 
-// Keyed by route so navigating to another page clears a previous failure.
+// App-wide safety net. Not keyed by route: remounting the whole app on every
+// navigation rebuilt the sidebar each click (custom link names flickered back
+// to their defaults while they reloaded).
 export default function ErrorBoundary({ children }: Props) {
+  return <Boundary>{children}</Boundary>;
+}
+
+// Wraps just the page area inside the layout, keyed by route so navigating to
+// another page clears a previous failure without touching the sidebar.
+export function PageErrorBoundary({ children }: Props) {
   const location = useLocation();
-  return <Boundary key={location.pathname}>{children}</Boundary>;
+  return <Boundary key={location.pathname} page>{children}</Boundary>;
 }

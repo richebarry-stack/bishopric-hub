@@ -560,6 +560,13 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Oct 18, 2026',
               items: [
+                'Fixed renamed sidebar links (e.g. "Speakers & Prayers History", "Bishopric Action Items") briefly flashing back to their default names whenever you clicked a link. The sidebar no longer reloads on every page change.',
+                'Current Bishopric Meeting: the "Copy everything from last week" confirmation now has a green "Copy" button instead of a red "Delete" button, since copying only adds to this week and never removes anything.',
+              ],
+            },
+            {
+              date: 'Oct 18, 2026',
+              items: [
                 'Calling Pipeline: tables now have an "Action" column showing Call or Release, so the Pray About list makes clear whether each person is being called or released. Releases can now be set to "2. Pray about" too (between In Release Discussion and Need to Release).',
                 'Current Bishopric Meeting: "Copy from last week" (Agenda, Move-ins, Move-outs, Other Items, Updates/Announcements) and "Copy everything from last week" now add to this week instead of replacing it. Anything already there is kept, and items or lines already present aren\'t duplicated.',
                 'Bishop\'s Schedule: Tithing Declaration blocks now show the name of who reserved them (or "Open"), and clicking one opens the Tithing Declaration page on that week.',
