@@ -1973,25 +1973,58 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const now = new Date().toISOString();
     const stmts = [];
     const unmatched: string[] = [];
+    const ambiguous: string[] = [];
+    const changed: { name: string; from: string; to: string }[] = [];
     let matched = 0, updated = 0;
+
+    // Group rows by the member they match first. Two rows hitting one member used
+    // to overwrite each other on alternate runs (e.g. LCR listing someone with both
+    // an old limited-use and a new endowed recommend), counting as "changed" forever.
+    type Row = typeof rows[number];
+    const byMember = new Map<number, { member: typeof roster[number]; rows: Row[] }>();
     for (const row of rows) {
       const member = matchRosterMember(row.name, roster);
       if (!member) { unmatched.push(row.name); continue; }
+      const group = byMember.get(member.id);
+      if (group) group.rows.push(row);
+      else byMember.set(member.id, { member: member as typeof roster[number], rows: [row] });
+    }
+
+    const rank = (r: Row) => [r.recommend_type === 'Endowed' ? 1 : 0, r.recommend_expires || ''] as const;
+    const describe = (type: string | null, expires: string | null) => type ? `${type} ${expires || '(no date)'}` : '(none)';
+
+    for (const { member, rows: memberRows } of byMember.values()) {
+      const names = new Set(memberRows.map(r => r.name.trim().toLowerCase()));
+      if (names.size > 1) {
+        // Different people's names resolving to one member: we can't tell whose
+        // status is right, so update nobody and report it.
+        ambiguous.push(`${memberRows.map(r => r.name).join(' / ')} → ${member.first_name} ${member.last_name}`);
+        continue;
+      }
+      // Same person listed twice: Endowed beats Limited, then the later expiration.
+      const row = memberRows.reduce((best, r) => {
+        const [tb, eb] = rank(best);
+        const [tr, er] = rank(r);
+        return tr > tb || (tr === tb && er > eb) ? r : best;
+      });
       matched++;
       // Only write when something actually differs. Older rows can hold '' where
       // the sync writes null, so normalize both sides before comparing — otherwise
       // those members would count as "updated" on every run, forever.
       const type = row.recommend_type || null;
       const expires = row.recommend_expires || null;
-      if (type === (member.recommend_type || null) && expires === (member.recommend_expires || null)) continue;
+      const oldType = member.recommend_type || null;
+      const oldExpires = member.recommend_expires || null;
+      if (type === oldType && expires === oldExpires) continue;
       stmts.push(
         db.prepare('UPDATE ward_members SET recommend_type = ?, recommend_expires = ?, updated_at = ?, updated_by = ? WHERE id = ?')
           .bind(type, expires, now, session.name, member.id)
       );
+      changed.push({ name: `${member.first_name} ${member.last_name}`, from: describe(oldType, oldExpires), to: describe(type, expires) });
       updated++;
     }
     if (stmts.length > 0) await db.batch(stmts);
-    return json({ ok: true, matched, updated, unmatched });
+    return json({ ok: true, matched, updated, unmatched, ambiguous, changed });
   }
 
   if (routeParts[0] === 'calling-pipeline' && routeParts[2] === 'history' && method === 'GET') {

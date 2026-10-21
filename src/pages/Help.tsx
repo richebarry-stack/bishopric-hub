@@ -558,6 +558,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Oct 20, 2026',
+              items: [
+                'Fixed: the LCR sync reported "Recommends: 3 changed" on every run. LCR lists some members twice on the recommend report (an old limited-use recommend and a new endowed one), and the two rows kept overwriting each other, so those members showed the wrong recommend every other run. The sync now keeps the endowed recommend, or the later expiration when both rows are the same type. If two different names ever match the same member, neither is applied and the sync log says so.',
+              ],
+            },
+            {
               date: 'Oct 18, 2026',
               items: [
                 'Tithing Declaration Slots: the slot editor now has "Reserved by" and "Contact" fields. Typing a family\'s name books the slot (it turns green and shows on Upcoming Reservations and the Bishop\'s Schedule), and clearing the name opens it back up.',

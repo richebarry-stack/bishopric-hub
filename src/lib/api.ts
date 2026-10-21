@@ -121,7 +121,7 @@ export const api = {
       method: 'POST', body: JSON.stringify(data),
     }),
     importRecommends: (rows: { name: string; recommend_type: string | null; recommend_expires: string | null }[]) =>
-      request<{ ok: true; updated: number; unmatched: string[] }>('/ward-members/import-recommends', {
+      request<{ ok: true; matched: number; updated: number; unmatched: string[]; ambiguous: string[]; changed: { name: string; from: string; to: string }[] }>('/ward-members/import-recommends', {
         method: 'POST', body: JSON.stringify({ rows }),
       }),
     fullSync: (rows: { name: string; gender: string | null; birth_date: string | null }[]) =>
