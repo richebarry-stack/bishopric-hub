@@ -560,6 +560,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Oct 23, 2026',
               items: [
+                'Calling Pipeline: the "Action" column is renamed "Call/Release".',
                 'Automation & Notifications: the syncs now list which records they changed, not just how many. LCR Sync History names the members created or filled in, each recommend change (old → new), and who was flagged as with the stake or cleared. Daily Jobs lists each record every job added, updated, linked, or removed (e.g. "Smith, John: added (Endowed Temple Rec, expires 2026-12)"), and every daily job now shows its own name and counts.',
                 'Fixed: the daily LCR sync reported the same "2 flagged" stake activations every day. The daily temple recommend check was deleting interviews that are with the stake (their new recommend expires more than 2 months out), and the LCR sync then re-added them. Interviews with the stake are now kept until the stake activates the recommend, so notes and assignments on them are no longer lost each day.',
               ],

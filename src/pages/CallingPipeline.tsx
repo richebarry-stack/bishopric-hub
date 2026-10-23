@@ -488,7 +488,7 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
           <tr className="border-b border-gray-100 bg-gray-50">
             <Th col="member" label="Member" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <Th col="calling" label="Calling" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
-            <Th col="type" label="Action" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+            <Th col="type" label="Call/Release" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <Th col="status" label="Status" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <Th col="assigned_to" label="Assigned To" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             <Th col="organization" label="Org" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
