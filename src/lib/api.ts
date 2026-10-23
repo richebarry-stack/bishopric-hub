@@ -625,12 +625,17 @@ export interface LcrSyncRun {
   roster_created: number | null;
   roster_filled: number | null;
   roster_missing: string | null; // JSON-stringified string[]
+  roster_created_names: string | null; // JSON-stringified string[]
+  roster_filled_names: string | null; // JSON-stringified string[]
   users_unmatched: string | null; // JSON-stringified string[] — hub accounts not found in the LCR roster
   recommend_updated: number | null;
   recommend_unmatched: string | null; // JSON-stringified string[]
+  recommend_changed: string | null; // JSON-stringified {name, from, to}[]
   stake_flagged: number | null;
   stake_cleared: number | null;
   stake_unmatched: string | null; // JSON-stringified string[]
+  stake_flagged_names: string | null; // JSON-stringified string[]
+  stake_cleared_names: string | null; // JSON-stringified string[]
   callings_created: number | null;
   callings_updated: number | null;
   callings_released: number | null;

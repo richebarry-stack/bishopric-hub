@@ -1522,6 +1522,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const matchedIds = new Set<number>();
     let created = 0;
     let filledDetails = 0;
+    const createdNames: string[] = [];
+    const filledNames: string[] = [];
 
     for (const row of rows) {
       const member = matchRosterMember(row.name, roster);
@@ -1541,6 +1543,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
                 now, session.name, member.id
               )
           );
+          const filled = [fillBirthDate && 'birth date', fillGender && 'gender'].filter(Boolean).join(', ');
+          filledNames.push(`${member.last_name}, ${member.first_name} (${filled})`);
           filledDetails++;
         }
         continue;
@@ -1552,6 +1556,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         db.prepare('INSERT INTO ward_members (last_name, first_name, active, birth_date, gender, updated_at, updated_by) VALUES (?, ?, 1, ?, ?, ?, ?)')
           .bind(last, first, row.birth_date || null, row.gender || null, now, session.name)
       );
+      createdNames.push(first ? `${last}, ${first}` : last);
       created++;
     }
     if (stmts.length > 0) await db.batch(stmts);
@@ -1603,7 +1608,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       })
       .map(u => `${u.name}${u.church_role ? ` (${u.church_role})` : ''}`);
 
-    return json({ ok: true, created, filledDetails, missingFromRoster, unmatchedHubUsers });
+    return json({ ok: true, created, filledDetails, createdNames, filledNames, missingFromRoster, unmatchedHubUsers });
   }
 
   // Syncs the "with the stake" flag on temple-recommend interviews from LCR's
@@ -1624,6 +1629,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const stmts = [];
     const matchedMemberIds = new Set<number>();
     const unmatched: string[] = [];
+    const flaggedNames: string[] = [];
+    const clearedNames: string[] = [];
     let flagged = 0;
 
     for (const name of names) {
@@ -1639,6 +1646,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (existing) {
         if (!existing.with_stake) {
           stmts.push(db.prepare('UPDATE interview_pipeline SET with_stake = 1, updated_at = ? WHERE id = ?').bind(now, existing.id));
+          flaggedNames.push(`${member.last_name}, ${member.first_name}`);
           flagged++;
         }
       } else {
@@ -1646,6 +1654,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         stmts.push(db.prepare(
           'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, date_recommend_expires, ward_member_id, with_stake, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)'
         ).bind(legalName, interviewType, 'Unassigned', '', member.recommend_expires || '', member.id, now, now));
+        flaggedNames.push(`${legalName} (new interview)`);
         flagged++;
       }
     }
@@ -1654,18 +1663,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // ward member) — a with_stake flag on an unlinked row was set some other
     // way and isn't ours to touch.
     const currentlyFlagged = (await db.prepare(
-      "SELECT id, ward_member_id FROM interview_pipeline WHERE with_stake = 1 AND type_of_interview IN ('Endowed Temple Rec', 'Limited') AND ward_member_id IS NOT NULL"
-    ).all<{ id: number; ward_member_id: number }>()).results;
+      "SELECT id, ward_member_id, member FROM interview_pipeline WHERE with_stake = 1 AND type_of_interview IN ('Endowed Temple Rec', 'Limited') AND ward_member_id IS NOT NULL"
+    ).all<{ id: number; ward_member_id: number; member: string }>()).results;
     let cleared = 0;
     for (const row of currentlyFlagged) {
       if (!matchedMemberIds.has(row.ward_member_id)) {
         stmts.push(db.prepare('UPDATE interview_pipeline SET with_stake = 0, updated_at = ? WHERE id = ?').bind(now, row.id));
+        clearedNames.push(row.member);
         cleared++;
       }
     }
 
     if (stmts.length > 0) await db.batch(stmts);
-    return json({ ok: true, flagged, cleared, unmatched });
+    return json({ ok: true, flagged, cleared, flaggedNames, clearedNames, unmatched });
   }
 
   // Bulk callings sync from LCR's Organizations page. Matches by ward_member_id

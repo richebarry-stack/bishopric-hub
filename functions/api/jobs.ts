@@ -5,6 +5,8 @@
 interface JobResult {
   ok: boolean;
   error?: string;
+  // One line per record the job changed, shown on the Automation page.
+  changes?: string[];
   [key: string]: unknown;
 }
 
@@ -46,6 +48,7 @@ export async function syncConduct(db: D1Database, todayStr: string): Promise<Job
   const [startYear, startMonthNum] = todayStr.split('-').map(Number);
 
   const stmts: D1PreparedStatement[] = [];
+  const changes: string[] = [];
   let created = 0, updated = 0;
 
   for (let i = 0; i < 12; i++) {
@@ -68,13 +71,16 @@ export async function syncConduct(db: D1Database, todayStr: string): Promise<Job
         const cur = (existing.conducting || '').trim();
         if (!cur) {
           stmts.push(db.prepare('UPDATE sacrament_themes SET conducting = ?, updated_at = ? WHERE id = ?').bind(assignment, now, existing.id));
+          changes.push(`${dateStr}: conducting set to ${assignment}`);
           updated++;
         } else if (!TITLED_RE.test(cur)) {
           stmts.push(db.prepare('UPDATE sacrament_themes SET conducting = ?, updated_at = ? WHERE id = ?').bind(formatConductor(cur), now, existing.id));
+          changes.push(`${dateStr}: conducting "${cur}" changed to ${formatConductor(cur)}`);
           updated++;
         }
       } else {
         stmts.push(db.prepare('INSERT INTO sacrament_themes (meeting_date, conducting, theme, references_text, meeting_link, stake_business, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(dateStr, assignment, '', '', '', '', now));
+        changes.push(`${dateStr}: added meeting, conducting ${assignment}`);
         created++;
         themeMap.set(dateStr, { id: -1, conducting: assignment });
       }
@@ -82,7 +88,7 @@ export async function syncConduct(db: D1Database, todayStr: string): Promise<Job
   }
 
   if (stmts.length > 0) await db.batch(stmts);
-  return { ok: true, created, updated };
+  return { ok: true, created, updated, changes };
 }
 
 /** Defaults the Presiding field on future sacrament meetings to "Bishop <lastname>"
@@ -93,10 +99,14 @@ export async function syncPresiding(db: D1Database, todayStr: string): Promise<J
   const bishop = await db.prepare("SELECT name FROM users WHERE church_role = 'Bishop' LIMIT 1").first<{ name: string }>();
   if (!bishop?.name) return { ok: true, updated: 0 };
   const lastName = bishop.name.trim().split(/\s+/).pop() || bishop.name;
+  const blank = (await db.prepare(
+    "SELECT meeting_date FROM sacrament_themes WHERE meeting_date >= ? AND (presiding IS NULL OR presiding = '') ORDER BY meeting_date"
+  ).bind(todayStr).all<{ meeting_date: string }>()).results;
+  if (blank.length === 0) return { ok: true, updated: 0, changes: [] };
   const result = await db.prepare(
     "UPDATE sacrament_themes SET presiding = ?, updated_at = ? WHERE meeting_date >= ? AND (presiding IS NULL OR presiding = '')"
   ).bind(`Bishop ${lastName}`, new Date().toISOString(), todayStr).run();
-  return { ok: true, updated: result.meta.changes ?? 0 };
+  return { ok: true, updated: result.meta.changes ?? 0, changes: blank.map(r => `${r.meeting_date.slice(0, 10)}: presiding set to Bishop ${lastName}`) };
 }
 
 /** Purges expired login sessions. */
@@ -173,6 +183,7 @@ export async function syncYouthInterviews(db: D1Database): Promise<JobResult> {
   }
 
   const stmts: D1PreparedStatement[] = [];
+  const changes: string[] = [];
   let created = 0, updated = 0, linked = 0;
 
   for (const wm of membersResult.results) {
@@ -185,6 +196,9 @@ export async function syncYouthInterviews(db: D1Database): Promise<JobResult> {
     if (linkedRow) {
       if (linkedRow.type_of_interview !== type || linkedRow.member !== legalName) {
         stmts.push(db.prepare('UPDATE interview_pipeline SET type_of_interview = ?, member = ?, updated_at = ? WHERE id = ?').bind(type, legalName, nowIso, linkedRow.id));
+        changes.push(linkedRow.type_of_interview !== type
+          ? `${legalName}: moved from ${linkedRow.type_of_interview} to ${type}`
+          : `${legalName}: name updated (was ${linkedRow.member})`);
         updated++;
       }
       continue;
@@ -193,6 +207,7 @@ export async function syncYouthInterviews(db: D1Database): Promise<JobResult> {
     const unlinkedRow = unlinkedByName.get(legalName.trim().toLowerCase());
     if (unlinkedRow) {
       stmts.push(db.prepare('UPDATE interview_pipeline SET ward_member_id = ?, type_of_interview = ?, updated_at = ? WHERE id = ?').bind(wm.id, type, nowIso, unlinkedRow.id));
+      changes.push(`${legalName}: linked existing interview to ward member (${type})`);
       linked++;
       continue;
     }
@@ -200,11 +215,12 @@ export async function syncYouthInterviews(db: D1Database): Promise<JobResult> {
     stmts.push(db.prepare(
       'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, ward_member_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).bind(legalName, type, 'Unassigned', bishopName, wm.id, nowIso, nowIso));
+    changes.push(`${legalName}: added (${type})`);
     created++;
   }
 
   if (stmts.length > 0) await db.batch(stmts);
-  return { ok: true, created, updated, linked };
+  return { ok: true, created, updated, linked, changes };
 }
 
 /** Keeps a "Setting Apart" interview_pipeline row in sync with every calling_pipeline
@@ -223,10 +239,11 @@ export async function syncSettingApartInterviews(db: D1Database): Promise<JobRes
   const desired = new Map(desiredResult.results.map(r => [r.id, r.member.replace(/\*\*/g, '').trim()]));
 
   const existingResult = await db.prepare(
-    "SELECT id, calling_id FROM interview_pipeline WHERE type_of_interview = 'Setting Apart' AND calling_id IS NOT NULL"
-  ).all<{ id: number; calling_id: number }>();
+    "SELECT id, calling_id, member FROM interview_pipeline WHERE type_of_interview = 'Setting Apart' AND calling_id IS NOT NULL"
+  ).all<{ id: number; calling_id: number; member: string }>();
 
   const stmts: D1PreparedStatement[] = [];
+  const changes: string[] = [];
   let created = 0, removed = 0;
 
   const existingCallingIds = new Set(existingResult.results.map(r => r.calling_id));
@@ -235,18 +252,20 @@ export async function syncSettingApartInterviews(db: D1Database): Promise<JobRes
     stmts.push(db.prepare(
       'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, setup_status, calling_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(member, 'Setting Apart', 'Unassigned', '', 'Not started', callingId, nowIso, nowIso));
+    changes.push(`${member}: added`);
     created++;
   }
 
   for (const row of existingResult.results) {
     if (!desired.has(row.calling_id)) {
       stmts.push(db.prepare('DELETE FROM interview_pipeline WHERE id = ?').bind(row.id));
+      changes.push(`${row.member}: removed`);
       removed++;
     }
   }
 
   if (stmts.length > 0) await db.batch(stmts);
-  return { ok: true, created, removed };
+  return { ok: true, created, removed, changes };
 }
 
 /** Keeps a "Calling" interview_pipeline row in sync with every calling_pipeline row
@@ -264,10 +283,11 @@ export async function syncCallingInterviews(db: D1Database): Promise<JobResult> 
   const desired = new Map(desiredResult.results.map(r => [r.id, { member: r.member.replace(/\*\*/g, '').trim(), assignedTo: r.assigned_to || '' }]));
 
   const existingResult = await db.prepare(
-    "SELECT id, calling_id, assigned_to FROM interview_pipeline WHERE type_of_interview = 'Calling' AND calling_id IS NOT NULL"
-  ).all<{ id: number; calling_id: number; assigned_to: string | null }>();
+    "SELECT id, calling_id, assigned_to, member FROM interview_pipeline WHERE type_of_interview = 'Calling' AND calling_id IS NOT NULL"
+  ).all<{ id: number; calling_id: number; assigned_to: string | null; member: string }>();
 
   const stmts: D1PreparedStatement[] = [];
+  const changes: string[] = [];
   let created = 0, removed = 0, updated = 0;
 
   const existingByCallingId = new Map(existingResult.results.map(r => [r.calling_id, r]));
@@ -277,9 +297,11 @@ export async function syncCallingInterviews(db: D1Database): Promise<JobResult> 
       stmts.push(db.prepare(
         'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, setup_status, calling_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
       ).bind(info.member, 'Calling', info.assignedTo ? 'Assigned' : 'Unassigned', info.assignedTo, 'Not started', callingId, nowIso, nowIso));
+      changes.push(`${info.member}: added${info.assignedTo ? `, assigned to ${info.assignedTo}` : ''}`);
       created++;
     } else if ((existing.assigned_to || '') !== info.assignedTo) {
       stmts.push(db.prepare('UPDATE interview_pipeline SET assigned_to = ?, updated_at = ? WHERE id = ?').bind(info.assignedTo, nowIso, existing.id));
+      changes.push(`${existing.member}: reassigned from ${existing.assigned_to || '(nobody)'} to ${info.assignedTo || '(nobody)'}`);
       updated++;
     }
   }
@@ -287,12 +309,13 @@ export async function syncCallingInterviews(db: D1Database): Promise<JobResult> 
   for (const row of existingResult.results) {
     if (!desired.has(row.calling_id)) {
       stmts.push(db.prepare('DELETE FROM interview_pipeline WHERE id = ?').bind(row.id));
+      changes.push(`${row.member}: removed`);
       removed++;
     }
   }
 
   if (stmts.length > 0) await db.batch(stmts);
-  return { ok: true, created, removed, updated };
+  return { ok: true, created, removed, updated, changes };
 }
 
 // Aaronic Priesthood advancement age -> ordinance type, per General Handbook guidance.
@@ -319,6 +342,7 @@ export async function syncOrdinanceCandidates(db: D1Database): Promise<JobResult
   const tracked = new Set(existingResult.results.map(r => `${r.member_name.trim().toLowerCase()}|${r.ordinance_type}`));
 
   const stmts: D1PreparedStatement[] = [];
+  const changes: string[] = [];
   let created = 0;
   for (const wm of membersResult.results) {
     const birthYear = parseInt(wm.birth_date.slice(0, 4), 10);
@@ -330,10 +354,11 @@ export async function syncOrdinanceCandidates(db: D1Database): Promise<JobResult
     stmts.push(db.prepare(
       'INSERT INTO ordinances (member_name, ordinance_type, status, updated_at) VALUES (?, ?, ?, ?)'
     ).bind(legalName, ordinanceType, 'Upcoming', nowIso));
+    changes.push(`${legalName}: added (${ordinanceType})`);
     created++;
   }
   if (stmts.length > 0) await db.batch(stmts);
-  return { ok: true, created };
+  return { ok: true, created, changes };
 }
 
 const RECOMMEND_TYPE_TO_INTERVIEW_TYPE: Record<string, string> = { Endowed: 'Endowed Temple Rec', Limited: 'Limited' };
@@ -379,6 +404,11 @@ export async function syncTempleRecommendInterviews(db: D1Database): Promise<Job
   const existingByKey = new Map(existingResult.results.map(r => [`${r.ward_member_id}|${r.type_of_interview}`, r]));
 
   const stmts: D1PreparedStatement[] = [];
+  const changes: string[] = [];
+  const nameOf = (id: number) => {
+    const m = membersById.get(id);
+    return m ? (m.first_name ? `${m.last_name}, ${m.first_name}` : m.last_name) : `member #${id}`;
+  };
   let created = 0, updated = 0, removed = 0;
 
   // Pass 1: every existing linked row — keep it in sync, or remove it once its
@@ -405,6 +435,7 @@ export async function syncTempleRecommendInterviews(db: D1Database): Promise<Job
     // horizon. Deleting it here made the LCR sync re-create it every day.
     if (!validOwner || (!withinHorizon && !row.with_stake)) {
       stmts.push(db.prepare('DELETE FROM interview_pipeline WHERE id = ?').bind(row.id));
+      changes.push(`${nameOf(row.ward_member_id)}: removed (${row.type_of_interview}${validOwner ? `, recommend now expires ${expiresMonth}` : ''})`);
       removed++;
       if (validOwner) {
         stmts.push(db.prepare('UPDATE ward_members SET recommend_interview_synced_expires = ? WHERE id = ?').bind(expiresMonth, row.ward_member_id));
@@ -414,6 +445,7 @@ export async function syncTempleRecommendInterviews(db: D1Database): Promise<Job
 
     if ((row.date_recommend_expires || '').slice(0, 7) !== expiresMonth) {
       stmts.push(db.prepare('UPDATE interview_pipeline SET date_recommend_expires = ?, updated_at = ? WHERE id = ?').bind(expiresMonth, nowIso, row.id));
+      changes.push(`${nameOf(row.ward_member_id)}: expiration changed from ${(row.date_recommend_expires || '').slice(0, 7) || '(none)'} to ${expiresMonth}`);
       updated++;
     }
     if ((wm!.recommend_interview_synced_expires || '') !== expiresMonth) {
@@ -442,10 +474,11 @@ export async function syncTempleRecommendInterviews(db: D1Database): Promise<Job
       'INSERT INTO interview_pipeline (member, type_of_interview, status, assigned_to, date_recommend_expires, ward_member_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(legalName, interviewType, 'Unassigned', '', expiresMonth, wm.id, nowIso, nowIso));
     stmts.push(db.prepare('UPDATE ward_members SET recommend_interview_synced_expires = ? WHERE id = ?').bind(expiresMonth, wm.id));
+    changes.push(`${legalName}: added (${interviewType}, expires ${expiresMonth})`);
     created++;
   }
   if (stmts.length > 0) await db.batch(stmts);
-  return { ok: true, created, updated, removed };
+  return { ok: true, created, updated, removed, changes };
 }
 
 /** Once a baby's blessing date has passed and its church record hasn't been marked
@@ -459,7 +492,7 @@ export async function syncClerkBabyRecordTasks(db: D1Database, todayStr: string)
   const babiesResult = await db.prepare(
     "SELECT id, name, blessing_date FROM babies WHERE blessing_date IS NOT NULL AND blessing_date != '' AND blessing_date <= ? AND church_record_created = 0"
   ).bind(todayStr).all<{ id: number; name: string; blessing_date: string }>();
-  if (babiesResult.results.length === 0) return { ok: true, created: 0 };
+  if (babiesResult.results.length === 0) return { ok: true, created: 0, changes: [] };
 
   const clerk = await db.prepare("SELECT name FROM users WHERE church_role = 'Clerk' LIMIT 1").first<{ name: string }>();
   const assignedTo = clerk?.name ?? '';
@@ -469,6 +502,7 @@ export async function syncClerkBabyRecordTasks(db: D1Database, todayStr: string)
 
   const nowIso = new Date().toISOString();
   const stmts: D1PreparedStatement[] = [];
+  const changes: string[] = [];
   let created = 0;
   for (const baby of babiesResult.results) {
     const taskText = `Create church record for ${baby.name} (blessed ${baby.blessing_date.slice(0, 10)})`;
@@ -476,10 +510,11 @@ export async function syncClerkBabyRecordTasks(db: D1Database, todayStr: string)
     stmts.push(db.prepare(
       'INSERT INTO tasks (task, assigned_to, created_date, done, share_with, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).bind(taskText, assignedTo, todayStr, 0, 'Bishopric', nowIso, nowIso));
+    changes.push(`Task added: ${taskText}`);
     created++;
   }
   if (stmts.length > 0) await db.batch(stmts);
-  return { ok: true, created };
+  return { ok: true, created, changes };
 }
 
 export async function runDailyJobs(db: D1Database): Promise<Record<string, JobResult>> {

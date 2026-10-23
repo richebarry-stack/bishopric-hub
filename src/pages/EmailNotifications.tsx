@@ -12,11 +12,22 @@ const WEEKDAYS = [
 
 const JOB_LABELS: Record<string, string> = {
   syncConduct: 'Sacrament conducting sync',
+  syncPresiding: 'Sacrament presiding sync',
   cleanupSessions: 'Expired session cleanup',
   cleanupLoginAttempts: 'Login attempt log cleanup',
   cleanupPresence: 'Stale presence cleanup',
   syncYouthInterviews: 'Youth interview roster sync',
+  syncSettingApartInterviews: 'Setting apart interview sync',
+  syncCallingInterviews: 'Calling interview sync',
+  syncOrdinanceCandidates: 'Priesthood advancement sync',
+  syncTempleRecommendInterviews: 'Temple recommend interview sync',
+  syncClerkBabyRecordTasks: 'Baby record task sync',
 };
+
+// Count fields a daily job may report, in display order.
+const JOB_COUNT_LABELS: [string, string][] = [
+  ['created', 'created'], ['updated', 'updated'], ['linked', 'linked'], ['removed', 'removed'], ['deleted', 'deleted'],
+];
 
 const COMMON_TIME_ZONES = [
   'America/Denver',
@@ -37,6 +48,14 @@ function formatWhen(iso: string | null): string {
 function parseNames(json: string | null): string[] {
   if (!json) return [];
   try { return JSON.parse(json); } catch { return []; }
+}
+
+function parseRecommendChanged(json: string | null): string[] {
+  if (!json) return [];
+  try {
+    const items = JSON.parse(json) as { name: string; from: string; to: string }[];
+    return items.map(it => `${it.name} (${it.from} → ${it.to})`);
+  } catch { return []; }
 }
 
 function parseChanged(json: string | null, secondKey: 'calling' | 'section'): string[] {
@@ -74,6 +93,8 @@ function SyncRun({ run }: { run: LcrSyncRun }) {
       {!!run.success && (
         <div className="mt-1 text-xs text-gray-500 space-y-0.5">
           <p>Roster: {run.roster_created ?? 0} created, {run.roster_filled ?? 0} filled in{parseNames(run.roster_missing).length > 0 ? `, ${parseNames(run.roster_missing).length} missing from LCR` : ''}</p>
+          <NameList label="Created" names={parseNames(run.roster_created_names)} />
+          <NameList label="Filled in" names={parseNames(run.roster_filled_names)} />
           <NameList label="Missing from LCR roster" names={parseNames(run.roster_missing)} />
           {unmatchedUsers.length > 0 && (
             <p className="text-red-600">
@@ -81,8 +102,11 @@ function SyncRun({ run }: { run: LcrSyncRun }) {
             </p>
           )}
           <p>Recommends: {run.recommend_updated ?? 0} changed{parseNames(run.recommend_unmatched).length > 0 ? `, ${parseNames(run.recommend_unmatched).length} unmatched` : ''}</p>
+          <NameList label="Recommends changed" names={parseRecommendChanged(run.recommend_changed)} />
           <NameList label="Unmatched recommends" names={parseNames(run.recommend_unmatched)} />
           <p>Stake activations: {run.stake_flagged ?? 0} flagged, {run.stake_cleared ?? 0} cleared{parseNames(run.stake_unmatched).length > 0 ? `, ${parseNames(run.stake_unmatched).length} unmatched` : ''}</p>
+          <NameList label="Flagged as with the stake" names={parseNames(run.stake_flagged_names)} />
+          <NameList label="Cleared (activated)" names={parseNames(run.stake_cleared_names)} />
           <NameList label="Unmatched stake activations" names={parseNames(run.stake_unmatched)} />
           <p>Callings: {run.callings_created ?? 0} created, {run.callings_updated ?? 0} updated, {run.callings_released ?? 0} released{parseNames(run.callings_unmatched).length > 0 ? `, ${parseNames(run.callings_unmatched).length} unmatched` : ''}</p>
           <NameList label="Callings changed" names={parseChanged(run.callings_changed, 'calling')} />
@@ -435,16 +459,29 @@ export default function EmailNotifications() {
               {Object.keys(data?.results || {}).length === 0 && (
                 <p className="text-sm text-gray-400 py-2">Jobs run automatically once a day the next time anyone uses the app — nothing has run yet.</p>
               )}
-              {Object.entries(data?.results || {}).map(([key, result]) => (
-                <div key={key} className="py-2 flex items-center justify-between text-sm">
-                  <span className="text-gray-700">{JOB_LABELS[key] || key}</span>
-                  {result.ok ? (
-                    <span className="text-green-600 text-xs">✓ OK{'created' in result || 'updated' in result ? ` — ${result.created ?? 0} created, ${result.updated ?? 0} updated` : ''}</span>
-                  ) : (
-                    <span className="text-red-600 text-xs" title={result.error}>✗ Failed</span>
-                  )}
-                </div>
-              ))}
+              {Object.entries(data?.results || {}).map(([key, result]) => {
+                const counts = JOB_COUNT_LABELS
+                  .filter(([field]) => typeof result[field] === 'number')
+                  .map(([field, label]) => `${result[field]} ${label}`);
+                const changes = Array.isArray(result.changes) ? (result.changes as string[]) : [];
+                return (
+                  <div key={key} className="py-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-700">{JOB_LABELS[key] || key}</span>
+                      {result.ok ? (
+                        <span className="text-green-600 text-xs">✓ OK{counts.length > 0 ? ` — ${counts.join(', ')}` : ''}</span>
+                      ) : (
+                        <span className="text-red-600 text-xs" title={result.error}>✗ Failed</span>
+                      )}
+                    </div>
+                    {changes.length > 0 && (
+                      <ul className="mt-1 text-xs text-gray-500 list-disc pl-5 space-y-0.5">
+                        {changes.map((c, i) => <li key={i}>{c}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </>
         )}
