@@ -374,8 +374,8 @@ export async function syncTempleRecommendInterviews(db: D1Database): Promise<Job
   const membersById = new Map(membersResult.results.map(m => [m.id, m]));
 
   const existingResult = await db.prepare(
-    "SELECT id, ward_member_id, type_of_interview, date_recommend_expires FROM interview_pipeline WHERE ward_member_id IS NOT NULL AND type_of_interview IN ('Endowed Temple Rec', 'Limited')"
-  ).all<{ id: number; ward_member_id: number; type_of_interview: string; date_recommend_expires: string | null }>();
+    "SELECT id, ward_member_id, type_of_interview, date_recommend_expires, with_stake FROM interview_pipeline WHERE ward_member_id IS NOT NULL AND type_of_interview IN ('Endowed Temple Rec', 'Limited')"
+  ).all<{ id: number; ward_member_id: number; type_of_interview: string; date_recommend_expires: string | null; with_stake: number | null }>();
   const existingByKey = new Map(existingResult.results.map(r => [`${r.ward_member_id}|${r.type_of_interview}`, r]));
 
   const stmts: D1PreparedStatement[] = [];
@@ -400,7 +400,10 @@ export async function syncTempleRecommendInterviews(db: D1Database): Promise<Job
       withinHorizon = !!y && !!mo && new Date(y, mo, 0).getTime() <= cutoff.getTime();
     }
 
-    if (!validOwner || !withinHorizon) {
+    // A row "with the stake" stays until the LCR sync clears that flag (the stake
+    // activated the recommend), even though a newly issued recommend is outside the
+    // horizon. Deleting it here made the LCR sync re-create it every day.
+    if (!validOwner || (!withinHorizon && !row.with_stake)) {
       stmts.push(db.prepare('DELETE FROM interview_pipeline WHERE id = ?').bind(row.id));
       removed++;
       if (validOwner) {

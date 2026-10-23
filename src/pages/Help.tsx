@@ -558,6 +558,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Oct 23, 2026',
+              items: [
+                'Fixed: the daily LCR sync reported the same "2 flagged" stake activations every day. The daily temple recommend check was deleting interviews that are with the stake (their new recommend expires more than 2 months out), and the LCR sync then re-added them. Interviews with the stake are now kept until the stake activates the recommend, so notes and assignments on them are no longer lost each day.',
+              ],
+            },
+            {
               date: 'Oct 20, 2026',
               items: [
                 'Fixed: the LCR sync reported "Recommends: 3 changed" on every run. LCR lists some members twice on the recommend report (an old limited-use recommend and a new endowed one), and the two rows kept overwriting each other, so those members showed the wrong recommend every other run. The sync now keeps the endowed recommend, or the later expiration when both rows are the same type. If two different names ever match the same member, neither is applied and the sync log says so.',
