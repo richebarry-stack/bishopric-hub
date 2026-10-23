@@ -4,6 +4,7 @@ import { useTable } from '../lib/useTable';
 import type { SacramentSpeaker, Prayer, SacramentMusic, SacramentTheme, SacramentAnnouncement, WardMember } from '../lib/api';
 import Modal from '../components/Modal';
 import { Input, Select, Textarea } from '../components/FormFields';
+import MemberNameInput from '../components/MemberNameInput';
 import { SPEAKER_TYPES, NO_MEETING_TYPES } from '../lib/constants';
 import { useAuth } from '../lib/auth';
 import { resolveMemberName } from '../lib/nameUtils';
@@ -297,7 +298,7 @@ export default function SacramentPlanning() {
         {editSpeaker && (
           <form onSubmit={async e => { e.preventDefault(); const d = { ...editSpeaker }; delete (d as Record<string, unknown>).id; if (editSpeaker.id) await updateSpeaker(editSpeaker.id, d as Record<string, unknown>); else await createSpeaker(d as Record<string, unknown>); setEditSpeaker(null); }} className="space-y-3">
             <Input label="Meeting Date" value={toDateKey(editSpeaker.meeting_date || '')} onChange={v => setEditSpeaker({ ...editSpeaker, meeting_date: v })} type="date" required />
-            <Input label="Speaker" value={editSpeaker.speaker || ''} onChange={v => setEditSpeaker({ ...editSpeaker, speaker: v })} required />
+            <MemberNameInput label="Speaker" value={editSpeaker.speaker || ''} onChange={v => setEditSpeaker({ ...editSpeaker, speaker: v })} required />
             <Select label="Speaker Type" value={editSpeaker.speaker_type || ''} onChange={v => setEditSpeaker({ ...editSpeaker, speaker_type: v })} options={SPEAKER_TYPES} />
             <Input label="Topic" value={editSpeaker.topic || ''} onChange={v => setEditSpeaker({ ...editSpeaker, topic: v })} />
             <Select label="Accepted" value={editSpeaker.accepted || ''} onChange={v => setEditSpeaker({ ...editSpeaker, accepted: v })} options={['Considering', 'Called and Accepted']} />
@@ -315,7 +316,7 @@ export default function SacramentPlanning() {
         {editPrayer && (
           <form onSubmit={async e => { e.preventDefault(); const d = { ...editPrayer, name: resolveMemberName(editPrayer.name || '', wardMembers) }; delete (d as Record<string, unknown>).id; if (editPrayer.id) await updatePrayer(editPrayer.id, d as Record<string, unknown>); else await createPrayer(d as Record<string, unknown>); setEditPrayer(null); }} className="space-y-3">
             <Input label="Meeting Date" value={toDateKey(editPrayer.meeting_date || '')} onChange={v => setEditPrayer({ ...editPrayer, meeting_date: v })} type="date" required />
-            <Input label="Name" value={editPrayer.name || ''} onChange={v => setEditPrayer({ ...editPrayer, name: v })} required />
+            <MemberNameInput label="Name" value={editPrayer.name || ''} onChange={v => setEditPrayer({ ...editPrayer, name: v })} required />
             <Select label="Opening/Closing" value={editPrayer.opening_closing || ''} onChange={v => setEditPrayer({ ...editPrayer, opening_closing: v })} options={['Opening', 'Closing']} />
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setEditPrayer(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
@@ -330,8 +331,8 @@ export default function SacramentPlanning() {
         {editMusic && (
           <form onSubmit={async e => { e.preventDefault(); const d = { ...editMusic }; delete (d as Record<string, unknown>).id; if (editMusic.id) await updateMusic(editMusic.id, d as Record<string, unknown>); else await createMusic(d as Record<string, unknown>); setEditMusic(null); }} className="space-y-3">
             <Input label="Meeting Date" value={toDateKey(editMusic.meeting_date || '')} onChange={v => setEditMusic({ ...editMusic, meeting_date: v })} type="date" required />
-            <Input label="Chorister" value={editMusic.chorister || ''} onChange={v => setEditMusic({ ...editMusic, chorister: v })} />
-            <Input label="Organist" value={editMusic.organist || ''} onChange={v => setEditMusic({ ...editMusic, organist: v })} />
+            <MemberNameInput label="Chorister" format="firstLast" value={editMusic.chorister || ''} onChange={v => setEditMusic({ ...editMusic, chorister: v })} />
+            <MemberNameInput label="Organist" format="firstLast" value={editMusic.organist || ''} onChange={v => setEditMusic({ ...editMusic, organist: v })} />
             <Input label="Opening Hymn" value={editMusic.opening_hymn || ''} onChange={v => setEditMusic({ ...editMusic, opening_hymn: v })} />
             <Input label="Sacrament Hymn" value={editMusic.sacrament_hymn || ''} onChange={v => setEditMusic({ ...editMusic, sacrament_hymn: v })} />
             <Input label="Rest/Special" value={editMusic.rest_special || ''} onChange={v => setEditMusic({ ...editMusic, rest_special: v })} />
@@ -620,8 +621,8 @@ function AgendaModal(props: AgendaModalProps) {
           <Input label="Rest/Special" value={mus.rest_special} onChange={v => { setMus({ ...mus, rest_special: v }); mark(); }} />
           <Input label="Closing Hymn" value={mus.closing_hymn} onChange={v => { setMus({ ...mus, closing_hymn: v }); mark(); }} />
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Chorister" value={mus.chorister} onChange={v => { setMus({ ...mus, chorister: v }); mark(); }} />
-            <Input label="Organist" value={mus.organist} onChange={v => { setMus({ ...mus, organist: v }); mark(); }} />
+            <MemberNameInput label="Chorister" format="firstLast" value={mus.chorister} onChange={v => { setMus({ ...mus, chorister: v }); mark(); }} />
+            <MemberNameInput label="Organist" format="firstLast" value={mus.organist} onChange={v => { setMus({ ...mus, organist: v }); mark(); }} />
           </div>
         </section>
 
@@ -641,7 +642,7 @@ function AgendaModal(props: AgendaModalProps) {
                 <div key={i} className="rounded-md border border-gray-200 p-3 space-y-2 relative">
                   <button type="button" onClick={() => { setSpeakerRows(rows => rows.filter((_, idx) => idx !== i)); mark(); }} aria-label="Remove"
                     className="absolute top-2 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
-                  <Input label={`Speaker ${i + 1}`} value={r.speaker} onChange={v => updateSpeakerRow(i, { speaker: v })} />
+                  <MemberNameInput label={`Speaker ${i + 1}`} value={r.speaker} onChange={v => updateSpeakerRow(i, { speaker: v })} />
                   <div className="grid grid-cols-2 gap-3">
                     <Select label="Type" value={r.speaker_type} onChange={v => updateSpeakerRow(i, { speaker_type: v })} options={SPEAKER_TYPES} />
                     <Select label="Accepted" value={r.accepted} onChange={v => updateSpeakerRow(i, { accepted: v })} options={['Considering', 'Called and Accepted']} />
@@ -657,8 +658,8 @@ function AgendaModal(props: AgendaModalProps) {
         <section className="space-y-3 border-t border-gray-100 pt-4">
           <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Prayers</h3>
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Opening" value={openingName} onChange={v => { setOpeningName(v); mark(); }} />
-            <Input label="Closing" value={closingName} onChange={v => { setClosingName(v); mark(); }} />
+            <MemberNameInput label="Opening" value={openingName} onChange={v => { setOpeningName(v); mark(); }} />
+            <MemberNameInput label="Closing" value={closingName} onChange={v => { setClosingName(v); mark(); }} />
           </div>
         </section>
 

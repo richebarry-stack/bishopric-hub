@@ -1,4 +1,5 @@
 import Modal from '../Modal';
+import MemberNameInput from '../MemberNameInput';
 import StatusBadge from '../StatusBadge';
 import { Input, Select, Textarea, Checkbox } from '../FormFields';
 import type { InterviewPipeline as InterviewType, WardMember, CallingPipeline } from '../../lib/api';
@@ -67,12 +68,23 @@ export default function InterviewEditModal({
       <form onSubmit={e => { e.preventDefault(); onSave(); }} className="space-y-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Member</label>
-          <input
-            value={editing.member || ''}
-            onChange={e => onChange({ member: e.target.value })}
-            required
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          />
+          {editingLinkedMember ? (
+            // Linked: this field renames the person on the roster, so no suggestions here.
+            <input
+              value={editing.member || ''}
+              onChange={e => onChange({ member: e.target.value })}
+              required
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            />
+          ) : (
+            <MemberNameInput
+              value={editing.member || ''}
+              onChange={v => onChange({ member: v })}
+              format="legal"
+              required
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            />
+          )}
           {editingLinkedMember && (
             <p className="text-xs text-gray-400 mt-1">Linked to Ward Members — saving here updates their name on the ward roster.</p>
           )}

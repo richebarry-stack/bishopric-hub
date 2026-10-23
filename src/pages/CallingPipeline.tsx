@@ -4,6 +4,7 @@ import { useTable } from '../lib/useTable';
 import { api } from '../lib/api';
 import type { CallingPipeline as CallingType, User, CallingPipelineHistoryEntry } from '../lib/api';
 import Modal from '../components/Modal';
+import MemberNameInput from '../components/MemberNameInput';
 import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Checkbox } from '../components/FormFields';
 import { CALLING_STATUSES, CALLING_STATUS_COLORS, CALLING_TYPE_STATUSES, RELEASE_TYPE_STATUSES, ORGANIZATIONS } from '../lib/constants';
@@ -55,10 +56,10 @@ function MemberInput({ value, onChange }: { value: string; onChange: (v: string)
         <button type="button" onMouseDown={e => e.preventDefault()} onClick={applyBold}
           className="text-xs px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-50 font-bold">B</button>
       </div>
-      <input
-        ref={ref}
+      <MemberNameInput
+        inputRef={ref}
         value={value}
-        onChange={e => onChange(e.target.value)}
+        onChange={onChange}
         required
         className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
       />

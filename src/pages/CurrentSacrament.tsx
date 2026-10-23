@@ -10,6 +10,7 @@ import { SPEAKER_TYPES, NO_MEETING_TYPES } from '../lib/constants';
 import { renderRichText } from '../lib/richText';
 import { resolveMemberName } from '../lib/nameUtils';
 import { useConfirm } from '../components/ConfirmDialog';
+import MemberNameInput, { type MemberNameFormat } from '../components/MemberNameInput';
 
 // ─── module-level constants ───────────────────────────────────────────────────
 
@@ -116,12 +117,18 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function SimpleField({ label, value, onChange, readonly, placeholder }: { label: string; value: string; onChange: (v: string) => void; readonly?: boolean; placeholder?: string }) {
+function SimpleField({ label, value, onChange, readonly, placeholder, memberFormat }: {
+  label: string; value: string; onChange: (v: string) => void; readonly?: boolean; placeholder?: string;
+  /** Set for person fields: suggests ward members as you type. */
+  memberFormat?: MemberNameFormat;
+}) {
   return (
     <Row label={label}>
       {readonly
         ? <p className="text-sm text-gray-800 py-1.5">{value || <span className="text-gray-300 italic">—</span>}</p>
-        : <input className={INPUT_CLS} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />}
+        : memberFormat
+          ? <MemberNameInput className={INPUT_CLS} value={value} onChange={onChange} placeholder={placeholder} format={memberFormat} />
+          : <input className={INPUT_CLS} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />}
     </Row>
   );
 }
@@ -178,8 +185,10 @@ function SpeakerItem({
         <div className="rounded-md border border-gray-200 p-2 relative">
           <button type="button" onClick={onRemove} aria-label="Remove"
             className="absolute top-1 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
-          <input className={INPUT_CLS + ' mb-1 pr-6'} placeholder="Speaker name" value={row.speaker}
-            onChange={e => onUpdate({ speaker: e.target.value })} />
+          <div className="mb-1 pr-6">
+            <MemberNameInput className={INPUT_CLS} placeholder="Speaker name" value={row.speaker}
+              onChange={v => onUpdate({ speaker: v })} />
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <select className={INPUT_CLS} value={row.speaker_type}
               onChange={e => onUpdate({ speaker_type: e.target.value })}>
@@ -265,7 +274,7 @@ function OptionalItem({ label, value, onChange, onRemove }: {
           className="ml-auto text-gray-300 hover:text-red-500 text-sm leading-none" title="Remove">×</button>
       </div>
       <div className="flex-1 min-w-0">
-        <input className={INPUT_CLS} placeholder="Name…" value={value} onChange={e => onChange(e.target.value)} />
+        <MemberNameInput className={INPUT_CLS} placeholder="Name…" value={value} onChange={onChange} format="firstLast" />
       </div>
     </div>
   );
@@ -900,8 +909,8 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
             case 'intro_remarks':  return <TextareaField key={kind} label={LABEL[kind]} value={introRemarks}   onChange={setIntroRemarks}  readonly={ro('intro_remarks')} />;
             case 'presiding':      return <SimpleField   key={kind} label={LABEL[kind]} value={presiding}     onChange={setPresiding}     readonly={ro('presiding')} />;
             case 'conducting':     return <SimpleField   key={kind} label={LABEL[kind]} value={conducting}    onChange={setConducting}    readonly={ro('conducting')} />;
-            case 'chorister':      return <SimpleField   key={kind} label={LABEL[kind]} value={chorister}     onChange={setChorister}     readonly={ro('chorister')} />;
-            case 'organist':       return <SimpleField   key={kind} label={LABEL[kind]} value={organist}      onChange={setOrganist}      readonly={ro('organist')} />;
+            case 'chorister':      return <SimpleField   key={kind} label={LABEL[kind]} value={chorister}     onChange={setChorister}     readonly={ro('chorister')} memberFormat="firstLast" />;
+            case 'organist':       return <SimpleField   key={kind} label={LABEL[kind]} value={organist}      onChange={setOrganist}      readonly={ro('organist')} memberFormat="firstLast" />;
             case 'high_councilor': return <SimpleField   key={kind} label={LABEL[kind]} value={highCouncilorName} onChange={setHighCouncilorName} readonly={ro('high_councilor')} />;
             case 'stake_reps':     return <SimpleField   key={kind} label={LABEL[kind]} value={stakeReps}       onChange={setStakeReps}     readonly={ro('stake_reps')} placeholder="Other stake representatives, if any…" />;
             case 'recognize': {
@@ -920,7 +929,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
                 autoLines={[highCouncilorThanksLine, stakeRepsLine, musicThanksLine].filter(Boolean)} />;
             }
             case 'opening_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={openingHymn}   onChange={setOpeningHymn}   readonly={ro('opening_hymn')} />;
-            case 'opening_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={openingPrayer} onChange={setOpeningPrayer} readonly={ro('opening_prayer')} />;
+            case 'opening_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={openingPrayer} onChange={setOpeningPrayer} readonly={ro('opening_prayer')} memberFormat="display" />;
             case 'stake_business': return viewerMode ? null : <TextareaField key={kind} label={LABEL[kind]} value={stakeBusiness} onChange={setStakeBusiness} />;
             case 'ward_business':  return viewerMode ? null : <TextareaField key={kind} label={LABEL[kind]} value={wardBusiness} onChange={setWardBusiness} />;
             case 'sacrament_intro': return <TextareaField key={kind} label={LABEL[kind]} value={sacramentIntro} onChange={setSacramentIntro} readonly={ro('sacrament_intro')} />;
@@ -934,7 +943,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
             case 'rest_special':   return <SimpleField   key={kind} label={LABEL[kind]} value={restSpecial}   onChange={setRestSpecial}   readonly={ro('rest_special')} />;
             case 'closing_remarks': return <TextareaField key={kind} label={LABEL[kind]} value={closingRemarks} onChange={setClosingRemarks} readonly={ro('closing_remarks')} />;
             case 'closing_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={closingHymn}   onChange={setClosingHymn}   readonly={ro('closing_hymn')} />;
-            case 'closing_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={closingPrayer} onChange={setClosingPrayer} readonly={ro('closing_prayer')} />;
+            case 'closing_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={closingPrayer} onChange={setClosingPrayer} readonly={ro('closing_prayer')} memberFormat="display" />;
             case 'announcements':
               if (viewerMode === 'music') return null;
               if (viewerMode === 'readonly') {

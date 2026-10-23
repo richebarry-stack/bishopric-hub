@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTable } from '../lib/useTable';
 import type { MissionaryPipeline as MissionaryType } from '../lib/api';
 import Modal from '../components/Modal';
+import MemberNameInput from '../components/MemberNameInput';
 import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Textarea } from '../components/FormFields';
 import { MISSIONARY_STATUSES, MISSIONARY_TEMPLE_STATUSES } from '../lib/constants';
@@ -173,7 +174,7 @@ export default function MissionaryPipeline() {
       <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit Missionary' : 'New Missionary'}>
         {editing && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
-            <Input label="Who" value={editing.who || ''} onChange={v => setEditing({ ...editing, who: v })} required />
+            <MemberNameInput label="Who" value={editing.who || ''} onChange={v => setEditing({ ...editing, who: v })} required />
             <Select label="Status" value={editing.status || ''} onChange={v => setEditing({ ...editing, status: v })} options={MISSIONARY_STATUSES} />
             <Input label="Mission Call" value={editing.mission_call || ''} onChange={v => setEditing({ ...editing, mission_call: v })} />
             <Select label="Temple Status" value={editing.temple_status || ''} onChange={v => setEditing({ ...editing, temple_status: v })} options={MISSIONARY_TEMPLE_STATUSES} />

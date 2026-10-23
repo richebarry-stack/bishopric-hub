@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useTable } from '../lib/useTable';
 import type { Ordinance, OrdinanceSuggestionDismissal, WardMember } from '../lib/api';
 import Modal from '../components/Modal';
+import MemberNameInput from '../components/MemberNameInput';
 import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Textarea } from '../components/FormFields';
 import { ORDINANCE_TYPES, ORDINANCE_STATUSES, ORDINANCE_STATUS_COLORS } from '../lib/constants';
@@ -148,7 +149,7 @@ export default function Ordinances() {
       <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit Ordinance' : 'New Ordinance'}>
         {editing && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
-            <Input label="Member" value={editing.member_name || ''} onChange={v => setEditing({ ...editing, member_name: v })} required />
+            <MemberNameInput label="Member" format="legal" value={editing.member_name || ''} onChange={v => setEditing({ ...editing, member_name: v })} required />
             <Select label="Ordinance" value={editing.ordinance_type || ''} onChange={v => setEditing({ ...editing, ordinance_type: v })} options={ORDINANCE_TYPES} required />
             <Select label="Status" value={editing.status || ''} onChange={v => setEditing({ ...editing, status: v })} options={ORDINANCE_STATUSES} />
             <Input label="Target Date" value={toDateOnly(editing.target_date || '')} onChange={v => setEditing({ ...editing, target_date: v })} type="date" />

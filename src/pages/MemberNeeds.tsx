@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useTable } from '../lib/useTable';
 import type { MemberNeed } from '../lib/api';
 import Modal from '../components/Modal';
+import MemberNameInput from '../components/MemberNameInput';
 import { Input, Textarea } from '../components/FormFields';
 import { MEMBER_NEED_TYPES } from '../lib/constants';
 import { useAuth } from '../lib/auth';
@@ -155,7 +156,7 @@ export default function MemberNeeds() {
       <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit Need' : 'New Need'}>
         {editing && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
-            <Input label="Who" value={editing.who || ''} onChange={v => setEditing({ ...editing, who: v })} required />
+            <MemberNameInput label="Who" value={editing.who || ''} onChange={v => setEditing({ ...editing, who: v })} required />
             <Textarea label="What" value={editing.what || ''} onChange={v => setEditing({ ...editing, what: v })} />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
