@@ -561,6 +561,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Oct 25, 2026',
               items: [
+                'Speakers & Prayers: the Prayers history list no longer shows children under 8.',
                 'Calling Pipeline: added a Notes field. Entries with notes show a 📝 next to the calling; hover it to read them. Notes changes appear in the change history for that entry.',
                 'Calling Pipeline: the edit window is more compact, with short fields side by side and the LCR checkboxes on one line.',
                 'Calling Pipeline: Member and Calling are no longer required, so you can save a calling or release before you know who or what it is and fill it in later.',

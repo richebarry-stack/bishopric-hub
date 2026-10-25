@@ -606,7 +606,10 @@ function PrayersTab({ prayers, notes, onSaveNote, activeWardMembers, wardMembers
 
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
-    return rows.filter(r => (!q || r.label.toLowerCase().includes(q)) && (!onlyWithHistory || r.count > 0));
+    return rows.filter(r =>
+      // Children under 8 aren't asked to pray in sacrament meeting; unknown age stays listed.
+      (r.age === null || r.age >= 8) &&
+      (!q || r.label.toLowerCase().includes(q)) && (!onlyWithHistory || r.count > 0));
   }, [rows, filter, onlyWithHistory]);
 
   const sorted = useMemo(() => {
