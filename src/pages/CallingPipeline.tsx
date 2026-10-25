@@ -6,7 +6,7 @@ import type { CallingPipeline as CallingType, User, CallingPipelineHistoryEntry 
 import Modal from '../components/Modal';
 import MemberNameInput from '../components/MemberNameInput';
 import StatusBadge from '../components/StatusBadge';
-import { Input, Select, Checkbox } from '../components/FormFields';
+import { Input, Select, Checkbox, Textarea } from '../components/FormFields';
 import { CALLING_STATUSES, CALLING_STATUS_COLORS, CALLING_TYPE_STATUSES, RELEASE_TYPE_STATUSES, ORGANIZATIONS } from '../lib/constants';
 import { renderRichText, stripBold } from '../lib/richText';
 import LastEdited from '../components/LastEdited';
@@ -51,7 +51,7 @@ function MemberInput({ value, onChange }: { value: string; onChange: (v: string)
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-medium text-gray-700">Member</span>
+        <span className="text-sm font-medium text-gray-700">Member <span className="text-xs font-normal text-gray-400">(select text + B to bold)</span></span>
         {/* onMouseDown preventDefault keeps the input's text selection from clearing on button click */}
         <button type="button" onMouseDown={e => e.preventDefault()} onClick={applyBold}
           className="text-xs px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-50 font-bold">B</button>
@@ -63,9 +63,9 @@ function MemberInput({ value, onChange }: { value: string; onChange: (v: string)
         minAge={8}
         className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
       />
-      <p className="text-xs text-gray-400 mt-1">
-        Select text and click <span className="font-bold">B</span> to bold it. Preview: <span className="text-gray-600">{renderRichText(value) || '—'}</span>
-      </p>
+      {value.includes('**') && (
+        <p className="text-xs text-gray-400 mt-0.5">Preview: <span className="text-gray-600">{renderRichText(value)}</span></p>
+      )}
     </div>
   );
 }
@@ -399,39 +399,46 @@ export default function CallingPipeline() {
 
       <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit Calling' : 'New Calling'}>
         {editing && (
-          <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
+          <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-2.5">
             <MemberInput value={editing.member || ''} onChange={v => setEditing({ ...editing, member: v })} />
-            <Input label="Calling" value={editing.calling || ''} onChange={v => setEditing({ ...editing, calling: v })} />
-            <div>
-              <span className="text-sm font-medium text-gray-700">Type</span>
-              <div className="flex gap-4 mt-1">
-                {(['Calling', 'Release'] as const).map(t => (
-                  <label key={t} className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="radio" name="calling-type" value={t}
-                      checked={(editing.type || 'Calling') === t}
-                      onChange={() => {
-                        const nextStatuses = t === 'Release' ? RELEASE_TYPE_STATUSES : CALLING_TYPE_STATUSES;
-                        const status = nextStatuses.includes(editing.status || '') ? editing.status : nextStatuses[0];
-                        setEditing({ ...editing, type: t, status });
-                      }}
-                      className="text-blue-600" />
-                    <span className="text-sm text-gray-700">{t}</span>
-                  </label>
-                ))}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+              <Input label="Calling" value={editing.calling || ''} onChange={v => setEditing({ ...editing, calling: v })} />
+              <div>
+                <span className="text-sm font-medium text-gray-700">Type</span>
+                <div className="flex gap-4 mt-1 py-2">
+                  {(['Calling', 'Release'] as const).map(t => (
+                    <label key={t} className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="calling-type" value={t}
+                        checked={(editing.type || 'Calling') === t}
+                        onChange={() => {
+                          const nextStatuses = t === 'Release' ? RELEASE_TYPE_STATUSES : CALLING_TYPE_STATUSES;
+                          const status = nextStatuses.includes(editing.status || '') ? editing.status : nextStatuses[0];
+                          setEditing({ ...editing, type: t, status });
+                        }}
+                        className="text-blue-600" />
+                      <span className="text-sm text-gray-700">{t}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
+              <Select label="Status" value={editing.status || ''} onChange={v => setEditing({ ...editing, status: v })} options={statusOptions} />
+              <AssignedToField value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} options={bishopricOptions} />
+              <Select label="Organization" value={editing.organization || ''} onChange={v => setEditing({ ...editing, organization: v })} options={ORGANIZATIONS} />
             </div>
-            <Select label="Status" value={editing.status || ''} onChange={v => setEditing({ ...editing, status: v })} options={statusOptions} />
-            <AssignedToField value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} options={bishopricOptions} />
-            <Select label="Organization" value={editing.organization || ''} onChange={v => setEditing({ ...editing, organization: v })} options={ORGANIZATIONS} />
-            {editing.type !== 'Release' && (
-              <>
-                <Checkbox label="Sustain recorded in LCR" checked={!!editing.sustain_recorded} onChange={v => setEditing({ ...editing, sustain_recorded: v ? 1 : 0 })} />
-                <Checkbox label="Setting apart recorded in LCR" checked={!!editing.set_apart_recorded} onChange={v => setEditing({ ...editing, set_apart_recorded: v ? 1 : 0 })} />
-              </>
+            {(editing.type !== 'Release' || editing.status === '10. Released') && (
+              <div className="flex flex-wrap gap-x-5 gap-y-1">
+                {editing.type !== 'Release' && (
+                  <>
+                    <Checkbox label="Sustain recorded in LCR" checked={!!editing.sustain_recorded} onChange={v => setEditing({ ...editing, sustain_recorded: v ? 1 : 0 })} />
+                    <Checkbox label="Setting apart recorded in LCR" checked={!!editing.set_apart_recorded} onChange={v => setEditing({ ...editing, set_apart_recorded: v ? 1 : 0 })} />
+                  </>
+                )}
+                {editing.status === '10. Released' && (
+                  <Checkbox label="Release recorded in LCR" checked={!!editing.release_recorded} onChange={v => setEditing({ ...editing, release_recorded: v ? 1 : 0 })} />
+                )}
+              </div>
             )}
-            {editing.status === '10. Released' && (
-              <Checkbox label="Release recorded in LCR" checked={!!editing.release_recorded} onChange={v => setEditing({ ...editing, release_recorded: v ? 1 : 0 })} />
-            )}
+            <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} rows={2} />
             <LastEdited updatedBy={editing.updated_by} updatedAt={editing.updated_at} />
             {editing.id && <HistoryList entries={history} />}
             <div className="flex justify-end gap-2 pt-2">
@@ -501,7 +508,10 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
           {sorted.map(r => (
             <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => onEdit(r)}>
               <td className="px-3 py-2 font-medium text-gray-900">{renderRichText(r.member)}</td>
-              <td className="px-3 py-2 text-gray-700">{r.calling}</td>
+              <td className="px-3 py-2 text-gray-700">
+                {r.calling}
+                {r.notes?.trim() && <span className="ml-1.5 cursor-help" title={r.notes}>📝</span>}
+              </td>
               <td className="px-3 py-2">
                 {r.type === 'Release'
                   ? <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-50 text-red-700">Release</span>

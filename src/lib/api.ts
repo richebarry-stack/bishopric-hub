@@ -213,6 +213,7 @@ export interface CallingPipeline {
   type: string; // 'Calling' | 'Release'
   ward_member_id: number | null;
   sustained_date: string | null;
+  notes: string | null;
   updated_at: string;
   updated_by?: string;
 }

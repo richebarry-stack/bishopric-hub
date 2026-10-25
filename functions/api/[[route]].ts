@@ -130,6 +130,7 @@ const CALLING_PIPELINE_HISTORY_LABELS: Record<string, string> = {
   member: 'Member', calling: 'Calling', status: 'Status', assigned_to: 'Assigned To',
   organization: 'Organization', type: 'Type', sustain_recorded: 'Sustain recorded in LCR',
   set_apart_recorded: 'Setting apart recorded in LCR', release_recorded: 'Release recorded in LCR',
+  notes: 'Notes',
 };
 const CALLING_PIPELINE_HISTORY_FIELDS = Object.keys(CALLING_PIPELINE_HISTORY_LABELS);
 const CALLING_PIPELINE_BOOLEAN_FIELDS = new Set(['sustain_recorded', 'set_apart_recorded', 'release_recorded']);
