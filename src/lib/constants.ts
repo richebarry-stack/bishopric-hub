@@ -232,6 +232,13 @@ export const MISSIONARY_STATUSES = [
   'Canceled',
 ];
 
+// Preparing to serve (forms started) but not yet in the MTC — these people are
+// listed for prayer in the dashboards' Missionaries panel.
+export const MISSIONARY_PRAYER_STATUSES = new Set(MISSIONARY_STATUSES.slice(
+  MISSIONARY_STATUSES.indexOf('Candidate Completing Forms'),
+  MISSIONARY_STATUSES.indexOf('Entered the MTC'),
+));
+
 export const MISSIONARY_TEMPLE_STATUSES = [
   '1-Participating in Temple Prep',
   '2-Bishop recommend interview needed',

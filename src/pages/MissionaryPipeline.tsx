@@ -182,6 +182,10 @@ export default function MissionaryPipeline() {
             <Input label="Report Date" value={toDateOnly(editing.report_date || '')} onChange={v => setEditing({ ...editing, report_date: v })} type="date" />
             <Input label="Release Date" value={toDateOnly(editing.release_date || '')} onChange={v => setEditing({ ...editing, release_date: v })} type="date" />
             <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} />
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={editing.pray_for !== 0} onChange={e => setEditing({ ...editing, pray_for: e.target.checked ? 1 : 0 })} className="rounded" />
+              🙏 Show on dashboard prayer list (while preparing, before the MTC)
+            </label>
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
               <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">Save</button>

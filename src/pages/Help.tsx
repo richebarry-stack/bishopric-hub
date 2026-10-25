@@ -322,6 +322,7 @@ const FULL_SECTIONS: Section[] = [
       <div className="space-y-2">
         <p>Track prospective missionaries, currently serving missionaries, and recently returned missionaries.</p>
         <p>Record temple preparation status, call received, report date, release date, and current status.</p>
+        <p>Anyone from <strong>Candidate Completing Forms</strong> up until they enter the MTC appears automatically on the dashboards' <strong>Missionaries</strong> prayer list, and drops off once they enter the MTC. Tap 🙏 on the dashboard to take someone off the list; turn it back on from their Missionary Pipeline record.</p>
       </div>
     ),
   },
@@ -557,6 +558,12 @@ function VersionHistoryList(limit?: number) {
 }
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
+            {
+              date: 'Oct 25, 2026',
+              items: [
+                'Dashboard and Ward Council Dashboard: the Missionaries panel is now a prayer list. It automatically lists missionaries who are preparing (Candidate Completing Forms through Assignment Made / Postponed) and removes them when they enter the MTC. "Not at this time" and "Considering" are no longer listed. Tap 🙏 to take someone off the list; it stays off until turned back on in their Missionary Pipeline record.',
+              ],
+            },
             {
               date: 'Oct 23, 2026',
               items: [

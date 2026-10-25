@@ -475,6 +475,7 @@ export interface MissionaryPipeline {
   status: string;
   ward_member_id: number | null;
   mission_end_estimated: string | null;
+  pray_for: number;
 }
 
 export interface Baby {

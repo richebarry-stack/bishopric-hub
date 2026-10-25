@@ -9,13 +9,9 @@ import {
   loadWcDashboardConfig, saveWcDashboardConfig,
 } from '../lib/wcDashboardConfig';
 import { responsiveGridCols } from '../lib/gridCols';
-import { MISSIONARY_STATUSES } from '../lib/constants';
+import { MISSIONARY_PRAYER_STATUSES } from '../lib/constants';
 
 const TODAY = new Date().toISOString().slice(0, 10);
-// Everything except still-serving/wrapped-up statuses — this is the dashboard's
-// "in progress toward serving" summary, so those are shown on Missionary Pipeline instead.
-const INACTIVE_MISSIONARY_STATUSES = new Set(['Entered the MTC', 'Entered the Mission Field', 'Released from Mission Field', 'Canceled']);
-const ACTIVE_MISSIONARY_STATUSES = new Set(MISSIONARY_STATUSES.filter(s => !INACTIVE_MISSIONARY_STATUSES.has(s)));
 const FONT_SIZES: FontSize[] = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl'];
 
 function formatDate(iso: string): string {
@@ -158,7 +154,9 @@ export default function WcDashboard() {
   const isWcContext = user?.hub === 'wc' || (user?.hub === 'both' && selectedHub === 'wc');
   const { rows: meetings } = useTable<WcMeeting>('wc-meetings');
   const { rows: allNeeds, create: createNeed, update: updateNeed } = useTable<MemberNeed>('member-needs');
-  const { rows: missionaries } = useTable<MissionaryPipeline>('missionary-pipeline');
+  const { rows: missionaries, update: updateMissionary } = useTable<MissionaryPipeline>('missionary-pipeline');
+  // WC-only users have read-only access to missionary records.
+  const canEditMissionaries = user?.hub !== 'wc';
   const { rows: tasks } = useTable<Task>('tasks');
   const { rows: events } = useTable<CalendarEvent>('calendaring');
 
@@ -166,8 +164,9 @@ export default function WcDashboard() {
     meetings.filter(m => m.date.slice(0, 10) >= TODAY).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null,
     [meetings]);
 
+  // Prayer list: preparing (forms started) but not yet in the MTC, unless someone tapped 🙏 to remove them.
   const activeMissionaries = useMemo(() =>
-    missionaries.filter(m => ACTIVE_MISSIONARY_STATUSES.has(m.status)), [missionaries]);
+    missionaries.filter(m => MISSIONARY_PRAYER_STATUSES.has(m.status) && m.pray_for !== 0), [missionaries]);
 
   const pendingTasks = useMemo(() => {
     const undone = tasks.filter(t => !t.done);
@@ -326,11 +325,20 @@ export default function WcDashboard() {
               <div className="space-y-2">
                 {activeMissionaries.length === 0 && <p className="text-gray-300 italic">None</p>}
                 {activeMissionaries.map(m => (
-                  <div key={m.id}>
-                    <p className={`${FONT_SIZE_CLASS[cfg.missionaries.fontSize]} font-medium text-gray-800 leading-tight`}>{m.who}</p>
-                    {cfg.missionaries.showStatus && (
-                      <p className="text-sm text-gray-400">{m.status.replace(/^\d+-/, '')}{m.mission_call ? ` — ${m.mission_call}` : ''}</p>
+                  <div key={m.id} className="flex items-start gap-2">
+                    {canEditMissionaries ? (
+                      <button onClick={() => updateMissionary(m.id, { pray_for: 0 })}
+                        className="text-xl leading-none flex-shrink-0 opacity-100 hover:opacity-40 transition-opacity"
+                        title="Remove from prayer list">🙏</button>
+                    ) : (
+                      <span className="text-xl leading-none flex-shrink-0">🙏</span>
                     )}
+                    <div className="min-w-0">
+                      <p className={`${FONT_SIZE_CLASS[cfg.missionaries.fontSize]} font-medium text-gray-800 leading-tight`}>{m.who}</p>
+                      {cfg.missionaries.showStatus && (
+                        <p className="text-sm text-gray-400">{m.status.replace(/^\d+-/, '')}{m.mission_call ? ` — ${m.mission_call}` : ''}</p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

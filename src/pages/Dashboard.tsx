@@ -6,7 +6,7 @@ import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 import type { CallingPipeline, CalendarEvent, Task, MemberNeed, MissionaryPipeline, BishopricMeeting, AnnualDuty, Baby } from '../lib/api';
 import StatusBadge from '../components/StatusBadge';
-import { CALLING_STATUS_COLORS, MISSIONARY_STATUSES } from '../lib/constants';
+import { CALLING_STATUS_COLORS, MISSIONARY_PRAYER_STATUSES } from '../lib/constants';
 import { renderRichText } from '../lib/richText';
 import {
   type DashboardConfig, type FontSize,
@@ -20,10 +20,6 @@ import { responsiveGridCols } from '../lib/gridCols';
 const TODAY = new Date().toISOString().slice(0, 10);
 const DUE_SOON_CUTOFF = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
 const ACTION_STATUSES = new Set(['3. Approved and assigned', '8. Need to release']);
-// Everything except still-serving/wrapped-up statuses — this is the dashboard's
-// "in progress toward serving" summary, so those are shown on Missionary Pipeline instead.
-const INACTIVE_MISSIONARY_STATUSES = new Set(['Entered the MTC', 'Entered the Mission Field', 'Released from Mission Field', 'Canceled']);
-const ACTIVE_MISSIONARY_STATUSES = new Set(MISSIONARY_STATUSES.filter(s => !INACTIVE_MISSIONARY_STATUSES.has(s)));
 const FONT_SIZES: FontSize[] = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl'];
 
 function formatEventDate(iso: string): string {
@@ -280,7 +276,7 @@ export default function Dashboard() {
   const { rows: events } = useTable<CalendarEvent>('calendaring');
   const { rows: tasks } = useTable<Task>('tasks');
   const { rows: needs, create: createNeed, update: updateNeed } = useTable<MemberNeed>('member-needs');
-  const { rows: missionaries } = useTable<MissionaryPipeline>('missionary-pipeline');
+  const { rows: missionaries, update: updateMissionary } = useTable<MissionaryPipeline>('missionary-pipeline');
   const { rows: meetings, update: updateMeeting } = useTable<BishopricMeeting>('bishopric-meetings');
   const { rows: annualDuties } = useTable<AnnualDuty>('annual-duties');
   const { rows: babies } = useTable<Baby>('babies');
@@ -303,7 +299,8 @@ export default function Dashboard() {
 
   const healthNeeds = useMemo(() => needs.filter(n => n.type === 'Health' && n.pray_for), [needs]);
   const supportNeeds = useMemo(() => needs.filter(n => n.type === 'Support' && n.pray_for), [needs]);
-  const activeMissionaries = useMemo(() => missionaries.filter(m => ACTIVE_MISSIONARY_STATUSES.has(m.status)), [missionaries]);
+  // Prayer list: preparing (forms started) but not yet in the MTC, unless someone tapped 🙏 to remove them.
+  const activeMissionaries = useMemo(() => missionaries.filter(m => MISSIONARY_PRAYER_STATUSES.has(m.status) && m.pray_for !== 0), [missionaries]);
   const actionCallings = useMemo(() => callings.filter(c => ACTION_STATUSES.has(c.status)), [callings]);
   const pendingTasks = useMemo(() => tasks.filter(t => !t.done), [tasks]);
   const upcomingEvents = useMemo(() => {
@@ -483,11 +480,16 @@ export default function Dashboard() {
               <div className="space-y-2">
                 {activeMissionaries.length === 0 && <p className="text-gray-300 text-lg italic">None</p>}
                 {activeMissionaries.map(m => (
-                  <div key={m.id}>
-                    <p className={`${FONT_SIZE_CLASS[cfg.missionaries.fontSize]} font-medium text-gray-800 leading-tight`}>{m.who}</p>
-                    {cfg.missionaries.showStatus && (
-                      <p className="text-sm text-gray-400">{m.status.replace(/^\d+-/, '')}{m.mission_call ? ` — ${m.mission_call}` : ''}</p>
-                    )}
+                  <div key={m.id} className="flex items-start gap-2">
+                    <button onClick={() => updateMissionary(m.id, { pray_for: 0 })}
+                      className="text-xl leading-none flex-shrink-0 opacity-100 hover:opacity-40 transition-opacity"
+                      title="Remove from prayer list">🙏</button>
+                    <div className="min-w-0">
+                      <p className={`${FONT_SIZE_CLASS[cfg.missionaries.fontSize]} font-medium text-gray-800 leading-tight`}>{m.who}</p>
+                      {cfg.missionaries.showStatus && (
+                        <p className="text-sm text-gray-400">{m.status.replace(/^\d+-/, '')}{m.mission_call ? ` — ${m.mission_call}` : ''}</p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
