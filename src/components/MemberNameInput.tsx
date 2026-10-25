@@ -16,6 +16,18 @@ function formatName(m: WardMember, format: MemberNameFormat): string {
   return displayName(m);
 }
 
+/** Age in whole years today, or null when the roster has no birth date. */
+function ageToday(birthDate: string | null): number | null {
+  if (!birthDate) return null;
+  const bd = new Date(birthDate.slice(0, 10) + 'T12:00:00');
+  if (isNaN(bd.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - bd.getFullYear();
+  const m = today.getMonth() - bd.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
+  return age;
+}
+
 function nameParts(m: WardMember): string[] {
   return [m.first_name, m.last_name, m.preferred_first_name, m.preferred_last_name]
     .filter((p): p is string => !!p && !!p.trim())
@@ -72,7 +84,7 @@ function closestMember(raw: string, members: WardMember[]): WardMember | undefin
  * probably a typo.
  */
 export default function MemberNameInput({
-  value, onChange, format = 'display', placeholder, className, required, inputRef, label, showNote = true,
+  value, onChange, format = 'display', placeholder, className, required, inputRef, label, showNote = true, minAge,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -84,10 +96,22 @@ export default function MemberNameInput({
   /** When set, renders the standard form label above the field (like FormFields' Input). */
   label?: string;
   showNote?: boolean;
+  /** Leave out members younger than this from suggestions (e.g. 8 for callings).
+   * Members with no birth date on the roster are still suggested. */
+  minAge?: number;
 }) {
   const { rows } = useTable<WardMember>('ward-members');
   const members = useMemo(() => rows.filter(m => m.active), [rows]);
+  // Matching still uses every active member, so an already-entered child's name isn't
+  // flagged "Not on the ward roster"; only the suggestion lists skip them.
   const index = useMemo(() => buildNameIndex(members), [members]);
+  const suggestable = useMemo(() => {
+    if (minAge == null) return members;
+    return members.filter(m => {
+      const age = ageToday(m.birth_date);
+      return age === null || age >= minAge;
+    });
+  }, [members, minAge]);
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const listId = useId();
@@ -99,17 +123,17 @@ export default function MemberNameInput({
   const suggestions = useMemo(() => {
     const tokens = queryTokens(plain);
     if (tokens.length === 0) return [];
-    return members
+    return suggestable
       .filter(m => {
         const parts = nameParts(m);
         return tokens.every(t => parts.some(p => p.startsWith(t)));
       })
       .sort((a, b) => displayName(a).localeCompare(displayName(b)))
       .slice(0, MAX_SUGGESTIONS);
-  }, [plain, members]);
+  }, [plain, suggestable]);
 
   const showList = open && suggestions.length > 0 && !(exact && suggestions.length === 1 && suggestions[0].id === exact.id);
-  const guess = !exact && plain.trim() && members.length > 0 ? closestMember(plain, members) : undefined;
+  const guess = !exact && plain.trim() && members.length > 0 ? closestMember(plain, suggestable) : undefined;
 
   const pick = (m: WardMember) => {
     onChange(formatName(m, format));

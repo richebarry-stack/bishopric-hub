@@ -61,6 +61,7 @@ function MemberInput({ value, onChange }: { value: string; onChange: (v: string)
         value={value}
         onChange={onChange}
         required
+        minAge={8}
         className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
       />
       <p className="text-xs text-gray-400 mt-1">
