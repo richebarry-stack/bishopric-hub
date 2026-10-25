@@ -616,6 +616,15 @@ export interface WardMember {
   gender: string | null;
   recommend_type: string | null;
   recommend_expires: string | null;
+  // Synced from LCR; null = not synced yet (unknown).
+  baptized: number | null;
+  baptism_date: string | null;
+  priesthood_office: string | null;
+  ordination_date: string | null;
+  endowed: number | null;
+  endowment_date: string | null;
+  sealed_to_spouse: number | null;
+  sealing_date: string | null;
   updated_at: string;
 }
 
@@ -647,6 +656,9 @@ export interface LcrSyncRun {
   missionary_updated: number | null;
   missionary_changed: string | null; // JSON-stringified {name, section, action}[]
   missionary_unmatched: string | null; // JSON-stringified string[]
+  ordinances_updated: number | null;
+  ordinances_changed: string | null; // JSON-stringified string[]
+  ordinances_unmatched: string | null; // JSON-stringified string[]
   updated_by: string | null;
 }
 

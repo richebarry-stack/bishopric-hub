@@ -216,6 +216,22 @@ function SortHeader({ label, sortKey, current, asc, onSort, align = 'left', clas
   );
 }
 
+// Read-only ordinance badges synced from LCR; dates show on hover.
+function OrdinancesCell({ member: m }: { member: WardMember }) {
+  if (m.baptized === null || m.baptized === undefined) return <span className="text-gray-300 text-xs">—</span>;
+  const badge = (label: string, title: string, cls: string) => (
+    <span key={label} title={title} className={`text-xs rounded px-1.5 py-0.5 whitespace-nowrap ${cls}`}>{label}</span>
+  );
+  const on = 'bg-gray-100 text-gray-700';
+  const badges = [];
+  if (m.baptized) badges.push(badge('Bapt', `Baptized${m.baptism_date ? ` ${m.baptism_date}` : ''}`, on));
+  else badges.push(badge('Not baptized', 'No baptism on record in LCR', 'bg-red-50 text-red-600'));
+  if (m.priesthood_office) badges.push(badge(m.priesthood_office, `Ordained ${m.priesthood_office}${m.ordination_date ? ` ${m.ordination_date}` : ''}`, on));
+  if (m.endowed) badges.push(badge('Endowed', `Endowed${m.endowment_date ? ` ${m.endowment_date}` : ''}`, on));
+  if (m.sealed_to_spouse) badges.push(badge('Sealed', `Sealed to spouse${m.sealing_date ? ` ${m.sealing_date}` : ''}`, on));
+  return <div className="flex flex-wrap gap-1">{badges}</div>;
+}
+
 function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, lcrCallingsByMember, sortKey, sortAsc, onSort, showRecommend = true }: {
   title: string;
   members: WardMember[];
@@ -249,6 +265,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
               <SortHeader label="Birth Date" sortKey="birth_date" current={sortKey} asc={sortAsc} onSort={onSort} className="w-28" />
               {showRecommend && <SortHeader label="Temple Recommend" sortKey="recommend" current={sortKey} asc={sortAsc} onSort={onSort} className="w-40" />}
               <SortHeader label="Gender" sortKey="gender" current={sortKey} asc={sortAsc} onSort={onSort} align="center" className="w-16" />
+              <th className="text-left px-4 py-2 font-medium text-gray-600 w-40" title="Synced from LCR; hover a badge for its date">Ordinances</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-24">Status</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Speakers</th>
               <th className="text-center px-4 py-2 font-medium text-gray-600 w-28">Prayers</th>
@@ -284,6 +301,9 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                 )}
                 <td className="px-4 py-2 text-center">
                   <GenderCell member={m} onSave={v => onSaveGender(m, v)} />
+                </td>
+                <td className="px-4 py-2">
+                  <OrdinancesCell member={m} />
                 </td>
                 <td className="px-4 py-2 text-center">
                   {m.active ? (

@@ -562,6 +562,8 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
               date: 'Oct 25, 2026',
               items: [
                 'Speakers & Prayers: the Speakers and Prayers history lists no longer show children under 8.',
+                'LCR sync: now reads each member’s ordinances from LCR (baptism, priesthood office, endowment, sealing to spouse) using a saved LCR custom report named "Bishopric Hub – Ordinances (sync – do not delete)". Ward Members shows them in a new Ordinances column (hover a badge for its date).',
+                'Speakers & Prayers: people LCR shows as not baptized are no longer listed in the Speakers or Prayers history.',
                 'Calling Pipeline: added a Notes field. Entries with notes show a 📝 next to the calling; hover it to read them. Notes changes appear in the change history for that entry.',
                 'Calling Pipeline: the edit window is more compact, with short fields side by side and the LCR checkboxes on one line.',
                 'Calling Pipeline: Member and Calling are no longer required, so you can save a calling or release before you know who or what it is and fill it in later.',

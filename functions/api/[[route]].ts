@@ -1964,6 +1964,111 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // Bulk temple-recommend-status sync (e.g. from an automated LCR export). Matches rows
   // to the roster by name using the same logic as the manual CSV import above.
+  // Ordinance details from LCR's saved "Bishopric Hub – Ordinances" custom report
+  // (baptism, priesthood office, endowment, sealing to spouse). Rows are matched by
+  // last name + birth date first — far more reliable than names alone — then by
+  // name. Only writes members whose values actually changed.
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'sync-ordinances' && method === 'POST') {
+    type OrdRow = {
+      name: string; full_name: string | null; birth_date: string | null;
+      baptized?: boolean; baptism_date: string | null; priesthood_office: string | null; ordination_date: string | null;
+      endowed: boolean; endowment_date: string | null; sealed_to_spouse: boolean; sealing_date: string | null;
+    };
+    const body = await request.json() as { rows?: OrdRow[] };
+    const rows = (body.rows || []).slice(0, 2000);
+    // LCR ordinance dates can be partial (month+year or year only).
+    const dateRe = /^\d{4}(-\d{2}(-\d{2})?)?$/;
+    for (const r of rows) {
+      if (!r.name || !r.name.trim()) return json({ error: 'Row missing name' }, 400);
+      if (r.birth_date && !/^\d{4}-\d{2}-\d{2}$/.test(r.birth_date)) return json({ error: `Invalid birth date "${r.birth_date}" for "${r.name}"` }, 400);
+      for (const d of [r.baptism_date, r.ordination_date, r.endowment_date, r.sealing_date]) {
+        if (d && !dateRe.test(d)) return json({ error: `Invalid date "${d}" for "${r.name}"` }, 400);
+      }
+      if (r.priesthood_office && r.priesthood_office.length > 60) return json({ error: `Priesthood office too long for "${r.name}"` }, 400);
+    }
+
+    interface OrdMember extends RosterMember {
+      birth_date: string | null; baptized: number | null; baptism_date: string | null;
+      priesthood_office: string | null; ordination_date: string | null; endowed: number | null;
+      endowment_date: string | null; sealed_to_spouse: number | null; sealing_date: string | null;
+      ordinances_synced_at: string | null;
+    }
+    const roster = (await db.prepare(
+      `SELECT id, first_name, last_name, birth_date, baptized, baptism_date, priesthood_office, ordination_date,
+              endowed, endowment_date, sealed_to_spouse, sealing_date, ordinances_synced_at
+       FROM ward_members WHERE active = 1`
+    ).all<OrdMember>()).results;
+
+    const lastNameOf = (n: string) => (n.split(',')[0] || '').trim().toLowerCase();
+    const findMember = (r: OrdRow): OrdMember | null => {
+      if (r.birth_date) {
+        const lasts = new Set([lastNameOf(r.name), lastNameOf(r.full_name || '')].filter(Boolean));
+        const hits = roster.filter(m => m.birth_date === r.birth_date && lasts.has(m.last_name.trim().toLowerCase()));
+        if (hits.length === 1) return hits[0];
+      }
+      for (const n of [r.full_name, r.name]) {
+        if (!n) continue;
+        const m = matchRosterMember(n, roster) as OrdMember | null;
+        // A known birth date that disagrees means a different person with a similar name.
+        if (m && !(m.birth_date && r.birth_date && m.birth_date !== r.birth_date)) return m;
+      }
+      return null;
+    };
+
+    const byMember = new Map<number, { member: OrdMember; rows: OrdRow[] }>();
+    const unmatched: string[] = [];
+    for (const r of rows) {
+      const m = findMember(r);
+      if (!m) { unmatched.push(r.name); continue; }
+      const g = byMember.get(m.id);
+      if (g) g.rows.push(r); else byMember.set(m.id, { member: m, rows: [r] });
+    }
+
+    const now = new Date().toISOString();
+    const stmts = [];
+    const changed: string[] = [];
+    const ambiguous: string[] = [];
+    let updated = 0;
+    const describe = (label: string, flag: number | null, date: string | null) =>
+      flag === null ? `${label} unknown` : flag ? `${label}${date ? ` ${date}` : ''}` : `not ${label.toLowerCase()}`;
+
+    for (const { member: m, rows: memberRows } of byMember.values()) {
+      if (memberRows.length > 1) {
+        ambiguous.push(`${memberRows.map(r => r.name).join(' / ')} → ${m.first_name} ${m.last_name}`);
+        continue;
+      }
+      const r = memberRows[0];
+      const next = {
+        baptized: r.baptized || r.baptism_date ? 1 : 0,
+        baptism_date: r.baptism_date || null,
+        priesthood_office: (r.priesthood_office || '').trim() || null,
+        ordination_date: r.ordination_date || null,
+        endowed: r.endowed || r.endowment_date ? 1 : 0,
+        endowment_date: r.endowment_date || null,
+        sealed_to_spouse: r.sealed_to_spouse || r.sealing_date ? 1 : 0,
+        sealing_date: r.sealing_date || null,
+      };
+      const keys = Object.keys(next) as (keyof typeof next)[];
+      const diff = keys.filter(k => (m[k] ?? null) !== next[k]);
+      if (diff.length === 0) continue;
+      stmts.push(db.prepare(
+        `UPDATE ward_members SET ${keys.map(k => `${k} = ?`).join(', ')}, ordinances_synced_at = ?, updated_at = ? WHERE id = ?`
+      ).bind(...keys.map(k => next[k]), now, now, m.id));
+      updated++;
+      // First fill-in isn't a "change" worth listing — only report real changes.
+      if (m.ordinances_synced_at) {
+        const parts: string[] = [];
+        if (diff.includes('baptized') || diff.includes('baptism_date')) parts.push(`${describe('Baptized', m.baptized, m.baptism_date)} → ${describe('Baptized', next.baptized, next.baptism_date)}`);
+        if (diff.includes('priesthood_office') || diff.includes('ordination_date')) parts.push(`${m.priesthood_office || 'no office'} → ${next.priesthood_office || 'no office'}`);
+        if (diff.includes('endowed') || diff.includes('endowment_date')) parts.push(`${describe('Endowed', m.endowed, m.endowment_date)} → ${describe('Endowed', next.endowed, next.endowment_date)}`);
+        if (diff.includes('sealed_to_spouse') || diff.includes('sealing_date')) parts.push(`${describe('Sealed', m.sealed_to_spouse, m.sealing_date)} → ${describe('Sealed', next.sealed_to_spouse, next.sealing_date)}`);
+        changed.push(`${m.first_name} ${m.last_name} (${parts.join('; ')})`);
+      }
+    }
+    for (let i = 0; i < stmts.length; i += 50) await db.batch(stmts.slice(i, i + 50));
+    return json({ ok: true, matched: byMember.size, updated, changed, unmatched, ambiguous });
+  }
+
   if (routeParts[0] === 'ward-members' && routeParts[1] === 'import-recommends' && method === 'POST') {
     const body = await request.json() as {
       rows?: { name: string; recommend_type: string | null; recommend_expires: string | null }[];

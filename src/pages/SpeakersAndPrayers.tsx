@@ -333,8 +333,10 @@ function SpeakersTab({ speakers, notes, onSaveNote, activeWardMembers, wardMembe
     return rows.filter(r =>
       // Children under 8 aren't asked to speak in sacrament meeting; unknown age stays listed.
       (r.age === null || r.age >= 8) &&
+      // Not baptized per LCR; unknown (not synced yet) stays listed.
+      memberMap.get(r.key)?.baptized !== 0 &&
       (!q || r.label.toLowerCase().includes(q)) && (!onlyWithHistory || r.count > 0));
-  }, [rows, filter, onlyWithHistory]);
+  }, [rows, filter, onlyWithHistory, memberMap]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -612,8 +614,10 @@ function PrayersTab({ prayers, notes, onSaveNote, activeWardMembers, wardMembers
     return rows.filter(r =>
       // Children under 8 aren't asked to pray in sacrament meeting; unknown age stays listed.
       (r.age === null || r.age >= 8) &&
+      // Not baptized per LCR; unknown (not synced yet) stays listed.
+      memberMap.get(r.key)?.baptized !== 0 &&
       (!q || r.label.toLowerCase().includes(q)) && (!onlyWithHistory || r.count > 0));
-  }, [rows, filter, onlyWithHistory]);
+  }, [rows, filter, onlyWithHistory, memberMap]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {

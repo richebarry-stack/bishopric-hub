@@ -114,6 +114,11 @@ function SyncRun({ run }: { run: LcrSyncRun }) {
           <p>Missionary status: {run.missionary_created ?? 0} created, {run.missionary_updated ?? 0} updated{parseNames(run.missionary_unmatched).length > 0 ? `, ${parseNames(run.missionary_unmatched).length} unmatched` : ''}</p>
           <NameList label="Missionary status changed" names={parseChanged(run.missionary_changed, 'section')} />
           <NameList label="Unmatched missionaries" names={parseNames(run.missionary_unmatched)} />
+          {run.ordinances_updated !== null && run.ordinances_updated !== undefined && (
+            <p>Ordinances: {run.ordinances_updated} updated{parseNames(run.ordinances_unmatched).length > 0 ? `, ${parseNames(run.ordinances_unmatched).length} unmatched` : ''}</p>
+          )}
+          <NameList label="Ordinances changed" names={parseNames(run.ordinances_changed)} />
+          <NameList label="Unmatched ordinance rows" names={parseNames(run.ordinances_unmatched)} />
         </div>
       )}
     </div>
