@@ -561,6 +561,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Oct 25, 2026',
               items: [
+                'Calling Pipeline: Member and Calling are no longer required, so you can save a calling or release before you know who or what it is and fill it in later.',
                 'Dashboard and Ward Council Dashboard: the Missionaries panel is now a prayer list. It automatically lists missionaries who are preparing (Candidate Completing Forms through Assignment Made / Postponed) and removes them when they enter the MTC. "Not at this time" and "Considering" are no longer listed. Tap 🙏 to take someone off the list; it stays off until turned back on in their Missionary Pipeline record.',
               ],
             },

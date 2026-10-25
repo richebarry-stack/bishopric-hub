@@ -51,7 +51,7 @@ function MemberInput({ value, onChange }: { value: string; onChange: (v: string)
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-medium text-gray-700">Member *</span>
+        <span className="text-sm font-medium text-gray-700">Member</span>
         {/* onMouseDown preventDefault keeps the input's text selection from clearing on button click */}
         <button type="button" onMouseDown={e => e.preventDefault()} onClick={applyBold}
           className="text-xs px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-50 font-bold">B</button>
@@ -60,7 +60,6 @@ function MemberInput({ value, onChange }: { value: string; onChange: (v: string)
         inputRef={ref}
         value={value}
         onChange={onChange}
-        required
         minAge={8}
         className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
       />
@@ -402,7 +401,7 @@ export default function CallingPipeline() {
         {editing && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
             <MemberInput value={editing.member || ''} onChange={v => setEditing({ ...editing, member: v })} />
-            <Input label="Calling" value={editing.calling || ''} onChange={v => setEditing({ ...editing, calling: v })} required />
+            <Input label="Calling" value={editing.calling || ''} onChange={v => setEditing({ ...editing, calling: v })} />
             <div>
               <span className="text-sm font-medium text-gray-700">Type</span>
               <div className="flex gap-4 mt-1">
@@ -517,7 +516,7 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
                   : <>{r.sustain_recorded ? '✓S' : ''}{r.set_apart_recorded ? ' ✓A' : ''}</>}
               </td>
               <td className="px-3 py-2">
-                <button onClick={async e => { e.stopPropagation(); if (await confirm({ message: `Delete ${stripBold(r.member) || 'this entry'} — ${r.calling}?` })) onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
+                <button onClick={async e => { e.stopPropagation(); if (await confirm({ message: `Delete ${stripBold(r.member || '') || 'this entry'}${r.calling ? ` — ${r.calling}` : ''}?` })) onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
               </td>
             </tr>
           ))}
