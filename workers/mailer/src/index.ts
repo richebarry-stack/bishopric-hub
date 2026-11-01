@@ -162,8 +162,15 @@ async function sendWeeklyMail(env: Env, user: UserRow, items: ActionItem[], date
   // Only Action Items with a due date carry a date at all — Calling Pipeline, Interview
   // Setup, Clerk, and Bishopric Assignment items don't tie to one particular Sunday, so
   // they can't be "this week's" reminder either way.
-  const upcoming = items.filter(i => i.date && i.date.slice(0, 10) === nextMeetingDate);
+  // Ward Council meetings aren't always on Sunday, so their assignments (prayers,
+  // spiritual thought) get the reminder whenever the meeting is in the coming week.
+  const weekEnd = addDays(nextMeetingDate, 6);
+  const isWcMeetingSoon = (i: ActionItem) =>
+    i.source === 'Ward Council Meeting' && !!i.date && i.date.slice(0, 10) <= weekEnd;
+  const upcoming = items.filter(i => (i.date && i.date.slice(0, 10) === nextMeetingDate) || isWcMeetingSoon(i));
+  const onlySunday = upcoming.every(i => i.date?.slice(0, 10) === nextMeetingDate);
   const meetingDateLabel = formatIsoDateLabel(nextMeetingDate);
+  const reminderHeading = onlySunday ? `this Sunday, ${meetingDateLabel}` : 'coming up this week';
 
   const bySource = new Map<string, ActionItem[]>();
   for (const item of items) {
@@ -183,13 +190,13 @@ async function sendWeeklyMail(env: Env, user: UserRow, items: ActionItem[], date
   let reminderHtml = '';
   if (upcoming.length > 0) {
     const lines = upcoming.map(i => itemLine(i, env.HUB_BASE_URL));
-    reminderText = `⚠ Reminder — this Sunday, ${meetingDateLabel}:\n` + lines.map(l => `- ${l.text}`).join('\n') + '\n\n';
+    reminderText = `⚠ Reminder — ${reminderHeading}:\n` + lines.map(l => `- ${l.text}`).join('\n') + '\n\n';
     reminderHtml = `<p style="background:#fff8e1;border:1px solid #f0d878;border-radius:6px;padding:10px 14px">` +
-      `<strong>⚠ Reminder — this Sunday, ${escapeHtml(meetingDateLabel)}:</strong><ul>${lines.map(l => l.html).join('')}</ul></p>`;
+      `<strong>⚠ Reminder — ${escapeHtml(reminderHeading)}:</strong><ul>${lines.map(l => l.html).join('')}</ul></p>`;
   }
 
   const subject = upcoming.length > 0
-    ? `Your assignments — reminder for this Sunday, ${meetingDateLabel}`
+    ? `Your assignments — reminder for ${reminderHeading}`
     : `Your assignments — ${dateLabel}`;
   const hub = hubName(user);
   const text = `${reminderText}Here's everything currently assigned to you in ${hub}:\n\n${textSections.join('\n\n')}`;
@@ -215,6 +222,12 @@ function upcomingSunday(tz: string): string {
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() + add);
   return dt.toISOString().slice(0, 10);
+}
+
+function addDays(isoDate: string, days: number): string {
+  const d = new Date(isoDate + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 // Formats a plain YYYY-MM-DD (as stored on ActionItem.date) as "Sun, Aug 9" — no time-zone
