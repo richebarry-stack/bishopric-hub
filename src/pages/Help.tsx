@@ -571,6 +571,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Users: Ward Council accounts now show the email “✓ Verified” / “⏳ Pending” badge and Resend button, like bishopric accounts. New Ward Council accounts (or a changed email) are sent the Cloudflare verification email automatically.',
                 'Weekly summary email: the Saturday reminder box now also lists Ward Council meeting assignments (opening prayer, spiritual thought, closing prayer) for a meeting in the coming week, not only items dated that Sunday.',
                 'Ward Council Discussion Topics: select text and press Ctrl+B (Cmd+B on Mac) to bold it; press it again to unbold. When you click away, the box shows the bold text and bullets; click it to edit again.',
+                'Ward Council Discussion Topics: “Copy from prior meeting” now also copies General Topics, not just each organization’s Status, Next Steps and Help Needed.',
               ],
             },
             {

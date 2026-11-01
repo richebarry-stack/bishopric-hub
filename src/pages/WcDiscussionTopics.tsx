@@ -362,12 +362,22 @@ export default function WcDiscussionTopics() {
 
   const [copyingPrior, setCopyingPrior] = useState(false);
 
+  const activeMeeting = useMemo(() =>
+    meetings.find(m => m.date.slice(0, 10) === activeMeetingDate) ?? null,
+    [meetings, activeMeetingDate]);
+  const prevNotes = pastMeetings[0]?.notes ?? '';
+  const canCopyPrior = prevTopics.length > 0 || !!prevNotes.trim();
+
   const handleCopyFromPrior = useCallback(async () => {
-    if (!activeMeetingDate || prevTopics.length === 0) return;
-    const hasContent = activeTopics.some(t => t.status || t.next_steps || t.help_needed);
+    if (!activeMeetingDate || !canCopyPrior) return;
+    const hasContent = activeTopics.some(t => t.status || t.next_steps || t.help_needed) || !!activeMeeting?.notes?.trim();
     if (hasContent && !await confirm({ message: 'This will replace existing content for this meeting. Continue?', destructive: false, confirmLabel: 'Replace' })) return;
     setCopyingPrior(true);
     try {
+      // General Topics lives on the meeting itself, not on a per-organization row.
+      if (activeMeeting && prevNotes.trim()) {
+        await updateMeeting(activeMeeting.id, { notes: prevNotes }, { silent: true });
+      }
       for (const org of orgOrder) {
         const prev = prevTopics.find(t => t.organization === org);
         if (!prev) continue;
@@ -383,7 +393,7 @@ export default function WcDiscussionTopics() {
     } finally {
       setCopyingPrior(false);
     }
-  }, [activeMeetingDate, prevTopics, activeTopics, orgOrder, create, update, confirm]);
+  }, [activeMeetingDate, canCopyPrior, prevTopics, prevNotes, activeTopics, activeMeeting, orgOrder, create, update, updateMeeting, confirm]);
 
   const handleSave = useCallback(async (org: string, field: 'status' | 'next_steps' | 'help_needed', value: string) => {
     if (!activeMeetingDate) return;
@@ -395,10 +405,6 @@ export default function WcDiscussionTopics() {
       await create({ meeting_date: activeMeetingDate, organization: org, topic: '', status: payload.status, next_steps: payload.next_steps, help_needed: payload.help_needed });
     }
   }, [activeMeetingDate, getOrgRow, create, update]);
-
-  const activeMeeting = useMemo(() =>
-    meetings.find(m => m.date.slice(0, 10) === activeMeetingDate) ?? null,
-    [meetings, activeMeetingDate]);
 
   const handleSaveNotes = useCallback((value: string) => {
     if (!activeMeeting) return;
@@ -471,7 +477,7 @@ export default function WcDiscussionTopics() {
             {isPastMeeting && (
               <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Read-only — past meeting</span>
             )}
-            {!isPastMeeting && prevTopics.length > 0 && (
+            {!isPastMeeting && canCopyPrior && (
               <button
                 type="button"
                 onClick={handleCopyFromPrior}
