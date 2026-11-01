@@ -561,7 +561,8 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
               date: 'Nov 1, 2026',
               items: [
-                'Speakers & Prayers: each tab now ends with a "Not on ward list" section listing names in the history that didn’t match anyone on the ward list, usually because of a spelling slip. Each name shows the closest ward member when one is close ("Did you mean…?") and the dates it was used; tap a date to open that week’s agenda and fix the name.',
+                'Speakers & Prayers: each tab now ends with a "Not on ward list" section listing names in the history that didn’t match anyone on the ward list, usually because of a spelling slip. Each name shows the closest ward member when one is close and the dates it was used; tap a date to open that week’s agenda and fix the name.',
+                'Speakers & Prayers: in "Not on ward list", tap "Match to …" to accept the suggested ward member, or "Choose…" to search for the right one. After you confirm, the name is fixed on every date it was used, so the person is counted and their agendas and programs show the ward-list spelling.',
               ],
             },
             {

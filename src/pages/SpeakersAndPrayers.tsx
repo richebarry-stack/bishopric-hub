@@ -5,6 +5,9 @@ import type { SacramentSpeaker, Prayer, WardMember, SacramentMusic, SacramentThe
 import { AgendaEditor, type AgendaCalling } from './CurrentSacrament';
 import { displayName, legalName } from '../lib/displayName';
 import { buildNameIndex, matchMember, normalizeNameKey, closestMember } from '../lib/nameMatch';
+import MemberNameInput from '../components/MemberNameInput';
+import { useConfirm } from '../components/ConfirmDialog';
+import { toast } from '../lib/toast';
 
 function currentAge(birthDate: string | null | undefined): number | null {
   if (!birthDate) return null;
@@ -140,8 +143,11 @@ interface UnmatchedRow {
   key: string;
   label: string;          // name as typed
   dates: string[];        // sorted desc
-  suggestion: string | null;
+  suggestion: WardMember | null;
 }
+
+/** Rewrites every history entry typed as `typedKey` to the member's ward-list name. */
+type MatchFn = (typedLabel: string, typedKey: string, member: WardMember) => Promise<void>;
 
 function buildUnmatchedRows(
   entries: { name: string | null | undefined; date: string | null | undefined }[],
@@ -161,33 +167,81 @@ function buildUnmatchedRows(
   return Array.from(map.entries())
     .map(([key, { label, dates }]) => {
       const near = closestMember(members, label);
-      return { key, label, dates: [...new Set(dates)].sort((a, b) => b.localeCompare(a)), suggestion: near ? displayName(near) : null };
+      return { key, label, dates: [...new Set(dates)].sort((a, b) => b.localeCompare(a)), suggestion: near ?? null };
     })
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-function UnmatchedSection({ rows, onDateClick }: { rows: UnmatchedRow[]; onDateClick: (date: string) => void }) {
+function UnmatchedItem({ r, nameIndex, onMatch, onDateClick }: {
+  r: UnmatchedRow;
+  nameIndex: Map<string, WardMember>;
+  onMatch: MatchFn;
+  onDateClick: (date: string) => void;
+}) {
+  const [choosing, setChoosing] = useState(false);
+  const [picked, setPicked] = useState('');
+  const [busy, setBusy] = useState(false);
+  const pickedMember = matchMember(nameIndex, picked);
+
+  const run = async (m: WardMember) => {
+    setBusy(true);
+    try { await onMatch(r.label, r.key, m); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="px-3 py-2 text-sm flex flex-col md:flex-row md:items-start gap-1 md:gap-4">
+      <div className="md:w-72 shrink-0 space-y-1">
+        <p className="font-medium text-gray-900">{r.label}</p>
+        {!choosing ? (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+            {r.suggestion ? (
+              <button type="button" disabled={busy} onClick={() => run(r.suggestion!)}
+                className="rounded bg-blue-600 text-white px-2 py-0.5 hover:bg-blue-700 disabled:opacity-50">
+                Match to {displayName(r.suggestion)}
+              </button>
+            ) : <span className="text-gray-500">No close match</span>}
+            <button type="button" disabled={busy} onClick={() => setChoosing(true)}
+              className="text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50">
+              {r.suggestion ? 'Someone else…' : 'Choose…'}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <MemberNameInput value={picked} onChange={setPicked} showNote={false} placeholder="Search the ward list…"
+              className="block w-full rounded border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            <div className="flex items-center gap-2 text-xs">
+              <button type="button" disabled={!pickedMember || busy} onClick={() => pickedMember && run(pickedMember)}
+                className="rounded bg-blue-600 text-white px-2 py-0.5 hover:bg-blue-700 disabled:opacity-40">
+                {pickedMember ? `Match to ${displayName(pickedMember)}` : 'Match'}
+              </button>
+              <button type="button" onClick={() => { setChoosing(false); setPicked(''); }}
+                className="text-gray-500 hover:text-gray-700">Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {r.dates.map(d => (
+          <AgendaLink key={d} date={d} onOpen={onDateClick} className="text-xs bg-amber-50 text-amber-800 rounded px-2 py-0.5 hover:bg-amber-100 transition-colors">{formatDate(d)}</AgendaLink>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function UnmatchedSection({ rows, nameIndex, onMatch, onDateClick }: {
+  rows: UnmatchedRow[];
+  nameIndex: Map<string, WardMember>;
+  onMatch: MatchFn;
+  onDateClick: (date: string) => void;
+}) {
   if (rows.length === 0) return null;
   return (
     <div>
       <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide px-1 mb-1">Not on ward list <span className="font-normal normal-case text-gray-400">({rows.length})</span></h2>
-      <p className="text-xs text-gray-500 px-1 mb-2">These names didn't match anyone on the ward list, so they aren't counted above. Open a date to fix a misspelled name in that week's agenda.</p>
+      <p className="text-xs text-gray-500 px-1 mb-2">These names didn't match anyone on the ward list, so they aren't counted above. Match a name to a ward member to fix its spelling on every date, or open a date to see that week's agenda.</p>
       <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
-        {rows.map(r => (
-          <div key={r.key} className="px-3 py-2 text-sm flex flex-col md:flex-row md:items-start gap-1 md:gap-4">
-            <div className="md:w-64 shrink-0">
-              <p className="font-medium text-gray-900">{r.label}</p>
-              <p className="text-xs text-gray-500">
-                {r.suggestion ? <>Did you mean <span className="font-medium text-gray-700">{r.suggestion}</span>?</> : 'No close match'}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {r.dates.map(d => (
-                <AgendaLink key={d} date={d} onOpen={onDateClick} className="text-xs bg-amber-50 text-amber-800 rounded px-2 py-0.5 hover:bg-amber-100 transition-colors">{formatDate(d)}</AgendaLink>
-              ))}
-            </div>
-          </div>
-        ))}
+        {rows.map(r => <UnmatchedItem key={r.key} r={r} nameIndex={nameIndex} onMatch={onMatch} onDateClick={onDateClick} />)}
       </div>
     </div>
   );
@@ -340,8 +394,9 @@ function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey,
   );
 }
 
-function SpeakersTab({ speakers, notes, onSaveNote, activeWardMembers, wardMembers, onUpdateMember, onDateClick }: {
+function SpeakersTab({ speakers, notes, onSaveNote, activeWardMembers, wardMembers, onUpdateMember, onDateClick, onMatch }: {
   speakers: SacramentSpeaker[];
+  onMatch: MatchFn;
   notes: Map<string, string>;
   onSaveNote: (name: string, category: string, text: string) => void;
   activeWardMembers: WardMember[];
@@ -469,7 +524,7 @@ function SpeakersTab({ speakers, notes, onSaveNote, activeWardMembers, wardMembe
         </div>
       )}
       <p className="text-xs text-gray-400">{sorted.length} {sorted.length === 1 ? 'person' : 'people'}</p>
-      <UnmatchedSection rows={unmatchedShown} onDateClick={onDateClick} />
+      <UnmatchedSection rows={unmatchedShown} nameIndex={nameIndex} onMatch={onMatch} onDateClick={onDateClick} />
     </div>
   );
 }
@@ -620,8 +675,9 @@ function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, 
   );
 }
 
-function PrayersTab({ prayers, notes, onSaveNote, activeWardMembers, wardMembers, onUpdateMember, onDateClick }: {
+function PrayersTab({ prayers, notes, onSaveNote, activeWardMembers, wardMembers, onUpdateMember, onDateClick, onMatch }: {
   prayers: Prayer[];
+  onMatch: MatchFn;
   notes: Map<string, string>;
   onSaveNote: (name: string, category: string, text: string) => void;
   activeWardMembers: WardMember[];
@@ -760,7 +816,7 @@ function PrayersTab({ prayers, notes, onSaveNote, activeWardMembers, wardMembers
         </div>
       )}
       <p className="text-xs text-gray-400">{sorted.length} {sorted.length === 1 ? 'person' : 'people'}</p>
-      <UnmatchedSection rows={unmatchedShown} onDateClick={onDateClick} />
+      <UnmatchedSection rows={unmatchedShown} nameIndex={nameIndex} onMatch={onMatch} onDateClick={onDateClick} />
     </div>
   );
 }
@@ -786,8 +842,9 @@ export default function SpeakersAndPrayers() {
   const [tab, setTab] = useState<'speakers' | 'prayers'>('speakers');
   const [horizonMonths, setHorizonMonths] = useState<number | null>(24);
   const [previewDate, setPreviewDate] = useState<string | null>(null);
-  const { rows: speakers, isLoading: loadingSpeakers } = useTable<SacramentSpeaker>('sacrament-speakers');
-  const { rows: prayers, isLoading: loadingPrayers } = useTable<Prayer>('prayers');
+  const { rows: speakers, isLoading: loadingSpeakers, update: updateSpeaker } = useTable<SacramentSpeaker>('sacrament-speakers');
+  const { rows: prayers, isLoading: loadingPrayers, update: updatePrayer } = useTable<Prayer>('prayers');
+  const confirm = useConfirm();
   const { rows: wardMembers, isLoading: loadingMembers, update: updateMember } = useTable<WardMember>('ward-members');
   const [notes, setNotes] = useState<Map<string, string>>(new Map());
 
@@ -811,6 +868,33 @@ export default function SpeakersAndPrayers() {
   }, []);
 
   const isLoading = loadingSpeakers || loadingPrayers || loadingMembers;
+
+  // Matching rewrites the typed name on every entry (all dates, not just the shown
+  // range) to the ward-list name, the same form the agenda saves when a member is picked.
+  const makeMatch = (kind: 'speaker' | 'prayer'): MatchFn => async (typedLabel, typedKey, member) => {
+    const newName = displayName(member);
+    const ids = kind === 'speaker'
+      ? speakers.filter(s => normalizeNameKey(s.speaker) === typedKey).map(s => s.id)
+      : prayers.filter(p => normalizeNameKey(p.name) === typedKey).map(p => p.id);
+    if (ids.length === 0) return;
+    const n = ids.length;
+    const ok = await confirm({
+      title: 'Match name',
+      message: `Change "${typedLabel}" to "${newName}" on ${n} ${kind} ${n === 1 ? 'entry' : 'entries'}? This also fixes the name on those agendas and programs.`,
+      confirmLabel: 'Match',
+      destructive: false,
+    });
+    if (!ok) return;
+    try {
+      for (const id of ids) {
+        if (kind === 'speaker') await updateSpeaker(id, { speaker: newName }, { silent: true });
+        else await updatePrayer(id, { name: newName }, { silent: true });
+      }
+      toast.success(`Matched ${typedLabel} to ${newName}`);
+    } catch {
+      // useTable already shows the error toast.
+    }
+  };
 
   const cutoff = cutoffDate(horizonMonths);
   const filteredSpeakers = useMemo(
@@ -862,9 +946,9 @@ export default function SpeakersAndPrayers() {
       {isLoading ? (
         <p className="text-gray-400 text-sm">Loading…</p>
       ) : tab === 'speakers' ? (
-        <SpeakersTab speakers={filteredSpeakers} notes={notes} onSaveNote={handleSaveNote} activeWardMembers={activeWardMembers} wardMembers={wardMembers} onUpdateMember={handleUpdateMember} onDateClick={setPreviewDate} />
+        <SpeakersTab speakers={filteredSpeakers} notes={notes} onSaveNote={handleSaveNote} activeWardMembers={activeWardMembers} wardMembers={wardMembers} onUpdateMember={handleUpdateMember} onDateClick={setPreviewDate} onMatch={makeMatch('speaker')} />
       ) : (
-        <PrayersTab prayers={filteredPrayers} notes={notes} onSaveNote={handleSaveNote} activeWardMembers={activeWardMembers} wardMembers={wardMembers} onUpdateMember={handleUpdateMember} onDateClick={setPreviewDate} />
+        <PrayersTab prayers={filteredPrayers} notes={notes} onSaveNote={handleSaveNote} activeWardMembers={activeWardMembers} wardMembers={wardMembers} onUpdateMember={handleUpdateMember} onDateClick={setPreviewDate} onMatch={makeMatch('prayer')} />
       )}
     </div>
   );
