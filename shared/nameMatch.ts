@@ -59,7 +59,7 @@ function editDistance(a: string, b: string): number {
 
 /** "First Last" form of a typed name, with punctuation and titles like "Sister" removed
  * and "Last, First" flipped, for spelling comparisons. */
-function comparableName(raw: string): string {
+export function comparableName(raw: string): string {
   let s = normalizeNameKey(raw);
   const comma = s.indexOf(',');
   if (comma > 0) s = `${s.slice(comma + 1)} ${s.slice(0, comma)}`;

@@ -564,6 +564,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Speakers & Prayers: each tab now ends with a "Not on ward list" section listing names in the history that didn’t match anyone on the ward list, usually because of a spelling slip. Each name shows the closest ward member when one is close and the dates it was used; tap a date to open that week’s agenda and fix the name.',
                 'Speakers & Prayers: in "Not on ward list", tap "Match to …" to accept the suggested ward member, or "Choose…" to search for the right one. After you confirm, the name is fixed on every date it was used, so the person is counted and their agendas and programs show the ward-list spelling.',
                 'Calling Pipeline: a "Not on ward list" section at the bottom lists unfinished entries whose member name doesn’t match anyone on the ward list. Match a name to the suggested ward member or choose someone else, and the entry is linked to that person. Tap an entry to open it.',
+                'Member Needs: the Mission section now lists the missionaries on the bishopric’s prayer list automatically (from the Missionary Pipeline, preparing to serve until they enter the MTC), in both the bishopric and Ward Council hubs. Anyone already typed into Mission by hand is shown only once.',
               ],
             },
             {

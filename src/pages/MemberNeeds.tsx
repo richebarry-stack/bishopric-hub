@@ -1,10 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useTable } from '../lib/useTable';
-import type { MemberNeed } from '../lib/api';
+import type { MemberNeed, MissionaryPipeline } from '../lib/api';
 import Modal from '../components/Modal';
 import MemberNameInput from '../components/MemberNameInput';
 import { Input, Textarea } from '../components/FormFields';
-import { MEMBER_NEED_TYPES } from '../lib/constants';
+import { MEMBER_NEED_TYPES, MISSIONARY_PRAYER_STATUSES } from '../lib/constants';
+import { comparableName } from '../lib/nameMatch';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import LastEdited from '../components/LastEdited';
 
@@ -19,6 +21,41 @@ function addStoredType(type: string) {
   if (type && !existing.includes(type)) {
     localStorage.setItem(CUSTOM_TYPES_KEY, JSON.stringify([...existing, type]));
   }
+}
+
+const MISSION_TYPE = 'Mission';
+
+/** Missionaries on the bishopric's prayer list, shown live in the Mission section. */
+function PipelineMissionaries({ rows, canEdit, onRemove }: {
+  rows: MissionaryPipeline[];
+  canEdit: boolean;
+  onRemove: (m: MissionaryPipeline) => void;
+}) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+      <p className="px-3 py-1.5 text-xs text-gray-500 bg-gray-50 border-b border-gray-100">
+        From the <Link to="/missionary-pipeline" className="text-blue-600 hover:underline">Missionary Pipeline</Link>: preparing to serve, until they enter the MTC.
+      </p>
+      <table className="w-full text-sm">
+        <tbody>
+          {rows.map(m => (
+            <tr key={m.id} className="border-b border-gray-50 last:border-b-0">
+              <td className="px-3 py-2 text-center w-8">
+                {canEdit ? (
+                  <button type="button" onClick={() => onRemove(m)} title="Remove from prayer list"
+                    className="text-base select-none hover:opacity-40 transition-opacity">🙏</button>
+                ) : <span className="text-base select-none">🙏</span>}
+              </td>
+              <td className="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">{m.who}</td>
+              <td className="px-3 py-2 text-gray-600">
+                {m.status.replace(/^\d+-/, '')}{m.mission_call ? ` — ${m.mission_call}` : ''}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 const EMPTY: Partial<MemberNeed> = { who: '', what: '', type: '', notes: '', share_with: '', next_steps: '', pray_for: 1 };
@@ -75,6 +112,9 @@ export default function MemberNeeds() {
   const { user, selectedHub } = useAuth();
   const isWcContext = user?.hub === 'wc' || (user?.hub === 'both' && selectedHub === 'wc');
   const { rows, isLoading, create, update, remove } = useTable<MemberNeed>('member-needs');
+  const { rows: missionaries, isLoading: loadingMissionaries, update: updateMissionary } = useTable<MissionaryPipeline>('missionary-pipeline');
+  // Ward Council users can only read missionary records.
+  const canEditMissionaries = user?.hub !== 'wc';
   const [editing, setEditing] = useState<Partial<MemberNeed> | null>(null);
   const [, forceUpdate] = useState(0);
 
@@ -90,6 +130,26 @@ export default function MemberNeeds() {
     return [...new Set([...MEMBER_NEED_TYPES, ...stored, ...inUse])];
   }, [visibleRows]);
 
+  // Same prayer list as the dashboards' Missionaries panel. Anyone already typed into
+  // Mission by hand is skipped (the hand-typed need may carry notes), as is a second
+  // pipeline record for the same person. Names are compared ignoring order
+  // ("Last, First" vs "First Last"), case and titles, since Ward Council users can't
+  // read the ward list to match by member.
+  const pipelineMissionaries = useMemo(() => {
+    const seen = new Set(
+      visibleRows.filter(r => r.type === MISSION_TYPE).map(r => comparableName(r.who || '')).filter(Boolean)
+    );
+    const out: MissionaryPipeline[] = [];
+    for (const m of missionaries) {
+      if (!MISSIONARY_PRAYER_STATUSES.has(m.status) || m.pray_for === 0) continue;
+      const key = comparableName(m.who || '');
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(m);
+    }
+    return out.sort((a, b) => a.who.localeCompare(b.who));
+  }, [missionaries, visibleRows]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, MemberNeed[]>();
     for (const type of allTypes) map.set(type, []);
@@ -98,8 +158,9 @@ export default function MemberNeeds() {
       if (!map.has(t)) map.set(t, []);
       map.get(t)!.push(r);
     }
-    return [...map.entries()].filter(([, items]) => items.length > 0);
-  }, [visibleRows, allTypes]);
+    return [...map.entries()].filter(([type, items]) =>
+      items.length > 0 || (type === MISSION_TYPE && pipelineMissionaries.length > 0));
+  }, [visibleRows, allTypes, pipelineMissionaries]);
 
   const handleSave = async () => {
     if (!editing) return;
@@ -138,15 +199,21 @@ export default function MemberNeeds() {
         </p>
       )}
 
-      {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
+      {isLoading || loadingMissionaries ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div className="space-y-8">
           {grouped.map(([type, typeRows]) => (
             <section key={type}>
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
                 {type}
-                <span className="text-gray-400 font-normal normal-case tracking-normal">({typeRows.length})</span>
+                <span className="text-gray-400 font-normal normal-case tracking-normal">({typeRows.length + (type === MISSION_TYPE ? pipelineMissionaries.length : 0)})</span>
               </h2>
-              <NeedTable rows={typeRows} onEdit={setEditing} onDelete={remove} onTogglePray={handleTogglePray} />
+              <div className="space-y-2">
+                {typeRows.length > 0 && <NeedTable rows={typeRows} onEdit={setEditing} onDelete={remove} onTogglePray={handleTogglePray} />}
+                {type === MISSION_TYPE && pipelineMissionaries.length > 0 && (
+                  <PipelineMissionaries rows={pipelineMissionaries} canEdit={canEditMissionaries}
+                    onRemove={m => updateMissionary(m.id, { pray_for: 0 })} />
+                )}
+              </div>
             </section>
           ))}
           {grouped.length === 0 && <p className="text-sm text-gray-400 text-center py-8">No member needs</p>}
