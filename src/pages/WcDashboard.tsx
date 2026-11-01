@@ -10,6 +10,7 @@ import {
 } from '../lib/wcDashboardConfig';
 import { responsiveGridCols } from '../lib/gridCols';
 import { MISSIONARY_PRAYER_STATUSES } from '../lib/constants';
+import { comparableName } from '../lib/nameMatch';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const FONT_SIZES: FontSize[] = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl'];
@@ -184,7 +185,19 @@ export default function WcDashboard() {
 
   const prayerNeeds = useMemo(() => memberNeeds.filter(n => n.pray_for), [memberNeeds]);
   const healthPrayerNeeds = useMemo(() => prayerNeeds.filter(n => n.type === 'Health'), [prayerNeeds]);
-  const otherPrayerNeeds  = useMemo(() => prayerNeeds.filter(n => n.type !== 'Health'), [prayerNeeds]);
+  // Mission needs belong with the missionaries, not under Other Needs.
+  const otherPrayerNeeds  = useMemo(() => prayerNeeds.filter(n => n.type !== 'Health' && n.type !== 'Mission'), [prayerNeeds]);
+  const missionPrayerNeeds = useMemo(() => prayerNeeds.filter(n => n.type === 'Mission'), [prayerNeeds]);
+  // Pipeline missionaries not already typed in as a Mission need (same person shown once).
+  const pipelinePrayerMissionaries = useMemo(() => {
+    const seen = new Set(missionPrayerNeeds.map(n => comparableName(n.who || '')).filter(Boolean));
+    return activeMissionaries.filter(m => {
+      const key = comparableName(m.who || '');
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [activeMissionaries, missionPrayerNeeds]);
 
   const [newHealthNeed, setNewHealthNeed] = useState('');
   const [newOtherNeed, setNewOtherNeed] = useState('');
@@ -323,8 +336,19 @@ export default function WcDashboard() {
             <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
               <SectionTitle link="/missionary-pipeline">Missionaries</SectionTitle>
               <div className="space-y-2">
-                {activeMissionaries.length === 0 && <p className="text-gray-300 italic">None</p>}
-                {activeMissionaries.map(m => (
+                {missionPrayerNeeds.length === 0 && pipelinePrayerMissionaries.length === 0 && <p className="text-gray-300 italic">None</p>}
+                {missionPrayerNeeds.map(n => (
+                  <div key={`need-${n.id}`} className="flex items-start gap-2">
+                    <button onClick={() => removePrayer(n.id)}
+                      className="text-xl leading-none flex-shrink-0 opacity-100 hover:opacity-40 transition-opacity"
+                      title="Remove from prayer list">🙏</button>
+                    <div className="min-w-0">
+                      <p className={`${FONT_SIZE_CLASS[cfg.missionaries.fontSize]} font-medium text-gray-800 leading-tight`}>{n.who}</p>
+                      {cfg.missionaries.showStatus && n.what && <p className="text-sm text-gray-400">{n.what}</p>}
+                    </div>
+                  </div>
+                ))}
+                {pipelinePrayerMissionaries.map(m => (
                   <div key={m.id} className="flex items-start gap-2">
                     {canEditMissionaries ? (
                       <button onClick={() => updateMissionary(m.id, { pray_for: 0 })}

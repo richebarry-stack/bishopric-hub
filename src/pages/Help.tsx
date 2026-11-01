@@ -566,6 +566,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Calling Pipeline: a "Not on ward list" section at the bottom lists unfinished entries whose member name doesn’t match anyone on the ward list. Match a name to the suggested ward member or choose someone else, and the entry is linked to that person. Tap an entry to open it.',
                 'Member Needs: the Mission section now lists the missionaries on the bishopric’s prayer list automatically (from the Missionary Pipeline, preparing to serve until they enter the MTC), in both the bishopric and Ward Council hubs. Anyone already typed into Mission by hand is shown only once.',
                 'Calling Pipeline: Assigned To is now a dropdown of the bishop and counselors. Pick “Other…” to type anyone else; entries already assigned to someone not in the list keep that name.',
+                'Ward Council Dashboard: Mission needs on the prayer list now show in the Missionaries panel instead of Other Needs, alongside the missionaries from the Missionary Pipeline. Each person is shown once.',
               ],
             },
             {
