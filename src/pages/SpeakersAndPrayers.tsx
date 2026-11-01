@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 import type { SacramentSpeaker, Prayer, WardMember, SacramentMusic, SacramentTheme, SacramentAnnouncement, SacramentAgendaNote, SacramentWardBusiness } from '../lib/api';
 import { AgendaEditor, type AgendaCalling } from './CurrentSacrament';
 import { displayName, legalName } from '../lib/displayName';
-import { buildNameIndex, matchMember, normalizeNameKey } from '../lib/nameMatch';
+import { buildNameIndex, matchMember, normalizeNameKey, closestMember } from '../lib/nameMatch';
 
 function currentAge(birthDate: string | null | undefined): number | null {
   if (!birthDate) return null;
@@ -127,6 +127,68 @@ function NoteField({ name, category, notes, onSave }: { name: string; category: 
         placeholder="Notes…"
         className="w-full text-xs rounded border border-gray-200 px-2 py-1 text-gray-700 placeholder-gray-300 resize-none focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white focus:rows-3"
       />
+    </div>
+  );
+}
+
+// ─── Not on ward list ─────────────────────────────────────────────────────────
+
+// History entries whose typed name matched no active ward member. Usually a
+// spelling slip that keeps the person from being counted; sometimes a visitor,
+// missionary or someone who moved out.
+interface UnmatchedRow {
+  key: string;
+  label: string;          // name as typed
+  dates: string[];        // sorted desc
+  suggestion: string | null;
+}
+
+function buildUnmatchedRows(
+  entries: { name: string | null | undefined; date: string | null | undefined }[],
+  nameIndex: Map<string, WardMember>,
+  members: WardMember[],
+): UnmatchedRow[] {
+  const map = new Map<string, { label: string; dates: string[] }>();
+  for (const e of entries) {
+    const name = e.name?.trim();
+    if (!name || matchMember(nameIndex, name)) continue;
+    const key = normalizeNameKey(name);
+    const entry = map.get(key) ?? { label: name, dates: [] };
+    const date = e.date?.slice(0, 10);
+    if (date) entry.dates.push(date);
+    map.set(key, entry);
+  }
+  return Array.from(map.entries())
+    .map(([key, { label, dates }]) => {
+      const near = closestMember(members, label);
+      return { key, label, dates: [...new Set(dates)].sort((a, b) => b.localeCompare(a)), suggestion: near ? displayName(near) : null };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function UnmatchedSection({ rows, onDateClick }: { rows: UnmatchedRow[]; onDateClick: (date: string) => void }) {
+  if (rows.length === 0) return null;
+  return (
+    <div>
+      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide px-1 mb-1">Not on ward list <span className="font-normal normal-case text-gray-400">({rows.length})</span></h2>
+      <p className="text-xs text-gray-500 px-1 mb-2">These names didn't match anyone on the ward list, so they aren't counted above. Open a date to fix a misspelled name in that week's agenda.</p>
+      <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
+        {rows.map(r => (
+          <div key={r.key} className="px-3 py-2 text-sm flex flex-col md:flex-row md:items-start gap-1 md:gap-4">
+            <div className="md:w-64 shrink-0">
+              <p className="font-medium text-gray-900">{r.label}</p>
+              <p className="text-xs text-gray-500">
+                {r.suggestion ? <>Did you mean <span className="font-medium text-gray-700">{r.suggestion}</span>?</> : 'No close match'}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {r.dates.map(d => (
+                <AgendaLink key={d} date={d} onOpen={onDateClick} className="text-xs bg-amber-50 text-amber-800 rounded px-2 py-0.5 hover:bg-amber-100 transition-colors">{formatDate(d)}</AgendaLink>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -328,6 +390,15 @@ function SpeakersTab({ speakers, notes, onSaveNote, activeWardMembers, wardMembe
 
   const [onlyWithHistory, setOnlyWithHistory] = useState(false);
 
+  const unmatched = useMemo(
+    () => hasActiveRoster ? buildUnmatchedRows(speakers.map(x => ({ name: x.speaker, date: x.meeting_date })), nameIndex, activeWardMembers) : [],
+    [speakers, nameIndex, activeWardMembers, hasActiveRoster]
+  );
+  const unmatchedShown = useMemo(() => {
+    const q = filter.toLowerCase().trim();
+    return q ? unmatched.filter(r => r.label.toLowerCase().includes(q)) : unmatched;
+  }, [unmatched, filter]);
+
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
     return rows.filter(r =>
@@ -398,6 +469,7 @@ function SpeakersTab({ speakers, notes, onSaveNote, activeWardMembers, wardMembe
         </div>
       )}
       <p className="text-xs text-gray-400">{sorted.length} {sorted.length === 1 ? 'person' : 'people'}</p>
+      <UnmatchedSection rows={unmatchedShown} onDateClick={onDateClick} />
     </div>
   );
 }
@@ -609,6 +681,15 @@ function PrayersTab({ prayers, notes, onSaveNote, activeWardMembers, wardMembers
 
   const [onlyWithHistory, setOnlyWithHistory] = useState(false);
 
+  const unmatched = useMemo(
+    () => hasActiveRoster ? buildUnmatchedRows(prayers.map(x => ({ name: x.name, date: x.meeting_date })), nameIndex, activeWardMembers) : [],
+    [prayers, nameIndex, activeWardMembers, hasActiveRoster]
+  );
+  const unmatchedShown = useMemo(() => {
+    const q = filter.toLowerCase().trim();
+    return q ? unmatched.filter(r => r.label.toLowerCase().includes(q)) : unmatched;
+  }, [unmatched, filter]);
+
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
     return rows.filter(r =>
@@ -679,6 +760,7 @@ function PrayersTab({ prayers, notes, onSaveNote, activeWardMembers, wardMembers
         </div>
       )}
       <p className="text-xs text-gray-400">{sorted.length} {sorted.length === 1 ? 'person' : 'people'}</p>
+      <UnmatchedSection rows={unmatchedShown} onDateClick={onDateClick} />
     </div>
   );
 }

@@ -559,6 +559,12 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Nov 1, 2026',
+              items: [
+                'Speakers & Prayers: each tab now ends with a "Not on ward list" section listing names in the history that didn’t match anyone on the ward list, usually because of a spelling slip. Each name shows the closest ward member when one is close ("Did you mean…?") and the dates it was used; tap a date to open that week’s agenda and fix the name.',
+              ],
+            },
+            {
               date: 'Oct 25, 2026',
               items: [
                 'Speakers & Prayers: the Speakers and Prayers history lists no longer show children under 8.',
