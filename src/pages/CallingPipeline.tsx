@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../lib/useTable';
 import { api } from '../lib/api';
-import type { CallingPipeline as CallingType, User, CallingPipelineHistoryEntry } from '../lib/api';
+import type { CallingPipeline as CallingType, User, CallingPipelineHistoryEntry, WardMember } from '../lib/api';
 import Modal from '../components/Modal';
 import MemberNameInput from '../components/MemberNameInput';
 import StatusBadge from '../components/StatusBadge';
@@ -11,8 +11,25 @@ import { CALLING_STATUSES, CALLING_STATUS_COLORS, CALLING_TYPE_STATUSES, RELEASE
 import { renderRichText, stripBold } from '../lib/richText';
 import LastEdited from '../components/LastEdited';
 import { useConfirm } from '../components/ConfirmDialog';
+import { NotOnWardListSection, NotOnWardListItem } from '../components/NotOnWardList';
+import { buildNameIndex, matchMember, normalizeNameKey, closestMember } from '../lib/nameMatch';
+import { displayName } from '../lib/displayName';
+import { toast } from '../lib/toast';
 
 const ASSIGNED_DATALIST = 'assigned-to-options';
+// Entries in these statuses are done, so a misspelled name on them is left alone.
+const FINISHED_STATUSES = new Set(['6. Set apart', '10. Released', '11. Declined']);
+
+function ageToday(birthDate: string | null | undefined): number | null {
+  if (!birthDate) return null;
+  const bd = new Date(birthDate.slice(0, 10) + 'T12:00:00');
+  if (isNaN(bd.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - bd.getFullYear();
+  const m = today.getMonth() - bd.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
+  return age;
+}
 const NOW = Date.now();
 
 function AssignedToField({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
@@ -121,6 +138,8 @@ const EMPTY: Partial<CallingType> = {
 
 export default function CallingPipeline() {
   const { rows, isLoading, create, update, remove } = useTable<CallingType>('calling-pipeline');
+  const { rows: wardMembers } = useTable<WardMember>('ward-members');
+  const confirmMatch = useConfirm();
   const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['users'], queryFn: () => fetch('/api/users').then(r => r.json()) });
   const bishopricOptions = allUsers
     .filter(u => u.church_role && /bishop|counselor/i.test(u.church_role))
@@ -154,6 +173,54 @@ export default function CallingPipeline() {
     }
     return true;
   });
+
+  // Unfinished entries whose member name matches no active ward member, grouped by
+  // the name as typed. Suggestions skip children under 8, like the Member field does.
+  const activeMembers = useMemo(() => wardMembers.filter(m => m.active), [wardMembers]);
+  const nameIndex = useMemo(() => buildNameIndex(activeMembers), [activeMembers]);
+  const unmatched = useMemo(() => {
+    if (activeMembers.length === 0) return [];
+    const suggestable = activeMembers.filter(m => { const a = ageToday(m.birth_date); return a === null || a >= 8; });
+    const groups = new Map<string, { label: string; entries: CallingType[] }>();
+    for (const r of rows) {
+      if (FINISHED_STATUSES.has(r.status)) continue;
+      const plain = stripBold(r.member || '').trim();
+      if (!plain || matchMember(nameIndex, plain)) continue;
+      const key = normalizeNameKey(plain);
+      const g = groups.get(key) ?? { label: plain, entries: [] };
+      g.entries.push(r);
+      groups.set(key, g);
+    }
+    return [...groups.entries()]
+      .map(([key, g]) => ({ key, ...g, suggestion: closestMember(suggestable, g.label) ?? null }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [rows, activeMembers, nameIndex]);
+  const unmatchedShown = filter
+    ? unmatched.filter(u => u.label.toLowerCase().includes(filter.toLowerCase()))
+    : unmatched;
+
+  // Rewrites the member name on the listed entries to the ward-list name (the form the
+  // Member field saves when a suggestion is picked). A name that was all bold stays bold.
+  const matchEntries = async (label: string, entries: CallingType[], member: WardMember) => {
+    const newName = displayName(member);
+    const n = entries.length;
+    const ok = await confirmMatch({
+      title: 'Match name',
+      message: `Change "${label}" to "${newName}" on ${n} calling pipeline ${n === 1 ? 'entry' : 'entries'}?`,
+      confirmLabel: 'Match',
+      destructive: false,
+    });
+    if (!ok) return;
+    try {
+      for (const r of entries) {
+        const allBold = /^\*\*[^*]+\*\*$/.test((r.member || '').trim());
+        await update(r.id, { member: allBold ? `**${newName}**` : newName }, { silent: true });
+      }
+      toast.success(`Matched ${label} to ${newName}`);
+    } catch {
+      // useTable already shows the error toast.
+    }
+  };
 
   const handleSave = async () => {
     if (!editing || saving) return;
@@ -395,6 +462,28 @@ export default function CallingPipeline() {
           <h2 className="text-lg font-bold text-gray-800 mb-3 mt-8 border-b border-gray-200 pb-2">Releases ({releases.length})</h2>
           {renderGrouped(releases)}
         </>
+      )}
+
+      {!isLoading && (
+        <div className="mt-8">
+          <NotOnWardListSection count={unmatchedShown.length}
+            intro="These unfinished entries have a member name that doesn't match anyone on the ward list, so they aren't linked to the person. Match a name to a ward member to fix its spelling, or tap an entry to edit it.">
+            {unmatchedShown.map(u => (
+              <NotOnWardListItem key={u.key} label={u.label} suggestion={u.suggestion} nameIndex={nameIndex} minAge={8}
+                onMatch={m => matchEntries(u.label, u.entries, m)}>
+                <div className="flex flex-wrap gap-1.5">
+                  {u.entries.map(r => (
+                    <button key={r.id} type="button" onClick={() => setEditing(r)}
+                      className="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-0.5 hover:bg-gray-100 text-left">
+                      <span className="text-gray-700">{r.calling || (r.type === 'Release' ? 'Release' : 'Calling')}</span>
+                      <span className="text-gray-400"> · {r.status}</span>
+                    </button>
+                  ))}
+                </div>
+              </NotOnWardListItem>
+            ))}
+          </NotOnWardListSection>
+        </div>
       )}
 
       <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit Calling' : 'New Calling'}>
