@@ -55,7 +55,7 @@ const INTERVIEW_SCHEDULED_STATUSES = new Set([
 
 const CALLING_ACTION_STATUSES = new Set(['3. Approved and assigned', '8. Need to release']);
 
-export interface TaskRow { id: number; task: string; assigned_to: string; due_date: string; done: number }
+export interface TaskRow { id: number; task: string; assigned_to: string; due_date: string; done: number; share_with?: string | null }
 export interface CallingRow {
   id: number; calling: string; member: string; status: string; assigned_to: string; type: string;
   release_recorded: number; sustain_recorded: number; set_apart_recorded: number;
@@ -66,6 +66,7 @@ export interface InterviewRow {
 }
 export interface RotatingRow { id: number; month: string; plan_conduct: string; primary_message: string }
 export interface BabyRow { id: number; name: string; status: string; church_record_created: number }
+export interface WcMeetingRow { id: number; date: string; opening_prayer: string | null; spiritual_thought: string | null; closing_prayer: string | null }
 
 export interface ActionItemSources {
   tasks: TaskRow[];
@@ -73,6 +74,11 @@ export interface ActionItemSources {
   interviews: InterviewRow[];
   rotating: RotatingRow[];
   babies: BabyRow[];
+  /** Ward Council meetings; upcoming opening prayer / spiritual thought / closing prayer
+   * assignments are action items for Ward Council members. Omitted = none. */
+  wcMeetings?: WcMeetingRow[];
+  /** Today's date (YYYY-MM-DD, ward time zone); meetings before it are skipped. */
+  todayIso?: string;
   /** Roster ids that are no longer current youth (see agedOutMemberIds); youth interviews
    * linked to them are skipped. Omitted when the roster isn't available. */
   agedOutMemberIds?: Set<number>;
@@ -125,6 +131,26 @@ export function computeActionItems(
           detail: t.due_date ? `Due ${t.due_date.slice(0, 10)}` : undefined,
           date: t.due_date, link: '/tasks', source: 'Action Item',
         });
+      }
+    }
+  }
+
+  if (canWc) {
+    const WC_MEETING_PARTS = [
+      ['opening_prayer', 'Opening prayer'],
+      ['spiritual_thought', 'Spiritual thought'],
+      ['closing_prayer', 'Closing prayer'],
+    ] as const;
+    for (const m of sources.wcMeetings || []) {
+      const date = (m.date || '').slice(0, 10);
+      if (!date || (sources.todayIso && date < sources.todayIso)) continue;
+      for (const [field, label] of WC_MEETING_PARTS) {
+        if (sameName(m[field])) {
+          out.push({
+            id: `wcmeeting-${m.id}-${field}`, label: `${label} — Ward Council meeting`,
+            date, link: '/wc-meetings', source: 'Ward Council Meeting',
+          });
+        }
       }
     }
   }

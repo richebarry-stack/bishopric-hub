@@ -5,7 +5,7 @@ import { computeActionItems, buildNameIndex, type ActionItem } from '../../share
 import { agedOutMemberIds } from '../../shared/youth';
 import type {
   Task, CallingPipeline, InterviewPipeline, WardMember,
-  RotatingAssignment, Baby,
+  RotatingAssignment, Baby, WcMeeting,
 } from './api';
 
 export type { ActionItem };
@@ -34,6 +34,7 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
   const { rows: interviews, isLoading: l3 } = useTable<InterviewPipeline>('interview-pipeline', { enabled: canBishopric });
   const { rows: rotating, isLoading: l9 } = useTable<RotatingAssignment>('rotating-assignments', { enabled: canBishopric });
   const { rows: babies, isLoading: l10 } = useTable<Baby>('babies', { enabled: isClerk });
+  const { rows: wcMeetings, isLoading: l12 } = useTable<WcMeeting>('wc-meetings', { enabled: canWc });
   // Only the bishopric hub can read the roster (see WC_READABLE in the API); without it
   // name matching falls back to plain string/order matching, which is what it did before.
   const { rows: wardMembers, isLoading: l11 } = useTable<WardMember>('ward-members', { enabled: canBishopric });
@@ -50,13 +51,17 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
     return computeActionItems(
       user.name,
       { canBishopric, canWc, canYc, isClerk },
-      { tasks, callings, interviews, rotating, babies, agedOutMemberIds: canBishopric ? agedOutMemberIds(wardMembers) : undefined },
+      {
+        tasks, callings, interviews, rotating, babies,
+        wcMeetings: canWc ? wcMeetings : [], todayIso: new Date().toLocaleDateString('en-CA'),
+        agedOutMemberIds: canBishopric ? agedOutMemberIds(wardMembers) : undefined,
+      },
       nameIndex,
       currentMonthAbbr,
     );
-  }, [enabled, user, isClerk, canBishopric, canWc, canYc, tasks, callings, interviews, rotating, babies, wardMembers, nameIndex]);
+  }, [enabled, user, isClerk, canBishopric, canWc, canYc, tasks, callings, interviews, rotating, babies, wcMeetings, wardMembers, nameIndex]);
 
-  const isLoading = enabled && (l1 || l2 || l3 || l9 || (isClerk && l10) || (canBishopric && l11));
+  const isLoading = enabled && (l1 || l2 || l3 || l9 || (isClerk && l10) || (canBishopric && l11) || (canWc && l12));
 
   return { items, count: items.length, isLoading };
 }

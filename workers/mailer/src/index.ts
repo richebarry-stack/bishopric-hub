@@ -1,7 +1,7 @@
 import {
   computeActionItems, buildNameIndex,
   type ActionItem, type ActionItemSources, type NameIndexMember,
-  type TaskRow, type CallingRow, type InterviewRow, type RotatingRow, type BabyRow,
+  type TaskRow, type CallingRow, type InterviewRow, type RotatingRow, type BabyRow, type WcMeetingRow,
 } from '../../../shared/actionItems';
 import { agedOutMemberIds } from '../../../shared/youth';
 
@@ -54,24 +54,26 @@ async function getRecipients(db: D1Database): Promise<UserRow[]> {
   const { results } = await db.prepare(
     `SELECT id, name, email, hub, church_role
      FROM users
-     WHERE hub IN ('bh', 'both') AND role <> 'guest' AND email_notifications = 1`
+     WHERE hub IN ('bh', 'both', 'wc') AND role <> 'guest' AND email_notifications = 1`
   ).all<UserRow>();
   return results;
 }
 
-async function getSources(db: D1Database): Promise<ActionItemSources> {
-  const [tasks, callings, interviews, rotating, babies] = await Promise.all([
-    db.prepare('SELECT id, task, assigned_to, due_date, done FROM tasks').all<TaskRow>(),
+async function getSources(db: D1Database, todayIso: string): Promise<ActionItemSources> {
+  const [tasks, callings, interviews, rotating, babies, wcMeetings] = await Promise.all([
+    db.prepare('SELECT id, task, assigned_to, due_date, done, share_with FROM tasks').all<TaskRow>(),
     db.prepare('SELECT id, calling, member, status, assigned_to, type, release_recorded, sustain_recorded, set_apart_recorded FROM calling_pipeline').all<CallingRow>(),
     db.prepare('SELECT id, member, setup_assigned_to, setup_status, status, type_of_interview, ward_member_id FROM interview_pipeline').all<InterviewRow>(),
     db.prepare('SELECT id, month, plan_conduct, primary_message FROM rotating_assignments').all<RotatingRow>(),
     db.prepare('SELECT id, name, status, church_record_created FROM babies').all<BabyRow>(),
+    db.prepare('SELECT id, date, opening_prayer, spiritual_thought, closing_prayer FROM wc_meetings WHERE date >= ?').bind(todayIso).all<WcMeetingRow>(),
   ]);
   const { results: roster } = await db.prepare('SELECT id, active, birth_date FROM ward_members').all<{ id: number; active: number; birth_date: string | null }>();
   return {
     agedOutMemberIds: agedOutMemberIds(roster),
     tasks: tasks.results, callings: callings.results, interviews: interviews.results,
     rotating: rotating.results, babies: babies.results,
+    wcMeetings: wcMeetings.results, todayIso,
   };
 }
 
@@ -94,6 +96,17 @@ function permissionsFor(user: UserRow) {
   };
 }
 
+// Ward Council-only users can only see tasks shared with Ward Council (the API
+// filters the same way), so they're only emailed about those.
+function sourcesFor(user: UserRow, sources: ActionItemSources): ActionItemSources {
+  if (user.hub !== 'wc') return sources;
+  return { ...sources, tasks: sources.tasks.filter(t => (t.share_with || '').includes('Ward Council')) };
+}
+
+function hubName(user: UserRow): string {
+  return user.hub === 'wc' ? 'Ward Council Hub' : 'Bishopric Hub';
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -112,21 +125,21 @@ function itemLine(item: ActionItem, baseUrl: string): { text: string; html: stri
 
 // Appended to every email so recipients know not to hit "reply" on an unmonitored
 // mailbox, and always have a link back into the site.
-function footer(baseUrl: string): { text: string; html: string } {
+function footer(baseUrl: string, hub: string): { text: string; html: string } {
   return {
-    text: `\n\n---\nOpen Bishopric Hub: ${baseUrl}\nThis mailbox is not monitored — please don't reply to this email.`,
+    text: `\n\n---\nOpen ${hub}: ${baseUrl}\nThis mailbox is not monitored — please don't reply to this email.`,
     html: `<hr style="margin-top:24px;border:none;border-top:1px solid #ddd">` +
       `<p style="color:#888;font-size:12px">` +
-      `<a href="${baseUrl}">Open Bishopric Hub</a><br>` +
+      `<a href="${baseUrl}">Open ${hub}</a><br>` +
       `This mailbox is not monitored — please don't reply to this email.</p>`,
   };
 }
 
-async function sendMail(env: Env, to: string, subject: string, text: string, html: string, headers?: Record<string, string>): Promise<void> {
-  const f = footer(env.HUB_BASE_URL);
+async function sendMail(env: Env, user: UserRow, subject: string, text: string, html: string, headers?: Record<string, string>): Promise<void> {
+  const f = footer(env.HUB_BASE_URL, hubName(user));
   await env.EMAIL.send({
     from: { email: env.FROM_ADDRESS, name: env.FROM_NAME },
-    to,
+    to: user.email,
     subject,
     text: text + f.text,
     html: `<div style="font-family:sans-serif">${html}${f.html}</div>`,
@@ -137,11 +150,12 @@ async function sendMail(env: Env, to: string, subject: string, text: string, htm
 async function sendNewItemsMail(env: Env, user: UserRow, items: ActionItem[]): Promise<void> {
   const subject = items.length === 1 ? `New assignment: ${items[0].label}` : `${items.length} new assignments`;
   const lines = items.map(i => itemLine(i, env.HUB_BASE_URL));
-  const text = `You have ${items.length === 1 ? 'a new assignment' : 'new assignments'} in Bishopric Hub:\n\n` +
+  const hub = hubName(user);
+  const text = `You have ${items.length === 1 ? 'a new assignment' : 'new assignments'} in ${hub}:\n\n` +
     lines.map(l => l.text).join('\n\n');
-  const html = `<p>You have ${items.length === 1 ? 'a new assignment' : 'new assignments'} in Bishopric Hub:</p><ul>` +
+  const html = `<p>You have ${items.length === 1 ? 'a new assignment' : 'new assignments'} in ${hub}:</p><ul>` +
     lines.map(l => l.html).join('') + '</ul>';
-  await sendMail(env, user.email, subject, text, html);
+  await sendMail(env, user, subject, text, html);
 }
 
 async function sendWeeklyMail(env: Env, user: UserRow, items: ActionItem[], dateLabel: string, nextMeetingDate: string): Promise<void> {
@@ -177,12 +191,13 @@ async function sendWeeklyMail(env: Env, user: UserRow, items: ActionItem[], date
   const subject = upcoming.length > 0
     ? `Your assignments — reminder for this Sunday, ${meetingDateLabel}`
     : `Your assignments — ${dateLabel}`;
-  const text = `${reminderText}Here's everything currently assigned to you in Bishopric Hub:\n\n${textSections.join('\n\n')}`;
-  const html = `${reminderHtml}<p>Here's everything currently assigned to you in Bishopric Hub:</p>${htmlSections.join('')}`;
+  const hub = hubName(user);
+  const text = `${reminderText}Here's everything currently assigned to you in ${hub}:\n\n${textSections.join('\n\n')}`;
+  const html = `${reminderHtml}<p>Here's everything currently assigned to you in ${hub}:</p>${htmlSections.join('')}`;
   // Not RFC 8058 one-click (the page requires login to toggle the setting), so we
   // only send List-Unsubscribe as a link, not List-Unsubscribe-Post.
-  await sendMail(env, user.email, subject, text, html, {
-    'List-Unsubscribe': `<${env.HUB_BASE_URL}/email-notifications>`,
+  await sendMail(env, user, subject, text, html, {
+    'List-Unsubscribe': `<${env.HUB_BASE_URL}${user.hub === 'wc' ? '/my-actions' : '/email-notifications'}>`,
   });
 }
 
@@ -244,10 +259,11 @@ async function run(env: Env): Promise<void> {
   const db = env.DB;
   const live = env.MAILER_MODE === 'live';
   const [tz, weeklySchedule] = await Promise.all([getTimeZone(db), getWeeklySchedule(db)]);
+  const todayIso = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
   const [recipients, sources, nameIndex, allNotified] = await Promise.all([
     getRecipients(db),
-    getSources(db),
+    getSources(db, todayIso),
     getWardMemberNameIndex(db),
     db.prepare('SELECT user_id, item_id FROM action_item_notifications').all<{ user_id: number; item_id: string }>(),
   ]);
@@ -270,7 +286,7 @@ async function run(env: Env): Promise<void> {
 
   for (const user of recipients) {
     const permissions = permissionsFor(user);
-    const items = computeActionItems(user.name, permissions, sources, nameIndex, currentMonthAbbr);
+    const items = computeActionItems(user.name, permissions, sourcesFor(user, sources), nameIndex, currentMonthAbbr);
     perUserItems.set(user.id, items);
 
     const existingIds = notifiedByUser.get(user.id) || [];
