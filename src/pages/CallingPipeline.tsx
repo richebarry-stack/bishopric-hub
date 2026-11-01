@@ -16,7 +16,6 @@ import { buildNameIndex, matchMember, normalizeNameKey, closestMember } from '..
 import { displayName } from '../lib/displayName';
 import { toast } from '../lib/toast';
 
-const ASSIGNED_DATALIST = 'assigned-to-options';
 // Entries in these statuses are done, so a misspelled name on them is left alone.
 const FINISHED_STATUSES = new Set(['6. Set apart', '10. Released', '11. Declined']);
 
@@ -32,20 +31,38 @@ function ageToday(birthDate: string | null | undefined): number | null {
 }
 const NOW = Date.now();
 
+const OTHER = '__other__';
+
+// Dropdown of the bishop and counselors, with "Other…" for typing anyone else.
+// An existing entry whose name isn't in the list opens in "Other…" so it's kept.
 function AssignedToField({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+  const [otherMode, setOtherMode] = useState(false);
+  const isOther = otherMode || (!!value && !options.includes(value));
   return (
     <label className="block">
       <span className="text-sm font-medium text-gray-700">Assigned To</span>
-      <input
-        list={ASSIGNED_DATALIST}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder="Select or type name…"
-        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-      />
-      <datalist id={ASSIGNED_DATALIST}>
-        {options.map(o => <option key={o} value={o} />)}
-      </datalist>
+      <select
+        value={isOther ? OTHER : value}
+        onChange={e => {
+          const v = e.target.value;
+          if (v === OTHER) { setOtherMode(true); onChange(''); }
+          else { setOtherMode(false); onChange(v); }
+        }}
+        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
+      >
+        <option value="">Unassigned</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+        <option value={OTHER}>Other…</option>
+      </select>
+      {isOther && (
+        <input
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="Type a name…"
+          autoFocus={otherMode}
+          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+        />
+      )}
     </label>
   );
 }
@@ -141,9 +158,11 @@ export default function CallingPipeline() {
   const { rows: wardMembers } = useTable<WardMember>('ward-members');
   const confirmMatch = useConfirm();
   const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['users'], queryFn: () => fetch('/api/users').then(r => r.json()) });
-  const bishopricOptions = allUsers
-    .filter(u => u.church_role && /bishop|counselor/i.test(u.church_role))
-    .map(u => u.name);
+  const ASSIGNABLE_ROLES = ['Bishop', 'First Counselor', 'Second Counselor'];
+  const bishopricOptions = [...new Set(allUsers
+    .filter(u => u.church_role && ASSIGNABLE_ROLES.includes(u.church_role))
+    .sort((a, b) => ASSIGNABLE_ROLES.indexOf(a.church_role!) - ASSIGNABLE_ROLES.indexOf(b.church_role!) || a.name.localeCompare(b.name))
+    .map(u => u.name))];
   const [editing, setEditing] = useState<Partial<CallingType> | null>(null);
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
