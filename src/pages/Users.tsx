@@ -408,7 +408,7 @@ export default function Users() {
                         <td className="px-3 py-2 text-gray-700">
                           <div className="flex items-center gap-1.5">
                             {u.email}
-                            {isAdmin && hub === 'both' && (
+                            {isAdmin && (hub === 'both' || hub === 'wc') && (
                               verifiedMap.get(u.id) ? (
                                 <span title="This address is verified with Cloudflare and can receive assignment emails."
                                   className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700 whitespace-nowrap">

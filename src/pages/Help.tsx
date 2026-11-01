@@ -568,6 +568,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'Calling Pipeline: Assigned To is now a dropdown of the bishop and counselors. Pick “Other…” to type anyone else; entries already assigned to someone not in the list keep that name.',
                 'Ward Council Dashboard: Mission needs on the prayer list now show in the Missionaries panel instead of Other Needs, alongside the missionaries from the Missionary Pipeline. Each person is shown once.',
                 'Email notifications now reach Ward Council members: an email when they’re given a new assignment, and the weekly summary. Assignments are Action Items shared with Ward Council plus the opening prayer, spiritual thought or closing prayer for an upcoming Ward Council meeting (these also now show in My Actions). Ward Council members can turn the emails off with the checkbox at the top of My Actions.',
+                'Users: Ward Council accounts now show the email “✓ Verified” / “⏳ Pending” badge and Resend button, like bishopric accounts. New Ward Council accounts (or a changed email) are sent the Cloudflare verification email automatically.',
               ],
             },
             {

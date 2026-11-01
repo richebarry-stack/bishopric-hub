@@ -712,7 +712,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         ).bind(name, email, hash, newRole, church_role || '', newHub).run();
         const newUser = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(result.meta.last_row_id).first();
         if (church_role === 'Bishop') await resetFuturePresidingToBishop(db, name);
-        if (newHub === 'bh' || newHub === 'both') await registerEmailDestination(env, email);
+        if (newHub === 'bh' || newHub === 'both' || newHub === 'wc') await registerEmailDestination(env, email);
         return json({ ...newUser as object, temp_password: tempPassword }, 201);
       } catch {
         return json({ error: 'User already exists' }, 400);
@@ -780,7 +780,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       vals.push(targetId);
       await db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...vals).run();
       const updated = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(targetId).first<{ hub: string }>();
-      if (changingEmail && body.email && (updated?.hub === 'bh' || updated?.hub === 'both')) await registerEmailDestination(env, body.email);
+      if (changingEmail && body.email && (updated?.hub === 'bh' || updated?.hub === 'both' || updated?.hub === 'wc')) await registerEmailDestination(env, body.email);
       return json(updated);
     }
 
@@ -1009,13 +1009,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (routeParts[0] === 'email-verification-status' && routeParts[1] === 'resend' && method === 'POST') {
     if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
     const { user_id } = await request.json() as { user_id: number };
-    const target = await db.prepare("SELECT email FROM users WHERE id = ? AND hub IN ('bh','both')").bind(user_id).first<{ email: string }>();
+    const target = await db.prepare("SELECT email FROM users WHERE id = ? AND hub IN ('bh','both','wc')").bind(user_id).first<{ email: string }>();
     if (!target) return json({ error: 'User not found' }, 404);
     const result = await registerEmailDestination(env, target.email);
     return json(result);
   }
 
-  // Checks each bishopric-hub account's email address against Cloudflare's verified
+  // Checks each bishopric and Ward Council account's email address against Cloudflare's verified
   // destination-address list (required before the mailer can send it anything).
   // Verification is one-way — once true it stays true — so only accounts still
   // marked unverified in our own DB are re-checked against Cloudflare each call.
@@ -1023,7 +1023,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (session.role !== 'admin') return json({ error: 'Admin only' }, 403);
 
     const users = await db.prepare(
-      "SELECT id, email, email_verified FROM users WHERE hub IN ('bh','both') AND role != 'guest'"
+      "SELECT id, email, email_verified FROM users WHERE hub IN ('bh','both','wc') AND role != 'guest'"
     ).all<{ id: number; email: string; email_verified: number }>();
 
     const pending = users.results.filter(u => !u.email_verified);
