@@ -120,6 +120,8 @@ function AutoTextarea({ value, onSave, readOnly, placeholder, minRows = 1 }: {
 }) {
   const [local, setLocal] = useState(value);
   const [prevValue, setPrevValue] = useState(value);
+  // Shows the formatted text (bold, bullets) until clicked, then the raw text box.
+  const [editing, setEditing] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
 
   if (value !== prevValue) {
@@ -127,14 +129,48 @@ function AutoTextarea({ value, onSave, readOnly, placeholder, minRows = 1 }: {
     setLocal(value);
   }
 
+  const showBox = editing || !local.trim();
+
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = el.scrollHeight + 'px';
-  }, [local]);
+  }, [local, showBox]);
+
+  useEffect(() => {
+    if (editing) ref.current?.focus();
+  }, [editing]);
+
+  // Ctrl+B / Cmd+B wraps the selection in **…** (or unwraps it if already bold).
+  const toggleBold = (el: HTMLTextAreaElement) => {
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    if (start === end) return;
+    const sel = local.slice(start, end);
+    const before = local.slice(0, start);
+    const after = local.slice(end);
+    let next: string, selStart: number, selEnd: number;
+    if (sel.length >= 4 && sel.startsWith('**') && sel.endsWith('**')) {
+      next = before + sel.slice(2, -2) + after;
+      selStart = start; selEnd = end - 4;
+    } else if (before.endsWith('**') && after.startsWith('**')) {
+      next = before.slice(0, -2) + sel + after.slice(2);
+      selStart = start - 2; selEnd = end - 2;
+    } else {
+      next = before + '**' + sel + '**' + after;
+      selStart = start + 2; selEnd = end + 2;
+    }
+    setLocal(next);
+    setTimeout(() => { el.selectionStart = selStart; el.selectionEnd = selEnd; }, 0);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      if (ref.current) toggleBold(ref.current);
+      return;
+    }
     if (e.key !== 'Enter') return;
     const el = ref.current;
     if (!el) return;
@@ -162,12 +198,24 @@ function AutoTextarea({ value, onSave, readOnly, placeholder, minRows = 1 }: {
     return <div className="min-h-[2rem]">{renderRichContent(value)}</div>;
   }
 
+  if (!showBox) {
+    return (
+      <div role="button" tabIndex={0} title="Click to edit"
+        onClick={() => setEditing(true)}
+        onFocus={() => setEditing(true)}
+        className="w-full cursor-text border border-transparent hover:border-gray-200 rounded min-h-[2rem]">
+        {renderRichContent(local)}
+      </div>
+    );
+  }
+
   return (
     <textarea
       ref={ref}
       value={local}
       onChange={e => setLocal(e.target.value)}
-      onBlur={() => { if (local !== value && onSave) onSave(local); }}
+      onFocus={() => setEditing(true)}
+      onBlur={() => { setEditing(false); if (local !== value && onSave) onSave(local); }}
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
       rows={minRows}
