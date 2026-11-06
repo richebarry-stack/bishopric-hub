@@ -2132,6 +2132,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const oldType = member.recommend_type || null;
       const oldExpires = member.recommend_expires || null;
       if (type === oldType && expires === oldExpires) continue;
+      // LCR's report sometimes returns only a member's old limited-use recommend
+      // instead of their endowed one (Sedona Kirby flipped between the two every few
+      // days). Endowed beats Limited, so never let an older/equal Limited row
+      // overwrite a stored Endowed recommend.
+      if (oldType === 'Endowed' && type === 'Limited' && (expires || '') <= (oldExpires || '')) continue;
       stmts.push(
         db.prepare('UPDATE ward_members SET recommend_type = ?, recommend_expires = ?, updated_at = ?, updated_by = ? WHERE id = ?')
           .bind(type, expires, now, session.name, member.id)
