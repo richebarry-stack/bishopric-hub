@@ -106,6 +106,75 @@ async function checkConflict(db: D1Database, tableName: string, recordId: string
   return null;
 }
 
+// Tithing declarations are held with the Bishop, so his calendar and the tithing
+// slots must never double-book each other (hub suggestion #32). Times are
+// zero-padded "HH:MM" text, so string comparison orders them correctly.
+const BISHOP_ENTRY_OVERLAPS_SLOT = (slot: string) => `EXISTS (
+  SELECT 1 FROM schedule_entries e
+  WHERE substr(e.date, 1, 10) = substr(${slot}.date, 1, 10) AND e.calendars LIKE '%"Bishop"%'
+    AND e.start_time < ${slot}.end_time AND e.end_time > ${slot}.start_time)`;
+const RESERVED_SLOT_OVERLAPS_SLOT = (slot: string) => `EXISTS (
+  SELECT 1 FROM tithing_declaration_slots o
+  WHERE o.id != ${slot}.id AND o.reserved_by IS NOT NULL
+    AND substr(o.date, 1, 10) = substr(${slot}.date, 1, 10)
+    AND o.start_time < ${slot}.end_time AND o.end_time > ${slot}.start_time)`;
+
+function fmtTime12(t: string): string {
+  const [hh, mm] = t.split(':').map(Number);
+  return `${hh % 12 || 12}:${String(mm).padStart(2, '0')} ${hh >= 12 ? 'PM' : 'AM'}`;
+}
+
+// Returns a 409 when saving this Bishop appointment / tithing slot would double-book.
+// Bishop appointments may cover OPEN slots (they just drop off the public page) but
+// not reserved ones; slots may not overlap other slots or Bishop appointments.
+async function scheduleClash(
+  db: D1Database, tableName: string, body: Record<string, unknown>, recordId?: string,
+): Promise<Response | null> {
+  if (tableName !== 'schedule-entries' && tableName !== 'tithing-declarations') return null;
+  const table = tableName === 'schedule-entries' ? 'schedule_entries' : 'tithing_declaration_slots';
+  const existing = recordId
+    ? await db.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(recordId).first<Record<string, unknown>>()
+    : null;
+  const merged = { ...(existing ?? {}), ...body };
+  const date = String(merged.date ?? '').slice(0, 10);
+  const start = String(merged.start_time ?? '');
+  const end = String(merged.end_time ?? '');
+  if (!date || !start || !end) return null;
+  const id = recordId ? Number(recordId) : -1;
+  // Compare values, not which keys were sent — editors resend the full row, and only
+  // a real move should re-check, so editing a title or location doesn't trip over an
+  // overlap that predates this rule.
+  const timeChanged = !existing || date !== String(existing.date ?? '').slice(0, 10)
+    || start !== existing.start_time || end !== existing.end_time;
+
+  if (tableName === 'schedule-entries') {
+    if (!timeChanged && merged.calendars === existing?.calendars) return null;
+    if (!String(merged.calendars ?? '').includes('"Bishop"')) return null;
+    const slot = await db.prepare(
+      `SELECT reserved_by, start_time FROM tithing_declaration_slots
+       WHERE substr(date, 1, 10) = ? AND reserved_by IS NOT NULL AND start_time < ? AND end_time > ? LIMIT 1`
+    ).bind(date, end, start).first<{ reserved_by: string; start_time: string }>();
+    if (slot) return json({ error: `That time overlaps ${slot.reserved_by}'s tithing declaration at ${fmtTime12(slot.start_time)}. Pick another time, or move or unreserve that slot first.` }, 409);
+    return null;
+  }
+
+  const newlyReserved = !!merged.reserved_by && !existing?.reserved_by;
+  if (timeChanged || newlyReserved) {
+    const other = await db.prepare(
+      `SELECT reserved_by, start_time FROM tithing_declaration_slots
+       WHERE id != ? AND substr(date, 1, 10) = ? AND start_time < ? AND end_time > ?
+         ${timeChanged ? '' : 'AND reserved_by IS NOT NULL'} LIMIT 1`
+    ).bind(id, date, end, start).first<{ reserved_by: string | null; start_time: string }>();
+    if (other) return json({ error: `This slot overlaps ${other.reserved_by ? `${other.reserved_by}'s tithing declaration` : 'another tithing slot'} at ${fmtTime12(other.start_time)}. Pick a different time.` }, 409);
+    const entry = await db.prepare(
+      `SELECT title, start_time FROM schedule_entries
+       WHERE substr(date, 1, 10) = ? AND calendars LIKE '%"Bishop"%' AND start_time < ? AND end_time > ? LIMIT 1`
+    ).bind(date, end, start).first<{ title: string; start_time: string }>();
+    if (entry) return json({ error: `This slot overlaps the Bishop's "${entry.title}" appointment at ${fmtTime12(entry.start_time)}. Pick a different time, or move that appointment first.` }, 409);
+  }
+  return null;
+}
+
 // The Calling Pipeline's Member field is free text, so entries get typed as
 // "Richard Talbot" as often as "Talbot, Richard" — and an entry that isn't linked to
 // a ward_member_id is invisible to everything that matches by member (All Callings'
@@ -614,9 +683,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const today = new Date().toISOString().slice(0, 10);
     // Includes already-booked slots (with who booked them) so visitors can see what's
     // taken, not just what's open — but never exposes reserved_contact (phone/email).
+    // An open slot is hidden while a Bishop appointment or another reserved slot covers
+    // it (hub suggestion #32), without revealing what the Bishop's appointment is.
     const results = await db.prepare(
-      `SELECT id, date, start_time, end_time, location, notes, reserved_by FROM tithing_declaration_slots
-       WHERE date >= ? ORDER BY date ASC, start_time ASC`
+      `SELECT s.id, s.date, s.start_time, s.end_time, s.location, s.notes, s.reserved_by FROM tithing_declaration_slots s
+       WHERE s.date >= ?
+         AND (s.reserved_by IS NOT NULL OR (NOT ${BISHOP_ENTRY_OVERLAPS_SLOT('s')} AND NOT ${RESERVED_SLOT_OVERLAPS_SLOT('s')}))
+       ORDER BY s.date ASC, s.start_time ASC`
     ).bind(today).all();
     return json(results.results);
   }
@@ -628,9 +701,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const name = (body.name || '').trim();
     if (!name) return json({ error: 'Name is required' }, 400);
     const now = new Date().toISOString();
+    // The overlap checks live in the same UPDATE so a booking made a moment earlier on
+    // the Bishop's calendar (or an overlapping slot) can't slip through.
     const result = await db.prepare(
       `UPDATE tithing_declaration_slots SET reserved_by = ?, reserved_contact = ?, reserved_at = ?, updated_at = ?
-       WHERE id = ? AND reserved_by IS NULL`
+       WHERE id = ? AND reserved_by IS NULL
+         AND NOT ${BISHOP_ENTRY_OVERLAPS_SLOT('tithing_declaration_slots')}
+         AND NOT ${RESERVED_SLOT_OVERLAPS_SLOT('tithing_declaration_slots')}`
     ).bind(name, (body.contact || '').trim() || null, now, now, id).run();
     if (result.meta.changes === 0) return json({ error: 'That slot is no longer available — please pick another.' }, 409);
     return json({ ok: true });
@@ -2182,6 +2259,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     delete body.updated_by;
     body.updated_by = session.name;
     if (tableName === 'calling-pipeline') await linkCallingMember(db, body);
+    const clash = await scheduleClash(db, tableName, body);
+    if (clash) return clash;
     const keys = Object.keys(body);
     const placeholders = keys.map(() => '?').join(', ');
     const values = keys.map(k => body[k]);
@@ -2221,6 +2300,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const beforeUpdate = tableName === 'calling-pipeline'
       ? await db.prepare('SELECT * FROM calling_pipeline WHERE id = ?').bind(recordId).first<Record<string, unknown>>()
       : null;
+
+    const clash = await scheduleClash(db, tableName, body, recordId);
+    if (clash) return clash;
 
     body.updated_at = new Date().toISOString();
     body.updated_by = session.name;

@@ -5,6 +5,11 @@ import { parseCalendars } from '../lib/scheduleCalendars';
 import Modal from '../components/Modal';
 import { Input, Textarea } from '../components/FormFields';
 import { useConfirm } from '../components/ConfirmDialog';
+import { toast } from '../lib/toast';
+import {
+  findSlotOverlap, findReservedSlotOverlap, findBishopEntryOverlap, isSlotHiddenFromPublic,
+  describeSlot, describeEntry,
+} from '../lib/scheduleOverlap';
 
 function buildSlots(): string[] {
   const slots: string[] = [];
@@ -160,12 +165,32 @@ export default function TithingDeclarationSchedule() {
 
   const handleSave = async () => {
     if (!editing || !editing.location.trim()) return;
+    // Typing a name in "Reserved by" books the slot the same way a member reserving it
+    // online does; clearing the name opens it back up.
+    const reservedBy = editing.reservedBy.trim() || null;
+    const current = editing.id ? rows.find(r => r.id === editing.id) : undefined;
+
+    // No double booking (hub suggestion #32): a new or moved slot can't overlap another
+    // slot or a Bishop appointment, and a slot can't be reserved while either covers it.
+    // The server enforces the same rules.
+    const { date, start_time: start, end_time: end } = editing;
+    const timeChanged = !current || current.date.slice(0, 10) !== date || current.start_time !== start || current.end_time !== end;
+    const newlyReserved = !!reservedBy && !current?.reserved_by;
+    const slotClash = timeChanged
+      ? findSlotOverlap(rows, date, start, end, editing.id)
+      : newlyReserved ? findReservedSlotOverlap(rows, date, start, end, editing.id) : undefined;
+    if (slotClash) {
+      toast.error(`This slot overlaps ${describeSlot(slotClash)}. Pick a different time.`);
+      return;
+    }
+    const entryClash = timeChanged || newlyReserved ? findBishopEntryOverlap(scheduleRows, date, start, end) : undefined;
+    if (entryClash) {
+      toast.error(`This slot overlaps ${describeEntry(entryClash)}. Pick a different time, or move that appointment on the Bishop Schedule first.`);
+      return;
+    }
+
     setSaving(true);
     try {
-      // Typing a name in "Reserved by" books the slot the same way a member reserving it
-      // online does; clearing the name opens it back up.
-      const reservedBy = editing.reservedBy.trim() || null;
-      const current = editing.id ? rows.find(r => r.id === editing.id) : undefined;
       const reservedAt = !reservedBy ? null
         : current?.reserved_by && current.reserved_at ? current.reserved_at
         : new Date().toISOString();
@@ -264,6 +289,7 @@ export default function TithingDeclarationSchedule() {
         Click an open cell to add a slot. Members reserve slots without logging in at <span className="font-mono">/declare-tithing</span> — each slot holds one family. The
         {' '}<span className="inline-block align-middle w-3 h-3 rounded-sm mr-1" style={{ background: 'repeating-linear-gradient(45deg, rgba(107,114,128,0.5), rgba(107,114,128,0.5) 2px, rgba(107,114,128,0.25) 2px, rgba(107,114,128,0.25) 4px)' }} />
         hatched areas show the Bishop's existing calendar for reference — that's for your eyes only, never shown to members reserving a slot.
+        Slots can't overlap each other or a Bishop appointment. An open slot turns gray and is hidden from the public page when the Bishop books that time on his schedule.
       </p>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
@@ -347,12 +373,13 @@ export default function TithingDeclarationSchedule() {
                             const laneCount = startingHere.length;
                             const laneWidth = 100 / laneCount;
                             const reserved = !!entry.reserved_by;
+                            const hidden = isSlotHiddenFromPublic(entry, rows, scheduleRows);
 
                             return (
                               <div
                                 key={entry.id}
                                 className={`absolute text-white rounded px-1 py-0.5 overflow-hidden shadow-sm select-none cursor-pointer
-                                  ${reserved ? 'bg-green-600' : 'bg-blue-500'}`}
+                                  ${reserved ? 'bg-green-600' : hidden ? 'bg-gray-400' : 'bg-blue-500'}`}
                                 style={{
                                   top: 0,
                                   height: span * rowHeight,
@@ -364,12 +391,14 @@ export default function TithingDeclarationSchedule() {
                                 onClick={e => { e.stopPropagation(); openEditor(entry); }}
                                 title={reserved
                                   ? `Reserved by ${entry.reserved_by}${entry.reserved_contact ? ` (${entry.reserved_contact})` : ''} — ${entry.location}`
-                                  : `Open — ${entry.location}`}
+                                  : hidden
+                                    ? `Hidden from the public page — the Bishop has an appointment then — ${entry.location}`
+                                    : `Open — ${entry.location}`}
                               >
                                 <div className="font-medium truncate">{reserved ? entry.reserved_by : entry.location}</div>
-                                {span > 2 && (
+                                {span > 1 && (
                                   <div className="truncate text-xs text-white/80">
-                                    {reserved ? entry.location : 'Open'}
+                                    {reserved ? entry.location : hidden ? 'Hidden (Bishop busy)' : 'Open'}
                                   </div>
                                 )}
                               </div>

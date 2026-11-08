@@ -69,7 +69,7 @@ interface CallingRow extends MemberCalling {
 export default function AllCallings() {
   const { rows: members } = useTable<WardMember>('ward-members');
   const { rows: lcrCallings } = useTable<MemberCalling>('member-callings');
-  const { rows: callings, create: createCalling, update: updateCalling } = useTable<CallingPipeline>('calling-pipeline');
+  const { rows: callings, create: createCalling } = useTable<CallingPipeline>('calling-pipeline');
   const { rows: unfilledCallings } = useTable<UnfilledCalling>('unfilled-callings');
 
   const [tab, setTab] = useState<Tab>('lcr');
@@ -93,19 +93,6 @@ export default function AllCallings() {
       if (c.type === 'Release' && c.status !== '10. Released') s.add(key);
     }
     return s;
-  }, [callings]);
-
-  // Active (not released/declined) Calling row per pair, so "Consider for release"
-  // advances the existing entry instead of inserting a duplicate for the same pair.
-  const activeCallingRowByPair = useMemo(() => {
-    const m = new Map<string, CallingPipeline>();
-    for (const c of callings) {
-      if (c.type !== 'Calling' || c.ward_member_id === null || c.status === '10. Released' || c.status === '11. Declined') continue;
-      const key = `${c.ward_member_id}|${normCalling(c.calling)}`;
-      const prev = m.get(key);
-      if (!prev || c.id > prev.id) m.set(key, c);
-    }
-    return m;
   }, [callings]);
 
   // Members actively being considered for a NEW calling — excludes '8. Need to
@@ -135,27 +122,21 @@ export default function AllCallings() {
   const membersWithCallingIds = useMemo(() => new Set(lcrCallings.map(c => c.ward_member_id)), [lcrCallings]);
 
   const considerForRelease = useCallback((c: MemberCalling, memberName: string) => {
-    const existing = activeCallingRowByPair.get(`${c.ward_member_id}|${normCalling(c.calling)}`);
-    if (existing) {
-      // Already in the pipeline from when the call was made — flag that row as
-      // being discussed for release rather than adding a second entry for the
-      // same person/calling.
-      updateCalling(existing.id, { status: '7. In release discussion', release_recorded: 0 });
-    } else {
-      createCalling({
-        member: memberName,
-        calling: c.calling,
-        organization: c.organization,
-        status: '7. In release discussion',
-        assigned_to: '',
-        sustain_recorded: 1,
-        set_apart_recorded: c.set_apart ? 1 : 0,
-        release_recorded: 0,
-        type: 'Calling',
-        ward_member_id: c.ward_member_id,
-        sustained_date: c.sustained_date,
-      } as unknown as Record<string, unknown>);
-    }
+    // A release is its own Release entry (hub suggestion #33). Any existing Calling
+    // entry for this pair stays as the record of the call; the LCR sync marks this
+    // Release entry released once the person drops off LCR.
+    createCalling({
+      member: memberName,
+      calling: c.calling,
+      organization: c.organization,
+      status: '7. In release discussion',
+      assigned_to: '',
+      sustain_recorded: 0,
+      set_apart_recorded: 0,
+      release_recorded: 0,
+      type: 'Release',
+      ward_member_id: c.ward_member_id,
+    } as unknown as Record<string, unknown>);
     // Also start a placeholder entry for finding this person's replacement.
     createCalling({
       member: `Replacement for ${memberName}`,
@@ -169,7 +150,7 @@ export default function AllCallings() {
       type: 'Calling',
       ward_member_id: null,
     } as unknown as Record<string, unknown>);
-  }, [createCalling, updateCalling, activeCallingRowByPair]);
+  }, [createCalling]);
 
   const addForConsideration = useCallback((m: WardMember) => {
     createCalling({

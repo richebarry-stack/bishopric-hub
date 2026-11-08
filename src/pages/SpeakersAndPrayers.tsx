@@ -105,27 +105,66 @@ function AgendaOverlayModal({ date, onClose }: { date: string; onClose: () => vo
   );
 }
 
-function NoteField({ name, category, notes, onSave }: { name: string; category: string; notes: Map<string, string>; onSave: (name: string, category: string, text: string) => void }) {
+type SaveNoteFn = (name: string, category: string, text: string) => Promise<void>;
+
+// Saves shortly after typing stops, and also on blur, unmount and when the page is
+// hidden. Saving only on blur lost notes on phones and when leaving the page
+// (hub suggestion #35). A failed save shows an error and is retried on the next edit.
+const NOTE_SAVE_DELAY_MS = 700;
+
+function NoteField({ name, category, notes, onSave }: { name: string; category: string; notes: Map<string, string>; onSave: SaveNoteFn }) {
   const key = `${category}:${name}`;
   const current = notes.get(key) ?? '';
   const [text, setText] = useState(current);
-  const saved = useRef(current);
+  const saved = useRef(current);   // last text sent to the server
+  const latest = useRef(current);  // what's in the box right now
+  const timer = useRef<number | undefined>(undefined);
 
+  const flush = useCallback(() => {
+    window.clearTimeout(timer.current);
+    timer.current = undefined;
+    const value = latest.current;
+    if (value === saved.current) return;
+    const previous = saved.current;
+    saved.current = value;
+    onSave(name, category, value).catch(() => {
+      // Not saved; let the next edit or blur try again.
+      if (saved.current === value) saved.current = previous;
+    });
+  }, [name, category, onSave]);
+
+  // Pick up notes loaded or saved elsewhere, but never over unsaved typing.
   useEffect(() => {
     const v = notes.get(key) ?? '';
-    if (v !== saved.current) { setText(v); saved.current = v; }
+    if (v !== saved.current && latest.current === saved.current) {
+      setText(v); saved.current = v; latest.current = v;
+    }
   }, [notes, key]);
 
-  const handleBlur = () => {
-    if (text !== saved.current) { saved.current = text; onSave(name, category, text); }
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onHide);
+      flush();
+    };
+  }, [flush]);
+
+  const handleChange = (value: string) => {
+    setText(value);
+    latest.current = value;
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(flush, NOTE_SAVE_DELAY_MS);
   };
 
   return (
     <div onClick={e => e.stopPropagation()}>
       <textarea
         value={text}
-        onChange={e => setText(e.target.value)}
-        onBlur={handleBlur}
+        onChange={e => handleChange(e.target.value)}
+        onBlur={flush}
         rows={1}
         placeholder="Notes…"
         className="w-full text-xs rounded border border-gray-200 px-2 py-1 text-gray-700 placeholder-gray-300 resize-none focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white focus:rows-3"
@@ -240,7 +279,7 @@ function SpeakerDatesChips({ r, onDateClick }: { r: SpeakerRowEx; onDateClick: (
 function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember, onDateClick }: {
   rows: SpeakerRowEx[];
   notes: Map<string, string>;
-  onSaveNote: (name: string, category: string, text: string) => void;
+  onSaveNote: SaveNoteFn;
   expanded: string | null;
   setExpanded: (n: string | null) => void;
   sortKey: 'name' | 'count' | 'lastDate';
@@ -346,7 +385,7 @@ function SpeakersTab({ speakers, notes, onSaveNote, activeWardMembers, wardMembe
   speakers: SacramentSpeaker[];
   onMatch: MatchFn;
   notes: Map<string, string>;
-  onSaveNote: (name: string, category: string, text: string) => void;
+  onSaveNote: SaveNoteFn;
   activeWardMembers: WardMember[];
   wardMembers: WardMember[];
   onUpdateMember: (id: number, data: Record<string, unknown>) => void;
@@ -521,7 +560,7 @@ function PrayerDatesChips({ r, onDateClick }: { r: PrayerRowEx; onDateClick: (da
 function PrayerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey, sortDir, toggle, memberMap, onUpdateMember, onDateClick }: {
   rows: PrayerRowEx[];
   notes: Map<string, string>;
-  onSaveNote: (name: string, category: string, text: string) => void;
+  onSaveNote: SaveNoteFn;
   expanded: string | null;
   setExpanded: (n: string | null) => void;
   sortKey: 'name' | 'count' | 'lastDate';
@@ -627,7 +666,7 @@ function PrayersTab({ prayers, notes, onSaveNote, activeWardMembers, wardMembers
   prayers: Prayer[];
   onMatch: MatchFn;
   notes: Map<string, string>;
-  onSaveNote: (name: string, category: string, text: string) => void;
+  onSaveNote: SaveNoteFn;
   activeWardMembers: WardMember[];
   wardMembers: WardMember[];
   onUpdateMember: (id: number, data: Record<string, unknown>) => void;
@@ -810,8 +849,13 @@ export default function SpeakersAndPrayers() {
     }).catch(() => {});
   }, []);
 
-  const handleSaveNote = useCallback((name: string, category: string, text: string) => {
-    api.speakerNotes.save(name, category, text).catch(() => {});
+  const handleSaveNote = useCallback(async (name: string, category: string, text: string) => {
+    try {
+      await api.speakerNotes.save(name, category, text);
+    } catch (err) {
+      toast.error(`Note for ${name} didn't save — please try again.`);
+      throw err;
+    }
     setNotes(prev => new Map(prev).set(`${category}:${name}`, text));
   }, []);
 

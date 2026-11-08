@@ -721,7 +721,8 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
           break;
         }
         case 'opening_hymn':   if (openingHymn)   lines.push(`Opening Hymn: ${openingHymn}`); break;
-        case 'opening_prayer': if (openingPrayer) lines.push(`Opening Prayer: ${openingPrayer}`); break;
+        // Prayers always print, even when not yet assigned (hub suggestion #34).
+        case 'opening_prayer': lines.push(`Opening Prayer: ${openingPrayer}`); break;
         case 'announcements':
           if (announceRows.some(r => r.title.trim())) {
             lines.push('Announcements:');
@@ -761,7 +762,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
         case 'rest_special':   if (restSpecial)   lines.push(`Rest / Special Music: ${restSpecial}`); break;
         case 'closing_remarks': lines.push(`Closing Remarks: ${closingRemarks}`); break;
         case 'closing_hymn':   if (closingHymn)   lines.push(`Closing Hymn: ${closingHymn}`); break;
-        case 'closing_prayer': if (closingPrayer) lines.push(`Closing Prayer: ${closingPrayer}`); break;
+        case 'closing_prayer': lines.push(`Closing Prayer: ${closingPrayer}`); break;
       }
     }
     return lines.join('\n');

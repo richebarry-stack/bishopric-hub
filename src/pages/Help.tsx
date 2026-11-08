@@ -559,6 +559,16 @@ function VersionHistoryList(limit?: number) {
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
             {
+              date: 'Nov 8, 2026',
+              items: [
+                'Bishop Schedule: you can now book an appointment during an open tithing declaration slot by clicking that time. The slot then stops showing on the public sign-up page. Reserved slots can’t be booked over; clicking one still opens the Tithing Declaration page.',
+                'Tithing Declarations: no more double booking. A slot can’t overlap another slot or a Bishop appointment, a Bishop appointment can’t overlap a reserved slot, and the public sign-up page won’t let a family reserve a time the Bishop has booked. Open slots hidden this way show gray on the Tithing Declaration page.',
+                'Sacrament agenda: Opening Prayer and Closing Prayer always appear on the printed agenda and copied text, even before they’re assigned.',
+                'All Callings: "Consider for release" now adds a Release entry to the Calling Pipeline instead of a Calling entry.',
+                'Speakers & Prayers: notes now save as you type, and also when you leave the page or switch apps on your phone. If a note fails to save, you’ll see an error.',
+              ],
+            },
+            {
               date: 'Nov 6, 2026',
               items: [
                 'LCR Sync: a member with an endowed temple recommend is no longer switched back to an older limited-use recommend when LCR’s report occasionally lists only the old one. This stops the repeated recommend change for the same member in the sync history.',

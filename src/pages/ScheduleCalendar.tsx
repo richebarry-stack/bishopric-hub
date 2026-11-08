@@ -6,6 +6,7 @@ import { parseCalendars, stringifyCalendars } from '../lib/scheduleCalendars';
 import Modal from '../components/Modal';
 import { Input, Textarea, Select, Checkbox } from '../components/FormFields';
 import { toast } from '../lib/toast';
+import { findReservedSlotOverlap, describeSlot } from '../lib/scheduleOverlap';
 import { useConfirm } from '../components/ConfirmDialog';
 import {
   type RecurrenceFrequency,
@@ -151,6 +152,20 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
     }
     return map;
   }, [tithingRows, activeTab]);
+  // A Bishop appointment may cover an OPEN tithing slot (which then drops off the
+  // public reservation page) but never a reserved one. Shows why and returns true
+  // when blocked.
+  const blockedByTithing = (calendars: ScheduleCalendarName[], dates: string[], start: string, end: string): boolean => {
+    if (!calendars.includes('Bishop')) return false;
+    for (const d of dates) {
+      const slot = findReservedSlotOverlap(tithingRows, d, start, end);
+      if (slot) {
+        toast.error(`That time overlaps ${describeSlot(slot)}. Pick another time, or move or unreserve that slot on the Tithing Declaration page first.`);
+        return true;
+      }
+    }
+    return false;
+  };
   const [weekStart, setWeekStart] = useState(() => defaultWeekStart());
   const [editing, setEditing] = useState<FormState | null>(null);
   const confirm = useConfirm();
@@ -262,6 +277,7 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
         const newEnd = TIME_SLOTS[Math.min(d.previewEndIdx, TIME_SLOTS.length - 1)];
         const newDate = d.previewDate;
         if (newStart !== entry.start_time || newEnd !== entry.end_time || newDate !== entry.date.slice(0, 10)) {
+          if (blockedByTithing(parseCalendars(entry.calendars), [newDate], newStart, newEnd)) return;
           await update(entry.id, { date: newDate, start_time: newStart, end_time: newEnd, title: entry.title, notes: entry.notes || '' });
         }
       }
@@ -309,12 +325,16 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
       date: editing.date, start_time: editing.start_time, end_time: editing.end_time,
       title: editing.title, notes: editing.notes, calendars: stringifyCalendars(editing.calendars),
     };
+    const repeating = !editing.id && repeatEnabled && !!repeatEndDate;
+    const futureDates = repeating
+      ? generateRecurrenceDates(editing.date, repeatEndDate, repeatFrequency, repeatInterval, MAX_RECURRENCE_OCCURRENCES)
+      : [];
+    if (blockedByTithing(editing.calendars, [editing.date, ...futureDates], editing.start_time, editing.end_time)) return;
     setSaving(true);
     try {
       if (editing.id) {
         await update(editing.id, data);
-      } else if (repeatEnabled && repeatEndDate) {
-        const futureDates = generateRecurrenceDates(editing.date, repeatEndDate, repeatFrequency, repeatInterval, MAX_RECURRENCE_OCCURRENCES);
+      } else if (repeating) {
         if (futureDates.length === MAX_RECURRENCE_OCCURRENCES && futureDates[futureDates.length - 1] < repeatEndDate) {
           toast.error(`That would create more than ${MAX_RECURRENCE_OCCURRENCES} appointments — shorten the date range or pick a coarser frequency.`);
           return;
@@ -343,6 +363,10 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
   // recurrence metadata) to every sibling occurrence dated on or after it.
   const handleSaveToFutureSeries = async () => {
     if (!editing?.id || !editing.recurrence_id) return;
+    const futureSiblings = rows.filter(r =>
+      r.recurrence_id === editing.recurrence_id && r.id !== editing.id && r.date.slice(0, 10) >= editing.date
+    );
+    if (blockedByTithing(editing.calendars, [editing.date, ...futureSiblings.map(r => r.date)], editing.start_time, editing.end_time)) return;
     setSaving(true);
     try {
       const data: Record<string, unknown> = {
@@ -355,9 +379,6 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
         start_time: editing.start_time, end_time: editing.end_time, title: editing.title, notes: editing.notes,
         calendars: stringifyCalendars(editing.calendars),
       };
-      const futureSiblings = rows.filter(r =>
-        r.recurrence_id === editing.recurrence_id && r.id !== editing.id && r.date.slice(0, 10) >= editing.date
-      );
       for (const sibling of futureSiblings) {
         await update(sibling.id, contentData, { silent: true });
       }
@@ -466,7 +487,7 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
           <>
             {' '}
             <span className="inline-block align-middle w-3 h-3 rounded-sm mr-1" style={{ background: 'repeating-linear-gradient(45deg, rgba(217,119,6,0.6), rgba(217,119,6,0.6) 2px, rgba(217,119,6,0.3) 2px, rgba(217,119,6,0.3) 4px)' }} />
-            hatched areas are Tithing Declaration slots (reserved or still open) — click one to open the Tithing Declaration page.
+            hatched areas are Tithing Declaration slots. Click an open one to book that time for an appointment — the slot then stops showing on the public sign-up page. Reserved ones can't be booked over; click one to open the Tithing Declaration page.
           </>
         )}
       </p>
@@ -554,11 +575,15 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
                             const startIdx = slotIndex(entry.start_time);
                             const endIdx = slotIndex(entry.end_time);
                             const span = Math.max(1, endIdx - startIdx);
+                            // Open slots let clicks through to the cell, so the Bishop can book
+                            // that time directly (the slot then drops off the public page).
+                            // Reserved slots can't be booked over, so they link to the tithing page.
+                            const reserved = !!entry.reserved_by;
                             return (
                               <div
                                 key={`tithing-${entry.id}`}
-                                role="link"
-                                className="absolute rounded overflow-hidden select-none px-1 py-0.5 text-amber-900 font-medium cursor-pointer hover:ring-1 hover:ring-amber-600"
+                                role={reserved ? 'link' : undefined}
+                                className={`absolute rounded overflow-hidden select-none px-1 py-0.5 text-amber-900 font-medium ${reserved ? 'cursor-pointer hover:ring-1 hover:ring-amber-600' : ''}`}
                                 style={{
                                   top: 0,
                                   height: span * rowHeight,
@@ -566,12 +591,14 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
                                   width: 'calc(100% - 2px)',
                                   zIndex: 1,
                                   lineHeight: '1.2',
-                                  // Let drags pass through to the cells underneath.
-                                  pointerEvents: dragState ? 'none' : 'auto',
+                                  // Let drags (and clicks on open slots) pass through to the cells underneath.
+                                  pointerEvents: dragState || !reserved ? 'none' : 'auto',
                                   background: 'repeating-linear-gradient(45deg, rgba(217,119,6,0.3), rgba(217,119,6,0.3) 4px, rgba(217,119,6,0.15) 4px, rgba(217,119,6,0.15) 8px)',
                                 }}
-                                title={`Tithing Declaration: ${entry.reserved_by ? `Reserved — ${entry.reserved_by}` : 'Open'} — ${entry.location} (click to open Tithing Declaration)`}
-                                onClick={e => { e.stopPropagation(); navigate(`/tithing-declarations?date=${dayKey}`); }}
+                                title={reserved
+                                  ? `Tithing Declaration: Reserved — ${entry.reserved_by} — ${entry.location} (click to open Tithing Declaration)`
+                                  : undefined}
+                                onClick={reserved ? e => { e.stopPropagation(); navigate(`/tithing-declarations?date=${dayKey}`); } : undefined}
                               >
                                 <span className="truncate block">Tithing: {entry.reserved_by || 'Open'}</span>
                               </div>
