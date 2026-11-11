@@ -5,8 +5,9 @@ import { api } from '../lib/api';
 import type { CallingPipeline as CallingType, User, CallingPipelineHistoryEntry, WardMember } from '../lib/api';
 import Modal from '../components/Modal';
 import MemberNameInput from '../components/MemberNameInput';
+import CallingNameInput from '../components/CallingNameInput';
 import StatusBadge from '../components/StatusBadge';
-import { Input, Select, Checkbox, Textarea } from '../components/FormFields';
+import { Select, Checkbox, Textarea } from '../components/FormFields';
 import { CALLING_STATUSES, CALLING_STATUS_COLORS, CALLING_TYPE_STATUSES, RELEASE_TYPE_STATUSES, ORGANIZATIONS } from '../lib/constants';
 import { renderRichText, stripBold } from '../lib/richText';
 import LastEdited from '../components/LastEdited';
@@ -148,6 +149,15 @@ function HistoryList({ entries }: { entries: CallingPipelineHistoryEntry[] }) {
   );
 }
 
+// LCR organization names (e.g. "Other Callings") aren't all in the fixed list —
+// keep whatever an entry already has selectable instead of showing it blank.
+function orgOptions(current: string | undefined): string[] {
+  const v = (current || '').trim();
+  return v && !ORGANIZATIONS.includes(v) ? [v, ...ORGANIZATIONS] : ORGANIZATIONS;
+}
+
+const EMPTY_NEW_CALL = { calling: '', organization: '' };
+
 const EMPTY: Partial<CallingType> = {
   member: '', calling: '', status: '1. Discussion', assigned_to: '',
   sustain_recorded: 0, set_apart_recorded: 0, organization: '', type: 'Calling',
@@ -171,6 +181,10 @@ export default function CallingPipeline() {
     () => new Set(CALLING_STATUSES.filter(s => s !== '5. Sustained'))
   );
   const [saving, setSaving] = useState(false);
+  // Optional new calling to start for the person on a Release entry (hub suggestion #39).
+  // Not stored on the release itself — saving creates a separate Calling entry.
+  const [newCall, setNewCall] = useState(EMPTY_NEW_CALL);
+  const closeEditor = () => { setEditing(null); setNewCall(EMPTY_NEW_CALL); };
   const { data: history = [] } = useQuery({
     queryKey: ['calling-pipeline-history', editing?.id],
     queryFn: () => api.callingPipeline.history(editing!.id!),
@@ -249,7 +263,22 @@ export default function CallingPipeline() {
       delete (data as Record<string, unknown>).id;
       if (editing.id) await update(editing.id, data as Record<string, unknown>);
       else await create(data as Record<string, unknown>);
-      setEditing(null);
+      if (editing.type === 'Release' && newCall.calling.trim()) {
+        await create({
+          member: editing.member || '',
+          calling: newCall.calling.trim(),
+          organization: newCall.organization,
+          status: '1. Discussion',
+          assigned_to: editing.assigned_to || '',
+          sustain_recorded: 0,
+          set_apart_recorded: 0,
+          release_recorded: 0,
+          type: 'Calling',
+          ward_member_id: editing.ward_member_id ?? null,
+        }, { silent: true });
+        toast.success(`Also added a Calling entry for ${newCall.calling.trim()}`);
+      }
+      closeEditor();
     } finally {
       setSaving(false);
     }
@@ -505,12 +534,14 @@ export default function CallingPipeline() {
         </div>
       )}
 
-      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit Calling' : 'New Calling'}>
+      <Modal open={!!editing} onClose={closeEditor} title={editing?.id ? 'Edit Calling' : 'New Calling'}>
         {editing && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-2.5">
             <MemberInput value={editing.member || ''} onChange={v => setEditing({ ...editing, member: v })} />
             <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-              <Input label="Calling" value={editing.calling || ''} onChange={v => setEditing({ ...editing, calling: v })} />
+              <CallingNameInput label="Calling" value={editing.calling || ''}
+                onChange={v => setEditing(e => e && { ...e, calling: v })}
+                onPick={org => setEditing(e => e && { ...e, organization: org })} />
               <div>
                 <span className="text-sm font-medium text-gray-700">Type</span>
                 <div className="flex gap-4 mt-1 py-2">
@@ -531,8 +562,20 @@ export default function CallingPipeline() {
               </div>
               <Select label="Status" value={editing.status || ''} onChange={v => setEditing({ ...editing, status: v })} options={statusOptions} />
               <AssignedToField value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} options={bishopricOptions} />
-              <Select label="Organization" value={editing.organization || ''} onChange={v => setEditing({ ...editing, organization: v })} options={ORGANIZATIONS} />
+              <Select label="Organization" value={editing.organization || ''} onChange={v => setEditing({ ...editing, organization: v })} options={orgOptions(editing.organization)} />
             </div>
+            {editing.type === 'Release' && (
+              <div className="rounded-md border border-green-200 bg-green-50/50 p-2.5 space-y-2">
+                <p className="text-xs text-gray-600">Optional: start a new calling for this person. Saving adds a separate Calling entry in 1. Discussion.</p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                  <CallingNameInput label="New calling" value={newCall.calling}
+                    onChange={v => setNewCall(n => ({ ...n, calling: v }))}
+                    onPick={org => setNewCall(n => ({ ...n, organization: org }))} />
+                  <Select label="New calling organization" value={newCall.organization}
+                    onChange={v => setNewCall(n => ({ ...n, organization: v }))} options={orgOptions(newCall.organization)} />
+                </div>
+              </div>
+            )}
             {(editing.type !== 'Release' || editing.status === '10. Released') && (
               <div className="flex flex-wrap gap-x-5 gap-y-1">
                 {editing.type !== 'Release' && (
@@ -550,7 +593,7 @@ export default function CallingPipeline() {
             <LastEdited updatedBy={editing.updated_by} updatedAt={editing.updated_at} />
             {editing.id && <HistoryList entries={history} />}
             <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+              <button type="button" onClick={closeEditor} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
               <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">Save</button>
             </div>
           </form>

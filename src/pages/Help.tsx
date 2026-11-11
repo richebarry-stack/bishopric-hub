@@ -250,7 +250,7 @@ const FULL_SECTIONS: Section[] = [
       <div className="space-y-2">
         <p>Track callings from initial discussion through completion. Statuses move in order:</p>
         <UL items={[
-          '1. Discussion → 2. Pray about → 3. Approved and assigned',
+          '1. Discussion → 1.5 On hold (optional) → 2. Pray about → 3. Approved and assigned',
           '4. Called & accepted → 5. Sustained → 6. Set apart',
           '7. In release discussion → 8. Need to release → 9. Need to thank at pulpit → 10. Released',
         ]} />
@@ -558,6 +558,17 @@ function VersionHistoryList(limit?: number) {
 }
 
 const VERSION_HISTORY: { date: string; items: string[] }[] = [
+            {
+              date: 'Nov 11, 2026',
+              items: [
+                'New page: My Notes & To-Dos (under My Actions in the menu). A private scratch pad only you can see. Add an item as a To-Do or a Note, with an optional due date and an importance of High, Medium or Low. Check off To-Dos when finished; they move to a Done list. Overdue To-Dos are marked in red.',
+                'Calling Pipeline: new "1.5 On hold" status, between Discussion and Pray about, for both callings and releases.',
+                'Calling Pipeline: the Calling field now suggests the ward’s callings from LCR as you type. Picking one fills in its organization. You can still type any calling.',
+                'Calling Pipeline: a Release entry now has an optional "New calling" field. Fill it in and saving also adds a Calling entry for that person in 1. Discussion.',
+                'Calling Pipeline: an organization name from LCR that isn’t in the standard list (like "Other Callings") now stays selected instead of showing blank.',
+                'All Callings: the LCR Callings and Not Set Apart tabs now show each calling’s organization, and you can sort by it. "Consider for release" fills in the organization on the entries it creates.',
+              ],
+            },
             {
               date: 'Nov 8, 2026',
               items: [

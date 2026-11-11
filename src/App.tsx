@@ -50,6 +50,7 @@ const Ordinances = lazyWithReload(() => import('./pages/Ordinances'));
 const AnnualDuties = lazyWithReload(() => import('./pages/AnnualDuties'));
 const YcMeetings = lazyWithReload(() => import('./pages/YcMeetings'));
 const MyActions = lazyWithReload(() => import('./pages/MyActions'));
+const MyNotes = lazyWithReload(() => import('./pages/MyNotes'));
 const TithingDeclarationSchedule = lazyWithReload(() => import('./pages/TithingDeclarationSchedule'));
 const TithingDeclarationPublic = lazyWithReload(() => import('./pages/TithingDeclarationPublic'));
 
@@ -66,7 +67,7 @@ const queryClient = new QueryClient({
 function WcGuard({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const wcPaths = [
-    '/', '/my-actions', '/wc-meetings', '/wc-wins', '/wc-family-needs', '/wc-discussion-topics',
+    '/', '/my-actions', '/my-notes', '/wc-meetings', '/wc-wins', '/wc-family-needs', '/wc-discussion-topics',
     '/current-sacrament', '/calendaring',
     '/babies', '/youth-activities', '/tasks', '/wc-members', '/hub-suggestions', '/help',
     '/yc-meetings', '/privacy',
@@ -143,6 +144,7 @@ function AppRoutes() {
           <Route path="/youth-activities" element={<YouthActivities />} />
           {!isYcGuest && <Route path="/yc-meetings" element={<YcMeetings />} />}
           {!isYcGuest && <Route path="/my-actions" element={<MyActions />} />}
+          {!isYcGuest && <Route path="/my-notes" element={<MyNotes />} />}
           {!isYcGuest && <Route path="/help" element={<Help />} />}
           {!isYcGuest && <Route path="/privacy" element={<PrivacyPolicy />} />}
           <Route path="*" element={<Navigate to="/youth-activities" replace />} />
@@ -159,6 +161,7 @@ function AppRoutes() {
         <Route element={<Layout />}>
           <Route path="/" element={<WcDashboard />} />
           <Route path="/my-actions" element={<MyActions />} />
+          <Route path="/my-notes" element={<MyNotes />} />
           <Route path="/wc-meetings" element={<WcMeetings />} />
           <Route path="/wc-wins" element={<WcWins />} />
           <Route path="/wc-family-needs" element={<MemberNeeds />} />
@@ -185,6 +188,7 @@ function AppRoutes() {
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/my-actions" element={<MyActions />} />
+        <Route path="/my-notes" element={<MyNotes />} />
         <Route path="/calling-pipeline" element={<CallingPipeline />} />
         <Route path="/youth-interviews" element={<YouthInterviews />} />
         <Route path="/temple-interviews" element={<AdultTempleInterviews />} />

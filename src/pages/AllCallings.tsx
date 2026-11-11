@@ -58,7 +58,7 @@ function SortHeader<K extends string>({ label, sortKey, current, asc, onSort, al
 }
 
 type Tab = 'lcr' | 'notsetapart' | 'mwc' | 'unfilled';
-type CallingSortKey = 'calling' | 'sustained_date' | 'member' | 'time_in_calling';
+type CallingSortKey = 'calling' | 'organization' | 'sustained_date' | 'member' | 'time_in_calling';
 type MwcSortKey = 'name' | 'age' | 'pipeline';
 type UnfilledSortKey = 'calling' | 'organization';
 
@@ -200,6 +200,7 @@ export default function AllCallings() {
     return [...callingRows].sort((a, b) => {
       let va: string | null, vb: string | null;
       if (callingSortKey === 'calling') { va = a.calling; vb = b.calling; }
+      else if (callingSortKey === 'organization') { va = a.organization; vb = b.organization; }
       else if (callingSortKey === 'sustained_date' || callingSortKey === 'time_in_calling') { va = a.sustained_date; vb = b.sustained_date; }
       else { va = a.memberName; vb = b.memberName; }
       if (va !== vb) {
@@ -288,12 +289,13 @@ export default function AllCallings() {
       </div>
 
       {(tab === 'lcr' || tab === 'notsetapart') && (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <SortHeader label="Member Name" sortKey="member" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-56" />
                 <SortHeader label="Calling" sortKey="calling" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} />
+                <SortHeader label="Organization" sortKey="organization" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-48" />
                 <SortHeader label="Sustain Date" sortKey="sustained_date" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-32" />
                 <SortHeader label="Time in Calling" sortKey="time_in_calling" current={callingSortKey} asc={callingSortAsc} onSort={handleCallingSort} className="w-36" />
                 <th className="text-center px-4 py-2 font-medium text-gray-600 w-32">Set Apart</th>
@@ -307,6 +309,7 @@ export default function AllCallings() {
                   <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="px-4 py-2 font-medium text-gray-900">{c.memberName}</td>
                     <td className="px-4 py-2 text-gray-900">{c.calling}</td>
+                    <td className="px-4 py-2 text-gray-600">{c.organization || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-2 text-gray-600">{c.sustained_date || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-2 text-gray-600">{timeInCalling(c.sustained_date) || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-2 text-center">
@@ -329,7 +332,7 @@ export default function AllCallings() {
                 );
               })}
               {visibleCallingRows.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400 text-sm">{tab === 'notsetapart' ? 'Everyone with a calling on record has been set apart.' : 'No callings yet — run the LCR sync to populate this list.'}</td></tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400 text-sm">{tab === 'notsetapart' ? 'Everyone with a calling on record has been set apart.' : 'No callings yet — run the LCR sync to populate this list.'}</td></tr>
               )}
             </tbody>
           </table>

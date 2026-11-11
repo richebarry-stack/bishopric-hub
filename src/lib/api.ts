@@ -244,6 +244,20 @@ export interface RosterReviewFlag {
   flagged_at: string;
 }
 
+export interface PersonalItem {
+  id: number;
+  user_id: number;
+  kind: 'todo' | 'note';
+  title: string;
+  details: string | null;
+  due_date: string | null;
+  importance: 'High' | 'Medium' | 'Low';
+  done: number;
+  done_at: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
 export interface UnfilledCalling {
   id: number;
   calling: string;

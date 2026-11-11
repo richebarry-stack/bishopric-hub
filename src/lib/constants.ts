@@ -115,6 +115,7 @@ export const HUB_LABELS: Record<string, string> = {
 
 export const CALLING_STATUSES = [
   '1. Discussion',
+  '1.5 On hold',
   '2. Pray about',
   '3. Approved and assigned',
   '4. Called & accepted',
@@ -133,17 +134,19 @@ export const CALLING_STATUSES = [
 // the calling process) and a release runs 7-10. Used to keep the Status dropdown
 // from offering the wrong entry's stages.
 export const CALLING_TYPE_STATUSES = [
-  '1. Discussion', '2. Pray about', '3. Approved and assigned', '4. Called & accepted',
+  '1. Discussion', '1.5 On hold', '2. Pray about', '3. Approved and assigned', '4. Called & accepted',
   '4.5 Call & accepted, handle in class/quorum', '5. Sustained', '6. Set apart', '11. Declined',
 ];
 // '2. Pray about' sits between discussion and decision for releases too, so a
-// release can show on the Pray About list alongside callings.
+// release can show on the Pray About list alongside callings. '1.5 On hold'
+// (hub suggestion #37) parks an entry between discussion and praying about it.
 export const RELEASE_TYPE_STATUSES = [
-  '7. In release discussion', '2. Pray about', '8. Need to release', '9. Need to thank at pulpit', '10. Released',
+  '7. In release discussion', '1.5 On hold', '2. Pray about', '8. Need to release', '9. Need to thank at pulpit', '10. Released',
 ];
 
 export const CALLING_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   '1. Discussion': { bg: 'bg-gray-100', text: 'text-gray-700' },
+  '1.5 On hold': { bg: 'bg-slate-200', text: 'text-slate-700' },
   '2. Pray about': { bg: 'bg-yellow-100', text: 'text-yellow-800' },
   '3. Approved and assigned': { bg: 'bg-blue-100', text: 'text-blue-800' },
   '4. Called & accepted': { bg: 'bg-green-100', text: 'text-green-800' },

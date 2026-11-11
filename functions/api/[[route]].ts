@@ -935,6 +935,50 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
   }
 
+  // Private notes & to-dos (hub suggestion #36): every query is scoped to the
+  // caller's own user_id, so nobody else — admins included — can see them.
+  if (routeParts[0] === 'personal-items') {
+    if (session.role === 'guest') return json({ error: 'Forbidden' }, 403);
+    const id = routeParts[1];
+    const pick = (b: Record<string, unknown>) => {
+      const out: Record<string, unknown> = {};
+      if ('kind' in b) out.kind = b.kind === 'note' ? 'note' : 'todo';
+      if ('title' in b) out.title = String(b.title ?? '').slice(0, 500);
+      if ('details' in b) out.details = b.details == null ? null : String(b.details).slice(0, 10000);
+      if ('due_date' in b) out.due_date = typeof b.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.due_date) ? b.due_date : null;
+      if ('importance' in b) out.importance = ['High', 'Medium', 'Low'].includes(String(b.importance)) ? b.importance : 'Medium';
+      if ('done' in b) { out.done = b.done ? 1 : 0; out.done_at = b.done ? new Date().toISOString() : null; }
+      return out;
+    };
+    if (method === 'GET' && !id) {
+      const r = await db.prepare('SELECT * FROM personal_items WHERE user_id = ? ORDER BY done ASC, id DESC').bind(session.user_id).all();
+      return json(r.results);
+    }
+    if (method === 'POST' && !id) {
+      const data = pick(await request.json() as Record<string, unknown>);
+      data.user_id = session.user_id;
+      data.updated_at = new Date().toISOString();
+      const keys = Object.keys(data);
+      const res = await db.prepare(`INSERT INTO personal_items (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`)
+        .bind(...keys.map(k => data[k])).run();
+      return json(await db.prepare('SELECT * FROM personal_items WHERE id = ?').bind(res.meta.last_row_id).first(), 201);
+    }
+    if (method === 'PUT' && id) {
+      const data = pick(await request.json() as Record<string, unknown>);
+      data.updated_at = new Date().toISOString();
+      const keys = Object.keys(data);
+      const res = await db.prepare(`UPDATE personal_items SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ? AND user_id = ?`)
+        .bind(...keys.map(k => data[k]), id, session.user_id).run();
+      if (res.meta.changes === 0) return json({ error: 'Not found' }, 404);
+      return json(await db.prepare('SELECT * FROM personal_items WHERE id = ?').bind(id).first());
+    }
+    if (method === 'DELETE' && id) {
+      await db.prepare('DELETE FROM personal_items WHERE id = ? AND user_id = ?').bind(id, session.user_id).run();
+      return json({ ok: true });
+    }
+    return json({ error: 'Method not allowed' }, 405);
+  }
+
   // Presence heartbeat: upserts the caller's own row, then returns everyone else's
   // fresh (<90s old) presence in the same request — piggybacks on the client's
   // existing 30s polling instead of adding a separate channel.
@@ -1779,7 +1823,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     const CALLING_STATUS_ORDER = [
-      '1. Discussion', '2. Pray about', '3. Approved and assigned', '4. Called & accepted',
+      '1. Discussion', '1.5 On hold', '2. Pray about', '3. Approved and assigned', '4. Called & accepted',
       '4.5 Call & accepted, handle in class/quorum', '5. Sustained', '6. Set apart',
       '7. In release discussion', '8. Need to release', '9. Need to thank at pulpit', '10. Released', '11. Declined',
     ];

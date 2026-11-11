@@ -407,6 +407,16 @@ export default function Layout() {
                 My Actions
                 <MyActionsBadge count={myActionsCount} />
               </Link>
+              <Link
+                to="/my-notes"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors mb-1 ${
+                  location.pathname === '/my-notes' ? activeCls : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <i className="ti ti-notes text-base w-4 text-center" aria-hidden="true" />
+                My Notes &amp; To-Dos
+              </Link>
               {BH_NAV_CATEGORIES.map(cat => (
                 <div key={cat.label} className="mt-3">
                   <p className="px-3 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 select-none">
@@ -453,6 +463,16 @@ export default function Layout() {
                 My Actions
                 <MyActionsBadge count={myActionsCount} />
               </Link>
+              <Link
+                to="/my-notes"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors mb-1 ${
+                  location.pathname === '/my-notes' ? activeCls : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <span className="w-4 text-center">✎</span>
+                My Notes &amp; To-Dos
+              </Link>
               {WC_NAV_CATEGORIES.map(cat => (
                 <div key={cat.label} className="mt-3">
                   <p className="px-3 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 select-none">
@@ -487,6 +507,18 @@ export default function Layout() {
                   <span className="w-4 text-center">⚡</span>
                   My Actions
                   <MyActionsBadge count={myActionsCount} />
+                </Link>
+              )}
+              {isYc && !isGuest && (
+                <Link
+                  to="/my-notes"
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors mb-1 ${
+                    location.pathname === '/my-notes' ? activeCls : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <span className="w-4 text-center">✎</span>
+                  My Notes &amp; To-Dos
                 </Link>
               )}
               {navItems.map(item => (
