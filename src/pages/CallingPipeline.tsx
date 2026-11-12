@@ -186,7 +186,9 @@ export default function CallingPipeline() {
   const [newCall, setNewCall] = useState(EMPTY_NEW_CALL);
   // Release entries: also open the same calling for someone new.
   const [findReplacement, setFindReplacement] = useState(false);
-  const closeEditor = () => { setEditing(null); setNewCall(EMPTY_NEW_CALL); setFindReplacement(false); };
+  // Release entries: also give the person a new calling (reveals the New calling fields).
+  const [giveNewCall, setGiveNewCall] = useState(false);
+  const closeEditor = () => { setEditing(null); setNewCall(EMPTY_NEW_CALL); setFindReplacement(false); setGiveNewCall(false); };
   const { data: history = [] } = useQuery({
     queryKey: ['calling-pipeline-history', editing?.id],
     queryFn: () => api.callingPipeline.history(editing!.id!),
@@ -265,7 +267,7 @@ export default function CallingPipeline() {
       delete (data as Record<string, unknown>).id;
       if (editing.id) await update(editing.id, data as Record<string, unknown>);
       else await create(data as Record<string, unknown>);
-      if (editing.type === 'Release' && newCall.calling.trim()) {
+      if (editing.type === 'Release' && giveNewCall && newCall.calling.trim()) {
         await create({
           member: editing.member || '',
           calling: newCall.calling.trim(),
@@ -553,61 +555,61 @@ export default function CallingPipeline() {
         </div>
       )}
 
-      <Modal open={!!editing} onClose={closeEditor} title={editing?.id ? 'Edit Calling' : 'New Calling'}>
+      <Modal open={!!editing} onClose={closeEditor} title={`${editing?.id ? 'Edit' : 'New'} ${editing?.type === 'Release' ? 'Release' : 'Calling'}`}>
         {editing && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-2.5">
+            {/* Calling or Release comes first and stands out — it changes the statuses and options below. */}
+            <div role="radiogroup" aria-label="Type" className="grid grid-cols-2 rounded-lg border border-gray-200 bg-gray-100 p-1 gap-1">
+              {(['Calling', 'Release'] as const).map(t => {
+                const on = (editing.type || 'Calling') === t;
+                const onClass = t === 'Release' ? 'bg-amber-500 text-white shadow' : 'bg-blue-600 text-white shadow';
+                return (
+                  <button key={t} type="button" role="radio" aria-checked={on}
+                    onClick={() => {
+                      if (on) return;
+                      const nextStatuses = t === 'Release' ? RELEASE_TYPE_STATUSES : CALLING_TYPE_STATUSES;
+                      const status = nextStatuses.includes(editing.status || '') ? editing.status : nextStatuses[0];
+                      setEditing({ ...editing, type: t, status });
+                    }}
+                    className={`rounded-md py-1.5 text-sm font-semibold transition-colors ${on ? onClass : 'text-gray-600 hover:bg-white'}`}>
+                    {t === 'Calling' ? 'Calling someone' : 'Releasing someone'}
+                  </button>
+                );
+              })}
+            </div>
             <MemberInput value={editing.member || ''} onChange={v => setEditing({ ...editing, member: v })} />
+            <CallingNameInput label={editing.type === 'Release' ? 'Calling they are being released from' : 'Calling'} value={editing.calling || ''}
+              onChange={v => setEditing(e => e && { ...e, calling: v })}
+              onPick={org => setEditing(e => e && { ...e, organization: org })} />
             <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-              <div className="col-span-2">
-                <CallingNameInput label="Calling" value={editing.calling || ''}
-                  onChange={v => setEditing(e => e && { ...e, calling: v })}
-                  onPick={org => setEditing(e => e && { ...e, organization: org })} />
-              </div>
-              <div>
-                <span className="text-sm font-medium text-gray-700">Type</span>
-                <div className="flex gap-4 mt-1 py-2">
-                  {(['Calling', 'Release'] as const).map(t => (
-                    <label key={t} className="flex items-center gap-1.5 cursor-pointer">
-                      <input type="radio" name="calling-type" value={t}
-                        checked={(editing.type || 'Calling') === t}
-                        onChange={() => {
-                          const nextStatuses = t === 'Release' ? RELEASE_TYPE_STATUSES : CALLING_TYPE_STATUSES;
-                          const status = nextStatuses.includes(editing.status || '') ? editing.status : nextStatuses[0];
-                          setEditing({ ...editing, type: t, status });
-                        }}
-                        className="text-blue-600" />
-                      <span className="text-sm text-gray-700">{t}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
               <Select label="Status" value={editing.status || ''} onChange={v => setEditing({ ...editing, status: v })} options={statusOptions} />
               <AssignedToField value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} options={bishopricOptions} />
               <Select label="Organization" value={editing.organization || ''} onChange={v => setEditing({ ...editing, organization: v })} options={orgOptions(editing.organization)} />
             </div>
             {editing.type === 'Release' && (
-              <div className="rounded-md border border-blue-200 bg-blue-50/50 p-2.5">
+              <div className="rounded-md border border-amber-200 bg-amber-50/50 p-2.5 space-y-1.5">
                 <Checkbox label="Also find someone new for this calling" checked={findReplacement}
                   onChange={setFindReplacement} />
-                <p className="text-xs text-gray-600 mt-1 ml-6">
-                  {(editing.calling || '').trim()
-                    ? <>Saving adds a Calling entry for <b>{stripBold(editing.calling || '')}</b> in 1. Discussion, as &ldquo;Replacement for {stripBold(editing.member || '') || '…'}&rdquo;.</>
-                    : 'Fill in the Calling above first.'}
-                </p>
-              </div>
-            )}
-            {editing.type === 'Release' && (
-              <div className="rounded-md border border-green-200 bg-green-50/50 p-2.5 space-y-2">
-                <p className="text-xs text-gray-600">Optional: start a new calling for this person. Saving adds a separate Calling entry in 1. Discussion.</p>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-                  <div className="col-span-2">
-                    <CallingNameInput label="New calling" value={newCall.calling}
-                      onChange={v => setNewCall(n => ({ ...n, calling: v }))}
-                      onPick={org => setNewCall(n => ({ ...n, organization: org }))} />
+                {findReplacement && (
+                  <p className="text-xs text-gray-600 ml-6">
+                    {(editing.calling || '').trim()
+                      ? <>Adds <b>{stripBold(editing.calling || '')}</b> in 1. Discussion as &ldquo;Replacement for {stripBold(editing.member || '') || '…'}&rdquo;.</>
+                      : 'Fill in the calling above first.'}
+                  </p>
+                )}
+                <Checkbox label={`Also give ${stripBold(editing.member || '').trim() || 'this person'} a new calling`} checked={giveNewCall}
+                  onChange={setGiveNewCall} />
+                {giveNewCall && (
+                  <div className="ml-6 grid grid-cols-2 gap-x-3 gap-y-2.5">
+                    <div className="col-span-2">
+                      <CallingNameInput label="New calling" value={newCall.calling}
+                        onChange={v => setNewCall(n => ({ ...n, calling: v }))}
+                        onPick={org => setNewCall(n => ({ ...n, organization: org }))} />
+                    </div>
+                    <Select label="New calling organization" value={newCall.organization}
+                      onChange={v => setNewCall(n => ({ ...n, organization: v }))} options={orgOptions(newCall.organization)} />
                   </div>
-                  <Select label="New calling organization" value={newCall.organization}
-                    onChange={v => setNewCall(n => ({ ...n, organization: v }))} options={orgOptions(newCall.organization)} />
-                </div>
+                )}
               </div>
             )}
             {(editing.type !== 'Release' || editing.status === '10. Released') && (

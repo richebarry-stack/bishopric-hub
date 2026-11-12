@@ -17,7 +17,7 @@ const pillClass = (on: boolean) =>
 /**
  * A calling field that suggests the ward's callings from LCR (filled and unfilled)
  * as you type (hub suggestion #40). Picking one fills in its handbook organization too.
- * Pills under the field filter the suggestions by organization (grouped the way the
+ * Pills under the field (shown while it's in use) filter the suggestions by organization (grouped the way the
  * General Handbook organizes a ward) and to unfilled callings; with a filter on,
  * clicking into the empty field lists every matching calling.
  * Any other text can still be typed — it doesn't have to be a church-defined calling.
@@ -32,6 +32,8 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
   const { rows: filled } = useTable<MemberCalling>('member-callings');
   const { rows: unfilledRows } = useTable<UnfilledCalling>('unfilled-callings');
   const [open, setOpen] = useState(false);
+  // Filter pills only show while the field is in use, to keep the modal compact.
+  const [focused, setFocused] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [orgFilter, setOrgFilter] = useState<CallingGroup[]>([]);
   const [unfilledOnly, setUnfilledOnly] = useState(false);
@@ -88,6 +90,7 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
     onChange(k.calling);
     onPick(k.groups[0]);
     setOpen(false);
+    inputRef.current?.blur();
   };
 
   const handleChange = (v: string) => {
@@ -120,9 +123,9 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
           placeholder={filtering ? 'Click to see matching callings, or type…' : 'Type to search, or pick filters below…'}
           className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           onChange={e => handleChange(e.target.value)}
-          onFocus={() => setOpen(true)}
+          onFocus={() => { setFocused(true); setOpen(true); }}
           onClick={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
+          onBlur={() => { setFocused(false); setOpen(false); }}
           onKeyDown={e => {
             if (!showList) return;
             if (e.key === 'ArrowDown') { e.preventDefault(); setHighlight(h => (h + 1) % suggestions.length); }
@@ -134,7 +137,10 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
           }}
         />
       </div>
-      {known.length > 0 && (
+      {!focused && filtering && (
+        <p className="mt-1 text-xs text-blue-700">Filtered: {[...(unfilledOnly ? ['Unfilled only'] : []), ...orgFilter].join(', ')}</p>
+      )}
+      {focused && known.length > 0 && (
         // onMouseDown preventDefault keeps focus in the field so the list stays open while filtering.
         <div className="mt-1.5 flex flex-wrap items-center gap-1" onMouseDown={e => e.preventDefault()}>
           <span className="text-xs text-gray-500 mr-0.5">Filter:</span>
