@@ -127,3 +127,17 @@ export function callingGroups(calling: string, lcrOrg: string): CallingGroup[] {
 export function handbookOrganization(calling: string, lcrOrg: string | null | undefined): CallingGroup {
   return callingGroups(calling, lcrOrg || '')[0];
 }
+
+/**
+ * Stake leadership callings (presidencies, high council, clerks, secretaries,
+ * patriarch). The bishopric doesn't extend these, so the calling picker leaves
+ * them out; stake callings that serve in the ward (consultants, specialists,
+ * instructors, auditors) stay under Stake.
+ */
+export function isStakeLeadership(calling: string, lcrOrg: string): boolean {
+  const name = calling.trim().toLowerCase();
+  const org = lcrOrg.trim().toLowerCase();
+  if (org === 'stake presidency' || org === 'high council') return true;
+  if (!name.startsWith('stake ')) return false;
+  return /\b(presidency|president|counselor|councilor|secretary|clerk|patriarch)\b/.test(name);
+}

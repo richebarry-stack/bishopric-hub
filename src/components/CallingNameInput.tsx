@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useId } from 'react';
 import { useTable } from '../lib/useTable';
 import type { MemberCalling, UnfilledCalling } from '../lib/api';
-import { CALLING_GROUPS, callingGroups, type CallingGroup } from '../lib/callingGroups';
+import { CALLING_GROUPS, callingGroups, isStakeLeadership, type CallingGroup } from '../lib/callingGroups';
 
 const MAX_SUGGESTIONS = 10;
 /** With an organization filter on, show more so the whole org can be browsed. */
@@ -40,6 +40,7 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
       const calling = (c.calling || '').trim();
       if (!calling) continue;
       const organization = (c.organization || '').trim();
+      if (isStakeLeadership(calling, organization)) continue;
       const key = `${calling.toLowerCase()}|${organization.toLowerCase()}`;
       if (!seen.has(key)) seen.set(key, { calling, organization, groups: callingGroups(calling, organization) });
     }
