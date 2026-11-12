@@ -2,7 +2,8 @@ import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../lib/useTable';
 import { api } from '../lib/api';
-import type { CallingPipeline as CallingType, User, CallingPipelineHistoryEntry, WardMember } from '../lib/api';
+import type { CallingPipeline as CallingType, User, CallingPipelineHistoryEntry, WardMember, MemberCalling } from '../lib/api';
+import { handbookOrganization } from '../lib/callingGroups';
 import Modal from '../components/Modal';
 import MemberNameInput from '../components/MemberNameInput';
 import CallingNameInput from '../components/CallingNameInput';
@@ -157,6 +158,8 @@ function orgOptions(current: string | undefined): string[] {
 }
 
 const EMPTY_NEW_CALL = { calling: '', organization: '' };
+/** Calling entries: also release the person from a current calling. `pick` is the chosen LCR calling's index, or 'other'. */
+const EMPTY_RELEASE_CURRENT = { on: false, pick: '' as string, calling: '', organization: '', findReplacement: false };
 
 const EMPTY: Partial<CallingType> = {
   member: '', calling: '', status: '1. Discussion', assigned_to: '',
@@ -166,6 +169,7 @@ const EMPTY: Partial<CallingType> = {
 export default function CallingPipeline() {
   const { rows, isLoading, create, update, remove } = useTable<CallingType>('calling-pipeline');
   const { rows: wardMembers } = useTable<WardMember>('ward-members');
+  const { rows: memberCallings } = useTable<MemberCalling>('member-callings');
   const confirmMatch = useConfirm();
   const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['users'], queryFn: () => fetch('/api/users').then(r => r.json()) });
   const ASSIGNABLE_ROLES = ['Bishop', 'First Counselor', 'Second Counselor'];
@@ -188,7 +192,8 @@ export default function CallingPipeline() {
   const [findReplacement, setFindReplacement] = useState(false);
   // Release entries: also give the person a new calling (reveals the New calling fields).
   const [giveNewCall, setGiveNewCall] = useState(false);
-  const closeEditor = () => { setEditing(null); setNewCall(EMPTY_NEW_CALL); setFindReplacement(false); setGiveNewCall(false); };
+  const [releaseCurrent, setReleaseCurrent] = useState(EMPTY_RELEASE_CURRENT);
+  const closeEditor = () => { setEditing(null); setNewCall(EMPTY_NEW_CALL); setFindReplacement(false); setGiveNewCall(false); setReleaseCurrent(EMPTY_RELEASE_CURRENT); };
   const { data: history = [] } = useQuery({
     queryKey: ['calling-pipeline-history', editing?.id],
     queryFn: () => api.callingPipeline.history(editing!.id!),
@@ -215,6 +220,15 @@ export default function CallingPipeline() {
   // the name as typed. Suggestions skip children under 8, like the Member field does.
   const activeMembers = useMemo(() => wardMembers.filter(m => m.active), [wardMembers]);
   const nameIndex = useMemo(() => buildNameIndex(activeMembers), [activeMembers]);
+  // The ward member on the open entry (linked id, else matched by name) and their current LCR callings.
+  const editingMember = useMemo(() => {
+    if (!editing) return undefined;
+    if (editing.ward_member_id) return wardMembers.find(m => m.id === editing.ward_member_id);
+    return matchMember(nameIndex, stripBold(editing.member || '').trim());
+  }, [editing, wardMembers, nameIndex]);
+  const editingMemberCallings = useMemo(
+    () => editingMember ? memberCallings.filter(c => c.ward_member_id === editingMember.id) : [],
+    [editingMember, memberCallings]);
   const unmatched = useMemo(() => {
     if (activeMembers.length === 0) return [];
     const suggestable = activeMembers.filter(m => { const a = ageToday(m.birth_date); return a === null || a >= 8; });
@@ -298,6 +312,33 @@ export default function CallingPipeline() {
           ward_member_id: null,
         }, { silent: true });
         toast.success(`Also opened ${stripBold(editing.calling || '').trim()} for someone new`);
+      }
+      const rc = releaseCurrent;
+      if (editing.type !== 'Release' && rc.on && rc.calling.trim()) {
+        const base = { status: '1. Discussion', sustain_recorded: 0, set_apart_recorded: 0, release_recorded: 0 };
+        await create({
+          ...base,
+          member: editing.member || '',
+          calling: rc.calling.trim(),
+          organization: rc.organization,
+          status: '7. In release discussion',
+          assigned_to: editing.assigned_to || '',
+          type: 'Release',
+          ward_member_id: editing.ward_member_id ?? editingMember?.id ?? null,
+        }, { silent: true });
+        if (rc.findReplacement) {
+          const who = stripBold(editing.member || '').trim();
+          await create({
+            ...base,
+            member: who ? `Replacement for ${who}` : '',
+            calling: rc.calling.trim(),
+            organization: rc.organization,
+            assigned_to: '',
+            type: 'Calling',
+            ward_member_id: null,
+          }, { silent: true });
+        }
+        toast.success(`Also added a release from ${rc.calling.trim()}${rc.findReplacement ? ' and an entry to find someone new' : ''}`);
       }
       closeEditor();
     } finally {
@@ -586,6 +627,49 @@ export default function CallingPipeline() {
               <AssignedToField value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} options={bishopricOptions} />
               <Select label="Organization" value={editing.organization || ''} onChange={v => setEditing({ ...editing, organization: v })} options={orgOptions(editing.organization)} />
             </div>
+            {editing.type !== 'Release' && (() => {
+              const who = stripBold(editing.member || '').trim() || 'this person';
+              const rc = releaseCurrent;
+              const set = (patch: Partial<typeof rc>) => setReleaseCurrent(prev => ({ ...prev, ...patch }));
+              return (
+                <div className="rounded-md border border-blue-200 bg-blue-50/50 p-2.5 space-y-1.5">
+                  <Checkbox label={`Also release ${who} from a current calling`} checked={rc.on}
+                    onChange={v => set({ on: v })} />
+                  {rc.on && (
+                    <div className="ml-6 space-y-1.5">
+                      {editingMemberCallings.length > 0 ? (
+                        <div className="space-y-0.5">
+                          {editingMemberCallings.map((c, i) => (
+                            <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                              <input type="radio" name="release-current" checked={rc.pick === String(i)}
+                                onChange={() => set({ pick: String(i), calling: c.calling, organization: handbookOrganization(c.calling, c.organization) })} />
+                              <span className="text-gray-800">{c.calling}</span>
+                              <span className="text-xs text-gray-400">{handbookOrganization(c.calling, c.organization)}</span>
+                            </label>
+                          ))}
+                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input type="radio" name="release-current" checked={rc.pick === 'other'}
+                              onChange={() => set({ pick: 'other', calling: '', organization: '' })} />
+                            <span className="text-gray-800">Another calling…</span>
+                          </label>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500">
+                          {editingMember ? `LCR shows no current callings for ${who}.` : 'Pick the member from the list above to see their LCR callings, or type the calling.'}
+                        </p>
+                      )}
+                      {(editingMemberCallings.length === 0 || rc.pick === 'other') && (
+                        <CallingNameInput label="Calling to release from" value={rc.calling}
+                          onChange={v => set({ calling: v })}
+                          onPick={org => set({ organization: org })} />
+                      )}
+                      <Checkbox label="Also find someone new for that calling" checked={rc.findReplacement}
+                        onChange={v => set({ findReplacement: v })} />
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {editing.type === 'Release' && (
               <div className="rounded-md border border-amber-200 bg-amber-50/50 p-2.5 space-y-1.5">
                 <Checkbox label="Also find someone new for this calling" checked={findReplacement}
