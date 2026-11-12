@@ -564,6 +564,7 @@ const VERSION_HISTORY: { date: string; items: string[] }[] = [
                 'New page: My Notes & To-Dos (under My Actions in the menu). A private scratch pad only you can see. Add an item as a To-Do or a Note, with an optional due date and an importance of High, Medium or Low. Check off To-Dos when finished; they move to a Done list. Overdue To-Dos are marked in red.',
                 'Calling Pipeline: new "1.5 On hold" status, between Discussion and Pray about, for both callings and releases.',
                 'Calling Pipeline: the Calling field now suggests the ward’s callings from LCR as you type. Picking one fills in its organization. You can still type any calling.',
+                'Calling Pipeline: a Filter button next to the Calling field lets you check one or more organizations. Suggestions are then limited to those organizations, and clicking into the empty field lists every calling in them.',
                 'Calling Pipeline: a Release entry now has an optional "New calling" field. Fill it in and saving also adds a Calling entry for that person in 1. Discussion.',
                 'Calling Pipeline: an organization name from LCR that isn’t in the standard list (like "Other Callings") now stays selected instead of showing blank.',
                 'All Callings: the LCR Callings and Not Set Apart tabs now show each calling’s organization, and you can sort by it. "Consider for release" fills in the organization on the entries it creates.',

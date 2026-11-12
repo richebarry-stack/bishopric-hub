@@ -1,14 +1,26 @@
-import { useMemo, useState, useId } from 'react';
+import { useEffect, useMemo, useRef, useState, useId } from 'react';
 import { useTable } from '../lib/useTable';
 import type { MemberCalling, UnfilledCalling } from '../lib/api';
+import { ORGANIZATIONS } from '../lib/constants';
 
 const MAX_SUGGESTIONS = 10;
+/** With an organization filter on, show more so the whole org can be browsed. */
+const MAX_FILTERED = 100;
+const NO_ORG = '(No organization)';
 
 interface KnownCalling { calling: string; organization: string }
+
+/** Hub order first, then any other LCR organization alphabetically. */
+const orgRank = (o: string) => {
+  const i = ORGANIZATIONS.indexOf(o);
+  return i === -1 ? ORGANIZATIONS.length : i;
+};
 
 /**
  * A calling field that suggests the ward's callings from LCR (filled and unfilled)
  * as you type (hub suggestion #40). Picking one fills in its organization too.
+ * The Filter button limits suggestions to chosen organizations; with a filter on,
+ * clicking into the empty field lists every calling in those organizations.
  * Any other text can still be typed — it doesn't have to be a church-defined calling.
  */
 export default function CallingNameInput({ label, value, onChange, onPick }: {
@@ -22,6 +34,9 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
   const { rows: unfilled } = useTable<UnfilledCalling>('unfilled-callings');
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const [orgFilter, setOrgFilter] = useState<string[]>([]);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
   const listId = useId();
 
   // One entry per distinct calling + organization.
@@ -37,19 +52,38 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
     return [...seen.values()].sort((a, b) => a.calling.localeCompare(b.calling) || a.organization.localeCompare(b.organization));
   }, [filled, unfilled]);
 
+  const orgs = useMemo(() => {
+    const set = new Set(known.map(k => k.organization || NO_ORG));
+    return [...set].sort((a, b) => orgRank(a) - orgRank(b) || a.localeCompare(b));
+  }, [known]);
+
+  // Close the filter panel on a click outside it.
+  useEffect(() => {
+    if (!filterOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [filterOpen]);
+
+  const filtering = orgFilter.length > 0;
   const query = value.replace(/\*\*/g, '').trim().toLowerCase();
   const suggestions = useMemo(() => {
-    if (!query) return [];
-    const words = query.split(/\s+/);
+    if (!query && !filtering) return [];
+    const words = query ? query.split(/\s+/) : [];
     return known
+      .filter(k => !filtering || orgFilter.includes(k.organization || NO_ORG))
       .filter(k => {
         const hay = `${k.calling} ${k.organization}`.toLowerCase();
         return words.every(w => hay.includes(w));
       })
       // Callings that start with what's typed come first.
-      .sort((a, b) => Number(!a.calling.toLowerCase().startsWith(query)) - Number(!b.calling.toLowerCase().startsWith(query)))
-      .slice(0, MAX_SUGGESTIONS);
-  }, [query, known]);
+      .sort((a, b) => query
+        ? Number(!a.calling.toLowerCase().startsWith(query)) - Number(!b.calling.toLowerCase().startsWith(query))
+        : 0)
+      .slice(0, filtering ? MAX_FILTERED : MAX_SUGGESTIONS);
+  }, [query, known, filtering, orgFilter]);
 
   const exactOnly = suggestions.length === 1 && suggestions[0].calling.toLowerCase() === query;
   const showList = open && suggestions.length > 0 && !exactOnly;
@@ -69,9 +103,40 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
     if (matches.length === 1 && matches[0].organization) onPick(matches[0].organization);
   };
 
+  const toggleOrg = (o: string) => {
+    setOrgFilter(f => f.includes(o) ? f.filter(x => x !== o) : [...f, o]);
+    setHighlight(0);
+  };
+
   return (
     <div className="block">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-gray-700">{label}</span>
+        {orgs.length > 1 && (
+          <div className="relative" ref={filterRef}>
+            <button type="button" onClick={() => setFilterOpen(o => !o)} aria-expanded={filterOpen}
+              className={`text-xs px-1.5 py-0.5 rounded border ${filtering ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:text-gray-700'}`}>
+              Filter{filtering ? ` (${orgFilter.length})` : ''} ▾
+            </button>
+            {filterOpen && (
+              <div className="absolute z-50 right-0 mt-1 w-60 max-h-72 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg p-2 text-sm">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-gray-500">Organizations</span>
+                  {filtering && (
+                    <button type="button" className="text-xs text-blue-600 hover:underline" onClick={() => setOrgFilter([])}>Clear</button>
+                  )}
+                </div>
+                {orgs.map(o => (
+                  <label key={o} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-gray-50 cursor-pointer">
+                    <input type="checkbox" checked={orgFilter.includes(o)} onChange={() => toggleOrg(o)} />
+                    <span className="text-gray-800">{o}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       <div className="relative">
         <input
           value={value}
@@ -79,10 +144,11 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
           role="combobox"
           aria-expanded={showList}
           aria-controls={listId}
-          placeholder="Type to search LCR callings…"
+          placeholder={filtering ? 'Click to browse, or type…' : 'Type to search LCR callings…'}
           className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           onChange={e => handleChange(e.target.value)}
           onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
           onBlur={() => setOpen(false)}
           onKeyDown={e => {
             if (!showList) return;
