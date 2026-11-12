@@ -184,7 +184,9 @@ export default function CallingPipeline() {
   // Optional new calling to start for the person on a Release entry (hub suggestion #39).
   // Not stored on the release itself — saving creates a separate Calling entry.
   const [newCall, setNewCall] = useState(EMPTY_NEW_CALL);
-  const closeEditor = () => { setEditing(null); setNewCall(EMPTY_NEW_CALL); };
+  // Release entries: also open the same calling for someone new.
+  const [findReplacement, setFindReplacement] = useState(false);
+  const closeEditor = () => { setEditing(null); setNewCall(EMPTY_NEW_CALL); setFindReplacement(false); };
   const { data: history = [] } = useQuery({
     queryKey: ['calling-pipeline-history', editing?.id],
     queryFn: () => api.callingPipeline.history(editing!.id!),
@@ -277,6 +279,23 @@ export default function CallingPipeline() {
           ward_member_id: editing.ward_member_id ?? null,
         }, { silent: true });
         toast.success(`Also added a Calling entry for ${newCall.calling.trim()}`);
+      }
+      if (editing.type === 'Release' && findReplacement && (editing.calling || '').trim()) {
+        // Same placeholder wording as "Consider for release" on All Callings.
+        const who = stripBold(editing.member || '').trim();
+        await create({
+          member: who ? `Replacement for ${who}` : '',
+          calling: editing.calling,
+          organization: editing.organization || '',
+          status: '1. Discussion',
+          assigned_to: '',
+          sustain_recorded: 0,
+          set_apart_recorded: 0,
+          release_recorded: 0,
+          type: 'Calling',
+          ward_member_id: null,
+        }, { silent: true });
+        toast.success(`Also opened ${stripBold(editing.calling || '').trim()} for someone new`);
       }
       closeEditor();
     } finally {
@@ -566,6 +585,17 @@ export default function CallingPipeline() {
               <AssignedToField value={editing.assigned_to || ''} onChange={v => setEditing({ ...editing, assigned_to: v })} options={bishopricOptions} />
               <Select label="Organization" value={editing.organization || ''} onChange={v => setEditing({ ...editing, organization: v })} options={orgOptions(editing.organization)} />
             </div>
+            {editing.type === 'Release' && (
+              <div className="rounded-md border border-blue-200 bg-blue-50/50 p-2.5">
+                <Checkbox label="Also find someone new for this calling" checked={findReplacement}
+                  onChange={setFindReplacement} />
+                <p className="text-xs text-gray-600 mt-1 ml-6">
+                  {(editing.calling || '').trim()
+                    ? <>Saving adds a Calling entry for <b>{stripBold(editing.calling || '')}</b> in 1. Discussion, as &ldquo;Replacement for {stripBold(editing.member || '') || '…'}&rdquo;.</>
+                    : 'Fill in the Calling above first.'}
+                </p>
+              </div>
+            )}
             {editing.type === 'Release' && (
               <div className="rounded-md border border-green-200 bg-green-50/50 p-2.5 space-y-2">
                 <p className="text-xs text-gray-600">Optional: start a new calling for this person. Saving adds a separate Calling entry in 1. Discussion.</p>
