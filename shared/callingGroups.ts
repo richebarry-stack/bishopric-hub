@@ -11,7 +11,7 @@ export const CALLING_GROUPS = [
   'Bishopric and Clerks',
   'Elders Quorum',
   'Relief Society',
-  'Aaronic Priesthood (Young Men)',
+  'Aaronic Priesthood',
   'Young Women',
   'Primary',
   'Sunday School',
@@ -27,7 +27,7 @@ export const CALLING_GROUPS = [
 ] as const;
 export type CallingGroup = typeof CALLING_GROUPS[number];
 
-const AP: CallingGroup = 'Aaronic Priesthood (Young Men)';
+const AP: CallingGroup = 'Aaronic Priesthood';
 
 /** LCR section → handbook organization. Sections not listed are placed by calling name. */
 const BY_LCR_ORG: Record<string, CallingGroup[]> = {
