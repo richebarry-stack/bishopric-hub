@@ -4,6 +4,7 @@ import {
   type TaskRow, type CallingRow, type InterviewRow, type RotatingRow, type BabyRow, type WcMeetingRow,
 } from '../../../shared/actionItems';
 import { agedOutMemberIds } from '../../../shared/youth';
+import { VERSION_HISTORY, versionDateIso } from '../../../shared/versionHistory';
 
 export interface Env {
   DB: D1Database;
@@ -57,6 +58,50 @@ async function getRecipients(db: D1Database): Promise<UserRow[]> {
      WHERE hub IN ('bh', 'both', 'wc') AND role <> 'guest' AND email_notifications = 1`
   ).all<UserRow>();
   return results;
+}
+
+/** Bishopric Hub admins who get the weekly hub-updates email (hub defaults to 'both'). */
+async function getUpdateRecipients(db: D1Database): Promise<UserRow[]> {
+  const { results } = await db.prepare(
+    `SELECT id, name, email, hub, church_role
+     FROM users
+     WHERE (hub IS NULL OR hub IN ('bh', 'both')) AND role = 'admin' AND email_notifications = 1`
+  ).all<UserRow>();
+  return results;
+}
+
+/** What the last hub-updates email covered: the newest date it included, and that date's items. */
+interface UpdatesSent { through: string; items: string[] }
+const UPDATES_SENT_KEY = 'mailer_updates_sent';
+
+/**
+ * Version History items not yet emailed. The first time, that's the last 7 days.
+ * Items on the last email's newest date that weren't in it (added later that day) count as new.
+ */
+function unsentUpdates(sent: UpdatesSent | null, todayIso: string): { date: string; iso: string; items: string[] }[] {
+  const cutoff = sent?.through || addDays(todayIso, -7);
+  const already = new Set(sent?.items || []);
+  const out: { date: string; iso: string; items: string[] }[] = [];
+  for (const entry of VERSION_HISTORY) {
+    const iso = versionDateIso(entry.date);
+    if (!iso || iso > todayIso || iso < cutoff) continue;
+    const items = entry.items.filter(i => iso > cutoff || (sent ? !already.has(i) : true));
+    if (items.length > 0) out.push({ date: entry.date, iso, items });
+  }
+  return out;
+}
+
+async function sendUpdatesMail(env: Env, user: UserRow, updates: { date: string; items: string[] }[]): Promise<void> {
+  const count = updates.reduce((n, u) => n + u.items.length, 0);
+  const subject = `Bishopric Hub updates this week (${count} change${count === 1 ? '' : 's'})`;
+  const helpUrl = `${env.HUB_BASE_URL}/help`;
+  const text = `Here's what changed in Bishopric Hub since the last update email:\n\n` +
+    updates.map(u => `${u.date}:\n` + u.items.map(i => `- ${i}`).join('\n')).join('\n\n') +
+    `\n\nThe full Version History is on the Help page: ${helpUrl}`;
+  const html = `<p>Here's what changed in Bishopric Hub since the last update email:</p>` +
+    updates.map(u => `<h3>${escapeHtml(u.date)}</h3><ul>${u.items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`).join('') +
+    `<p>The full Version History is on the <a href="${helpUrl}">Help page</a>.</p>`;
+  await sendMail(env, user, subject, text, html, { 'List-Unsubscribe': `<${env.HUB_BASE_URL}/email-notifications>` });
 }
 
 async function getSources(db: D1Database, todayIso: string): Promise<ActionItemSources> {
@@ -252,7 +297,7 @@ function localDateLabel(tz: string): string {
   return new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric' }).format(new Date());
 }
 
-async function recordRun(db: D1Database, kind: 'new-items' | 'weekly' | 'seed', emailsSent: number, itemsNotified: number, errors: { recipient: string; error: string }[]): Promise<void> {
+async function recordRun(db: D1Database, kind: 'new-items' | 'weekly' | 'seed' | 'updates', emailsSent: number, itemsNotified: number, errors: { recipient: string; error: string }[]): Promise<void> {
   await db.prepare(
     'INSERT INTO mailer_runs (ran_at, kind, emails_sent, items_notified, errors) VALUES (?, ?, ?, ?, ?)'
   ).bind(new Date().toISOString(), kind, emailsSent, itemsNotified, errors.length > 0 ? JSON.stringify(errors) : null).run();
@@ -384,5 +429,53 @@ async function run(env: Env): Promise<void> {
 
       await recordRun(db, 'weekly', weeklyEmailsSent, 0, weeklyErrors);
     }
+
+    await sendHubUpdates(env, todayIso, live);
   }
+}
+
+/** Weekly email to Bishopric Hub admins listing new Version History items. Skipped when there are none. */
+async function sendHubUpdates(env: Env, todayIso: string, live: boolean): Promise<void> {
+  const db = env.DB;
+  const lastRun = await db.prepare(
+    "SELECT ran_at FROM mailer_runs WHERE kind = 'updates' ORDER BY id DESC LIMIT 1"
+  ).first<{ ran_at: string }>();
+  if (lastRun && (Date.now() - new Date(lastRun.ran_at).getTime()) < 24 * 60 * 60 * 1000) return;
+
+  const row = await db.prepare('SELECT value FROM ui_settings WHERE key = ?').bind(UPDATES_SENT_KEY).first<{ value: string }>();
+  let sent: UpdatesSent | null;
+  try { sent = row?.value ? JSON.parse(row.value) as UpdatesSent : null; } catch { sent = null; }
+
+  const updates = unsentUpdates(sent, todayIso);
+  if (updates.length === 0) return;
+
+  const recipients = await getUpdateRecipients(db);
+  const errors: { recipient: string; error: string }[] = [];
+  let emailsSent = 0;
+  if (live) {
+    for (const user of recipients) {
+      if (!user.email) continue;
+      try {
+        await sendUpdatesMail(env, user, updates);
+        emailsSent++;
+      } catch (err) {
+        errors.push({ recipient: user.name, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+  }
+  // If every send failed, leave the items unsent so next week tries again.
+  if (emailsSent === 0 && errors.length > 0) {
+    await recordRun(db, 'updates', 0, 0, errors);
+    return;
+  }
+
+  const newest = updates[0].iso; // VERSION_HISTORY is newest first
+  const sameDay = updates.filter(u => u.iso === newest).flatMap(u => u.items);
+  const through: UpdatesSent = sent?.through === newest
+    ? { through: newest, items: [...sent.items, ...sameDay] }
+    : { through: newest, items: sameDay };
+  await db.prepare(
+    'INSERT INTO ui_settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at'
+  ).bind(UPDATES_SENT_KEY, JSON.stringify(through), new Date().toISOString()).run();
+  await recordRun(db, 'updates', emailsSent, updates.reduce((n, u) => n + u.items.length, 0), errors);
 }

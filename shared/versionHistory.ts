@@ -1,0 +1,623 @@
+// The hub's Version History: shown on the Help page, and emailed weekly to
+// Bishopric Hub admins by the mailer worker (workers/mailer). Newest first.
+// Each date is "Mon D, YYYY"; items are plain text.
+
+export interface VersionEntry { date: string; items: string[] }
+
+export const VERSION_HISTORY: VersionEntry[] = [
+            {
+              date: 'Nov 11, 2026',
+              items: [
+                'New page: My Notes & To-Dos (under My Actions in the menu). A private scratch pad only you can see. Add an item as a To-Do or a Note, with an optional due date and an importance of High, Medium or Low. Check off To-Dos when finished; they move to a Done list. Overdue To-Dos are marked in red.',
+                'Calling Pipeline: new "1.5 On hold" status, between Discussion and Pray about, for both callings and releases.',
+                'Calling Pipeline: the Calling field now suggests the ward’s callings from LCR as you type. Picking one fills in its organization. You can still type any calling.',
+                'Calling Pipeline: filter buttons under the Calling field. Click one or more organizations, and/or "Unfilled only" for LCR’s vacant callings. The suggestions narrow to match, and clicking into the empty field lists every matching calling. Unfilled callings are marked in the list.',
+                'Calling Pipeline: the entry window now starts with a large Calling someone / Releasing someone switch, and its title says New/Edit Calling or Release. The filter buttons only show while you are in the Calling field. On a release, the two extra options are checkboxes: "Also find someone new for this calling" and "Also give [person] a new calling" (which opens the New calling fields).',
+                'New weekly email for Bishopric Hub admins: a summary of what changed in the hub that week, taken from this Version History. It goes out with the weekly assignments digest, is skipped when nothing changed, and follows each admin’s Email Notifications setting.',
+                'Calling Pipeline: when releasing someone, their current LCR callings show as buttons under their name. Click one to fill in the calling and its organization.',
+                'Calling Pipeline: when calling someone, each of their current LCR callings has its own checkbox, “Also release [person] from [calling]”, so there’s no second step to pick the calling. Check more than one to release them from several. “Also release from another calling” lets you type one LCR doesn’t show. Each release is added in 7. In release discussion, and its “and find someone new for it” box adds a Calling entry named “Replacement for” the person.',
+                'Calling Pipeline: each entry now has a ▸ button next to its status that moves it to the next step (for example ▸ Pray about, ▸ Sustained) without opening it. Moving to Approved and assigned or Need to release asks who it’s assigned to first. The Calling/Release switch in the entry window now uses the same green and red as the Call and Release labels.',
+                'Fewer scrollbars, especially in Safari and on smaller screens: pop-up windows and the side menu now size to the part of the screen you can actually see, and the Dashboards only fit themselves to the window (with a scroll area in each panel) on tall screens. On shorter screens the panels grow to fit and the page scrolls once.',
+                'Calling Pipeline: organizations now follow the General Handbook (Bishopric and Clerks, Elders Quorum, Relief Society, Aaronic Priesthood, Young Women, Primary, Sunday School, Missionary Work, Music, and so on) instead of LCR’s section names like "Other Callings", "Activities" or a class name. Each LCR calling is placed where it serves, for example Relief Society Activity Committee Member under Relief Society and Technology Specialist under Communication and Technology. Existing entries were converted, and the LCR sync now keeps them this way.',
+                'Calling Pipeline: the Calling suggestions no longer include stake leadership callings (stake presidency, stake organization presidencies, high councilors, stake clerks and secretaries). Stake callings that serve in the ward, like Stake Temple and Family History Consultant, are still listed under Stake.',
+                'Calling Pipeline: a Release entry now has an optional "New calling" field. Fill it in and saving also adds a Calling entry for that person in 1. Discussion.',
+                'Calling Pipeline: a Release entry has an "Also find someone new for this calling" checkbox. Check it and saving also adds a Calling entry for the same calling and organization in 1. Discussion, named "Replacement for" the person being released.',
+                'Calling Pipeline: an organization name from LCR that isn’t in the standard list (like "Other Callings") now stays selected instead of showing blank.',
+                'All Callings: the LCR Callings and Not Set Apart tabs now show each calling’s organization, and you can sort by it. "Consider for release" fills in the organization on the entries it creates.',
+              ],
+            },
+            {
+              date: 'Nov 8, 2026',
+              items: [
+                'Bishop Schedule: you can now book an appointment during an open tithing declaration slot by clicking that time. The slot then stops showing on the public sign-up page. Reserved slots can’t be booked over; clicking one still opens the Tithing Declaration page.',
+                'Tithing Declarations: no more double booking. A slot can’t overlap another slot or a Bishop appointment, a Bishop appointment can’t overlap a reserved slot, and the public sign-up page won’t let a family reserve a time the Bishop has booked. Open slots hidden this way show gray on the Tithing Declaration page.',
+                'Sacrament agenda: Opening Prayer and Closing Prayer always appear on the printed agenda and copied text, even before they’re assigned.',
+                'All Callings: "Consider for release" now adds a Release entry to the Calling Pipeline instead of a Calling entry.',
+                'Speakers & Prayers: notes now save as you type, and also when you leave the page or switch apps on your phone. If a note fails to save, you’ll see an error.',
+              ],
+            },
+            {
+              date: 'Nov 6, 2026',
+              items: [
+                'LCR Sync: a member with an endowed temple recommend is no longer switched back to an older limited-use recommend when LCR’s report occasionally lists only the old one. This stops the repeated recommend change for the same member in the sync history.',
+              ],
+            },
+            {
+              date: 'Nov 1, 2026',
+              items: [
+                'Speakers & Prayers: each tab now ends with a "Not on ward list" section listing names in the history that didn’t match anyone on the ward list, usually because of a spelling slip. Each name shows the closest ward member when one is close and the dates it was used; tap a date to open that week’s agenda and fix the name.',
+                'Speakers & Prayers: in "Not on ward list", tap "Match to …" to accept the suggested ward member, or "Choose…" to search for the right one. After you confirm, the name is fixed on every date it was used, so the person is counted and their agendas and programs show the ward-list spelling.',
+                'Calling Pipeline: a "Not on ward list" section at the bottom lists unfinished entries whose member name doesn’t match anyone on the ward list. Match a name to the suggested ward member or choose someone else, and the entry is linked to that person. Tap an entry to open it.',
+                'Member Needs: the Mission section now lists the missionaries on the bishopric’s prayer list automatically (from the Missionary Pipeline, preparing to serve until they enter the MTC), in both the bishopric and Ward Council hubs. Anyone already typed into Mission by hand is shown only once.',
+                'Calling Pipeline: Assigned To is now a dropdown of the bishop and counselors. Pick “Other…” to type anyone else; entries already assigned to someone not in the list keep that name.',
+                'Ward Council Dashboard: Mission needs on the prayer list now show in the Missionaries panel instead of Other Needs, alongside the missionaries from the Missionary Pipeline. Each person is shown once.',
+                'Email notifications now reach Ward Council members: an email when they’re given a new assignment, and the weekly summary. Assignments are Action Items shared with Ward Council plus the opening prayer, spiritual thought or closing prayer for an upcoming Ward Council meeting (these also now show in My Actions). Ward Council members can turn the emails off with the checkbox at the top of My Actions.',
+                'Users: Ward Council accounts now show the email “✓ Verified” / “⏳ Pending” badge and Resend button, like bishopric accounts. New Ward Council accounts (or a changed email) are sent the Cloudflare verification email automatically.',
+                'Weekly summary email: the Saturday reminder box now also lists Ward Council meeting assignments (opening prayer, spiritual thought, closing prayer) for a meeting in the coming week, not only items dated that Sunday.',
+                'Ward Council Discussion Topics: select text and press Ctrl+B (Cmd+B on Mac) to bold it; press it again to unbold. When you click away, the box shows the bold text and bullets; click it to edit again.',
+                'Ward Council Discussion Topics: “Copy from prior meeting” now also copies General Topics, not just each organization’s Status, Next Steps and Help Needed.',
+              ],
+            },
+            {
+              date: 'Oct 25, 2026',
+              items: [
+                'Speakers & Prayers: the Speakers and Prayers history lists no longer show children under 8.',
+                'LCR sync: now reads each member’s ordinances from LCR (baptism, priesthood office, endowment, sealing to spouse) using a saved LCR custom report named "Bishopric Hub – Ordinances (sync – do not delete)". Ward Members shows them in a new Ordinances column (hover a badge for its date).',
+                'Speakers & Prayers: people LCR shows as not baptized are no longer listed in the Speakers or Prayers history.',
+                'Calling Pipeline: added a Notes field. Entries with notes show a 📝 next to the calling; hover it to read them. Notes changes appear in the change history for that entry.',
+                'Calling Pipeline: the edit window is more compact, with short fields side by side and the LCR checkboxes on one line.',
+                'Calling Pipeline: Member and Calling are no longer required, so you can save a calling or release before you know who or what it is and fill it in later.',
+                'Dashboard and Ward Council Dashboard: the Missionaries panel is now a prayer list. It automatically lists missionaries who are preparing (Candidate Completing Forms through Assignment Made / Postponed) and removes them when they enter the MTC. "Not at this time" and "Considering" are no longer listed. Tap 🙏 to take someone off the list; it stays off until turned back on in their Missionary Pipeline record.',
+              ],
+            },
+            {
+              date: 'Oct 23, 2026',
+              items: [
+                'Name fields now suggest ward members as you type: Calling Pipeline member, sacrament speakers, prayers, chorister, organist, and child blessing/confirmation/advancement (Current Sacrament Meeting and Sacrament Meeting Planning), plus Ordinances, Interviews, Missionary Pipeline, and Member Needs. Pick a suggestion (click, or arrow keys and Enter) to fill in the name exactly as it is on the ward roster, so the person is recognized on every other page. Names not on the roster (visitors, other wards) can still be typed; a small note says so, and offers "Did you mean …?" when it looks like a typo.',
+                'Calling Pipeline: the "Action" column is renamed "Call/Release".',
+                'Automation & Notifications: the syncs now list which records they changed, not just how many. LCR Sync History names the members created or filled in, each recommend change (old → new), and who was flagged as with the stake or cleared. Daily Jobs lists each record every job added, updated, linked, or removed (e.g. "Smith, John: added (Endowed Temple Rec, expires 2026-12)"), and every daily job now shows its own name and counts.',
+                'Fixed: the daily LCR sync reported the same "2 flagged" stake activations every day. The daily temple recommend check was deleting interviews that are with the stake (their new recommend expires more than 2 months out), and the LCR sync then re-added them. Interviews with the stake are now kept until the stake activates the recommend, so notes and assignments on them are no longer lost each day.',
+              ],
+            },
+            {
+              date: 'Oct 20, 2026',
+              items: [
+                'Fixed: the LCR sync reported "Recommends: 3 changed" on every run. LCR lists some members twice on the recommend report (an old limited-use recommend and a new endowed one), and the two rows kept overwriting each other, so those members showed the wrong recommend every other run. The sync now keeps the endowed recommend, or the later expiration when both rows are the same type. If two different names ever match the same member, neither is applied and the sync log says so.',
+              ],
+            },
+            {
+              date: 'Oct 18, 2026',
+              items: [
+                'Tithing Declaration Slots: the slot editor now has "Reserved by" and "Contact" fields. Typing a family\'s name books the slot (it turns green and shows on Upcoming Reservations and the Bishop\'s Schedule), and clearing the name opens it back up.',
+              ],
+            },
+            {
+              date: 'Oct 18, 2026',
+              items: [
+                'Fixed renamed sidebar links (e.g. "Speakers & Prayers History", "Bishopric Action Items") briefly flashing back to their default names whenever you clicked a link. The sidebar no longer reloads on every page change.',
+                'Current Bishopric Meeting: the "Copy everything from last week" confirmation now has a green "Copy" button instead of a red "Delete" button, since copying only adds to this week and never removes anything.',
+              ],
+            },
+            {
+              date: 'Oct 18, 2026',
+              items: [
+                'Calling Pipeline: tables now have an "Action" column showing Call or Release, so the Pray About list makes clear whether each person is being called or released. Releases can now be set to "2. Pray about" too (between In Release Discussion and Need to Release).',
+                'Current Bishopric Meeting: "Copy from last week" (Agenda, Move-ins, Move-outs, Other Items, Updates/Announcements) and "Copy everything from last week" now add to this week instead of replacing it. Anything already there is kept, and items or lines already present aren\'t duplicated.',
+                'Bishop\'s Schedule: Tithing Declaration blocks now show the name of who reserved them (or "Open"), and clicking one opens the Tithing Declaration page on that week.',
+                'Scrollbars are now always visible in Safari on Mac (e.g. on the Bishop\'s calendar), instead of staying hidden until you start scrolling.',
+              ],
+            },
+            {
+              date: 'Oct 18, 2026',
+              items: [
+                'Bishop\'s Schedule, Counselor Schedule, and Tithing Declaration calendars now show the whole 7 AM–10 PM day at once with no separate scrollbar inside the calendar — the page scrolls instead, and on wide screens the day headings stay pinned at the top as you scroll.',
+                'Fixed calendar appointments drawing slightly too short when they crossed an hour line (up to several pixels by evening). Every appointment now lines up exactly with its start and end times.',
+              ],
+            },
+            {
+              date: 'Oct 17, 2026',
+              items: [
+                'Fixed: dismissing a suggested ordinance on the Ordinances page now sticks. Dismissed suggestions used to reappear after a page reload; they are now saved and stay hidden for everyone in the bishopric.',
+              ],
+            },
+            {
+              date: 'Oct 17, 2026',
+              items: [
+                'Tithing Declaration Slots: the reservation list now sits below the calendar, is renamed "Upcoming Reservations", and only shows reservations that haven\'t happened yet.',
+              ],
+            },
+            {
+              date: 'Oct 16, 2026',
+              items: [
+                'Fixed: the automated LCR sync had stopped updating the ward roster, temple recommend status, and "with the stake" flags. LCR\'s pages changed how they load, and the sync gave up waiting for them. They update again, and a recommend number containing a letter no longer merges two people\'s names on the stake activation list.',
+              ],
+            },
+            {
+              date: 'Oct 15, 2026',
+              items: [
+                'Fixed: the automated missionary-status sync was missing most missionaries. It read the church\'s missionary site before the "Entered the Mission Field" list had finished loading, and never opened the collapsed "Released from Mission Field" and "Canceled" lists, so returned missionaries (e.g. Dylan Thatcher) were never marked Released. It now waits for every list and reads each one. Released and Canceled entries only update missionaries already in the Missionary Pipeline (no records are added for people who served years ago), and a release date no longer overwrites a missionary\'s start date.',
+              ],
+            },
+            {
+              date: 'Oct 11, 2026',
+              items: [
+                'Sacrament agenda: a Sunday can now be marked as Stake Conference or General Conference, meaning there is no sacrament meeting. Pick it from the meeting type list at the top of Current Sacrament Meeting (or in the Sacrament Meeting Planning agenda pop-up); the agenda is hidden for that week, and Sacrament Meeting Planning and the Sacrament Program show "no sacrament meeting" instead. Anything already entered for that Sunday is kept and comes back if you switch it to a regular meeting again.',
+                'My Actions (and the action-item emails) no longer list sacrament meeting agenda assignments — speaking, opening/closing prayer, chorister, and organist. Those are already on the agenda and didn\'t need a separate reminder.',
+                'Sacrament Meeting Planning and Current Sacrament Agenda: removed "Not Comfortable Speaking" from the speaker Type choices — a speaker is now just a Youth Speaker or an Adult Speaker.',
+                'Fixed: Current Sacrament Meeting deleted every speaker slot that had no name yet whenever it autosaved, so placeholder speakers (e.g. "a youth speaker, to be decided") vanished after you moved to another week and back. Unnamed speaker slots are now kept on both the Current Sacrament Meeting and Sacrament Meeting Planning pages until you remove them, and the Sacrament Program shows them as "Speaker TBD".',
+              ],
+            },
+            {
+              date: 'Sep 20, 2026',
+              items: [
+                'All Callings: the LCR Callings tab now shows Member Name as its first column, matching the Not Set Apart tab.',
+                'Fixed pages occasionally coming up completely blank until you reloaded: a page that fails to load now retries automatically (and reloads for a new version if needed), and if something still goes wrong you get a "Try again / Reload page" message instead of a blank screen.',
+                'Calling Pipeline: the duplicate "YW" organization is gone — existing YW entries were merged into Young Women, and the LCR sync now maps YW to Young Women too.',
+                'All Callings: the LCR Callings tab now has a Set Apart column showing, from the last LCR sync, whether each calling has been set apart, and a new "Not Set Apart" tab lists only the callings still awaiting a setting apart, with the member name as its first column.',
+                'My Actions (and the action-item emails) no longer list "Set up interview" items for youth interviews once the member has turned 18 (after Sep 1 of that year) or gone inactive, matching how the Youth Interviews page already hides them.',
+                'Calling Pipeline: the LCR column now shows a ✓R for a release entry once the clerk has recorded it in LCR (matching the existing ✓S/✓A indicators for sustaining/setting apart on a calling entry), so it\'s clear at a glance why a completed release no longer shows up as a clerk action item.',
+                'Calling Pipeline entries now keep a change history: opening the edit modal for an existing entry shows a collapsible "History" list with every field that changed, its old and new value, who made the change, and when.',
+                'Calling Pipeline\'s Status dropdown now only offers the stages that apply to the selected Type — a calling can be set to Discussion through Set Apart (or Declined), a release to In Release Discussion through Released — so the two processes\' stages can\'t be mixed up. Switching Type also updates Status to match. The Sustain/Setting Apart LCR checkboxes, which only ever applied to a calling, no longer show up when editing a release.',
+              ],
+            },
+            {
+              date: 'Aug 30, 2026',
+              items: [
+                'Added Tithing Declaration: bishopric can publish appointment slots (date, time, location) on a new "Tithing Declaration" admin calendar, and members reserve an open slot at /declare-tithing with no login required — one family per slot. A "Reservations" list at the top of the calendar shows who has reserved a slot at a glance, and the Bishop\'s existing calendar is overlaid (hatched) for reference when picking times — that overlay is never sent to the public reservation page.',
+                'Member Needs: "+ Add Need" now defaults "Include in prayer list" to checked, matching the Dashboard and Ward Council quick-add forms.',
+                'Fixed a bug where a member\'s preferred name (e.g. shown on the Speakers & Prayers page) could silently revert to the legal name after saving an unrelated interview — the Interview edit modal was overwriting it with a stale cached value.',
+                'Fixed the real cause of speaker/prayer names reverting to the legal name: saving a speaker or prayer on the Current Sacrament page (and prayers on Sacrament Planning) normalizes whatever you typed against the ward roster — that normalization was rewriting it to the legal name instead of the person\'s preferred name.',
+                'All Tithing Declaration slots (open or reserved) now also show (hatched) on the Bishop Schedule page, so his calendar reflects that blocked-off time. And on the Tithing Declaration page, "Unreserve" clears a family\'s reservation and reopens the slot without deleting it.',
+                'Tithing Declaration signup page: location is now marked with a 📍 icon, already-booked slots show who reserved them so it\'s clear what\'s taken, and the page tells members to contact the bishopric directly to cancel or change a reservation.',
+                'The Bishop/Counselor Schedule and Tithing Declaration weekly calendars now fill the available screen height when there\'s room, but each 15-minute row has a minimum height so appointment titles stay readable — on a shorter screen the calendar scrolls rather than shrinking text into illegibility. Also fixed appointments visually ending short of their real end time on narrower screens (like an iPad) — a double-digit hour label ("10:00 AM") could wrap onto two lines and silently double that row\'s height, throwing off everything below it.',
+                'Adult Temple Interviews: a "With the Stake" recommend that isn\'t expiring for over a year is now dropped from the list entirely, since it doesn\'t need bishopric attention yet.',
+              ],
+            },
+            {
+              date: 'Aug 29, 2026',
+              items: [
+                'Ward Members: callings shown now include stake callings (e.g. High Council, Stake Young Men), not just ward ones — the weekly LCR sync tool now pulls filled callings from LCR\'s Member Callings report instead of just the ward Organizations page.',
+              ],
+            },
+            {
+              date: 'Aug 16, 2026',
+              items: [
+                'Calling Pipeline: added a "7. In release discussion" status, and renumbered the statuses after it to stay sequential integers (8. Need to release, 9. Need to thank at pulpit, 10. Released, 11. Declined). All Callings\' "Consider for release" now sets a calling to "In release discussion" instead of jumping straight to "Need to release", since being considered isn\'t yet a firm decision to release.',
+                'Member Needs: "New Need" now defaults "Share with ward council" to checked, since needs added here are usually meant to be prayed for as a council.',
+                'Clerk action items: "Record setting apart in LCR" now only appears while a calling is at "6. Set apart" — it no longer keeps showing once the calling has moved into the release track (In release discussion, Need to release, Need to thank at pulpit), since by then setting apart is moot.',
+              ],
+            },
+            {
+              date: 'Aug 15, 2026',
+              items: [
+                'Weekly assignment emails now include a List-Unsubscribe header pointing to the Email Notifications settings page, and growinghomegreens.com now has a DMARC record — both improve inbox deliverability and reduce the chance of these emails landing in spam.',
+              ],
+            },
+            {
+              date: 'Aug 10, 2026',
+              items: [
+                'Fixed the LCR roster sync flagging hub accounts as unmatched when someone\'s account uses their preferred name (e.g. "Jake Jones") but LCR only knows their legal name ("Jacob Jones") — the sync now checks the ward roster\'s preferred-name field too, not just the raw LCR export text.',
+              ],
+            },
+            {
+              date: 'Aug 9, 2026',
+              items: [
+                'Current Bishopric Meeting: added a "Copy from last week" button on the Agenda section, matching the one already on Move-ins/Move-outs/Other Items — copies last week\'s agenda items (and their notes) into this week in one click instead of re-typing them.',
+                'Fixed a false "someone else just changed this" error that could appear on Calling Pipeline and Current Sacrament Meeting even when no one else was editing — a rapid second save on the same record could read a stale version and trip the conflict check against the user\'s own prior save.',
+                'Fixed deleting a calling from Calling Pipeline sometimes failing outright (with a confusing "someone else changed this" or browser error) when it had a Setting Apart or Calling interview auto-generated for it — those interview rows are just internal bookkeeping the app manages on your behalf, so deleting the calling now removes its linked interview too instead of getting blocked by it.',
+                'Current Bishopric Meeting: added a "Copy everything from last week" button that copies Minutes, Notes, Updates/Announcements, Move-ins, Move-outs, Other Items, and Agenda from last week\'s meeting into this week in one click, replacing whatever is currently there. (Interviews Needed isn\'t tied to a specific week, so it carries forward on its own and isn\'t affected.)',
+              ],
+            },
+            {
+              date: 'Aug 3, 2026',
+              items: [
+                'Fixed Sacrament Planning: adding a speaker slot to an upcoming meeting without assigning a name yet would silently disappear on save — the save only kept rows that already had a name typed in. A speaker slot now saves as soon as anything is filled in (type, topic, or accepted status), showing "TBD" for the name until it\'s assigned.',
+                'Internal: fixed the action-item mailer marking an assignment as "notified" even when the email itself failed to send, which meant a delivery failure gave up silently instead of retrying — a misconfigured sending address briefly meant a real assignment email never went out and never got another attempt. Failed sends now stay unnotified so the next run tries again.',
+                'New bishopric-hub accounts are now automatically registered with Cloudflare as a verified-email destination when created (or when their email address changes) — this is what actually sends them Cloudflare\'s verification email, which nothing did automatically before. The Users page also gets a "Resend" link next to a Pending badge, for anyone who needs another verification email sent.',
+              ],
+            },
+            {
+              date: 'Aug 2, 2026',
+              items: [
+                'New: action-item email notifications. Bishopric leaders now get an email as soon as something new is assigned to them (a calling to approve, an interview to set up, a task, a clerk item — anything that would show up on My Actions), plus a weekly digest of everything still open. Sent from bishopric-hub@growinghomegreens.com; each email says the mailbox isn\'t monitored and links back into the site.',
+                'Automation & Notifications: added a "Weekly Assignment Email" setting (admins can change which day/time the digest goes out) and "My Email Notifications" (everyone can opt out of their own emails). A new "Action Item Emails" section shows recent sends and any delivery failures.',
+                'Internal: the My Actions matching rules were pulled into a shared module (shared/actionItems.ts) so the new mailer computes exactly the same list of assignments as the My Actions page — no separate copy of the rules to drift out of sync.',
+                'Current Bishopric Meeting: "Add to sacrament agenda" for a move-in now phrases it as "We have received the records of the following: [name]." Adding a second move-in the same week appends to that same sentence instead of starting a new one.',
+                'Fixed Current Sacrament sometimes saying "Someone else just changed this" (or the added move-in just not showing up) after a move-in was added from the Bishopric Meeting page while the Current Sacrament page was already open. Its fields only ever read the agenda once, at page load, so they never noticed the row had changed underneath them. The page now picks up that kind of outside change automatically, as long as you don\'t have unsaved edits of your own in progress.',
+                'Current Bishopric Meeting: clicking "Add to sacrament agenda" on a move-in now shows "✓ Added to agenda" for a couple seconds, since nothing on that page previously indicated whether the click had done anything.',
+                'Added a Privacy Policy page, in every hub\'s navigation (Bishopric, Ward Council, Youth Council, and Calendar) — what this tool stores, who can see it, and how to reach the bishop with questions or a removal request. Only lists what each hub itself can actually see.',
+                'The weekly assignment email now leads with a highlighted reminder if you have a speaking, prayer, chorister, or organist assignment in this coming Sunday\'s sacrament meeting, ahead of the full list of everything else assigned to you.',
+                'Fixed Youth Activities: deleting an event from a single class\'s tab (e.g. Deacons) was deleting that whole date for every class, not just that one. A class\'s tab now has a "Clear" action that only removes that class\'s own activity/time/location for that date. Added the same option to the "All Groups" view — clicking a class\'s cell now offers a "Remove" button alongside Save. The "All Groups" row-level Delete still removes the whole date for every class, as before.',
+                'Action-item email notifications are now live. Each bishopric-hub account\'s email address needs to be verified as a Cloudflare destination address once before it can receive mail — most accounts are still pending verification, so only some leaders are receiving mail yet.',
+                'Users page: bishopric-hub accounts now show a "✓ Verified" or "⏳ Pending" badge next to their email, so admins can see at a glance who can actually receive assignment emails. Checked against Cloudflare directly; once an address shows verified it\'s remembered and never re-checked. If the check itself fails (for example, the Cloudflare credentials aren\'t set up yet), a message explaining why appears above the user list instead of silently showing everyone as pending.',
+              ],
+            },
+            {
+              date: 'Aug 1, 2026',
+              items: [
+                'All Callings → LCR Callings: fixed the Actions column showing "Tracked" (with no way to act) for any calling that had ever gone through the Calling Pipeline. Because pipeline entries stay at "5. Sustained" after a call is filled, every calling the bishopric had ever filled through the pipeline could never be flagged for release from this page. The column now shows "Release pending" only when that specific calling is genuinely being released, and "Consider for release" is available otherwise.',
+                'Consider for release now advances the person\'s existing Calling Pipeline entry to "7. Need to release" instead of creating a second entry for the same person and calling.',
+                'My Actions: the "Set up interview" item now stays on your list until the interview actually reaches "Scheduled for Interview" (or later), instead of disappearing as soon as the Setup column said Scheduled. Marking Setup "Done" still clears it. The item now shows the interview status alongside the setup status.',
+                'My Actions: names are now matched through the ward roster, so an assignment typed as "First Last", "Last, First", or with a preferred name (e.g. "Rich Barry" vs "Richard Barry") all find the same person.',
+                'Calling Pipeline: a member name typed free-hand as "Richard Talbot" (rather than "Talbot, Richard") is now linked to that ward member on save, so the entry is visible to All Callings\' release tracking, the LCR callings sync, and My Actions. Existing entries were linked too, including release entries, which were never linked before.',
+                'Automation & Notifications: the LCR Sync History now shows only the 5 most recent runs, with the rest behind a "Show older runs" toggle. Admins get a "Clear older runs" button to delete the archived ones.',
+                'LCR sync: the roster sync now checks every bishopric-hub account name against the LCR roster and reports any that don\'t match — a mistyped or outdated account name silently breaks every name-matched assignment for that person. It only reports; nothing is restricted or changed. High councilors are skipped, since they aren\'t on the ward roster.',
+                'Data: corrected a misspelled leader surname across 100 records (interview setup assignments, prayer assignments, action items, hub suggestions and edit history). The misspelling meant those assignments never matched the person\'s account, so they never appeared in My Actions.',
+              ],
+            },
+            {
+              date: 'Jul 31, 2026',
+              items: [
+                'Automation & Notifications: the temple recommend line in the LCR sync history now reports how many members actually changed, not how many were matched. It previously showed the same number (everyone on the report) after every run, which made it impossible to tell whether anything had really been updated.',
+                'Internal: the recommend sync now skips writing rows whose status and expiration are unchanged, so a routine sync no longer stamps a "last updated" timestamp on every ward member.',
+                'Fixed the automatic "Create church record for [baby]" clerk task never being created. The daily job that generates it had a malformed database query and had been failing silently on every run since it was added — the Automation & Notifications page was the only place the error showed. Any babies whose blessing date has already passed and aren\'t yet marked "Church record created" will get their task on the next daily run.',
+              ],
+            },
+            {
+              date: 'Jul 29, 2026',
+              items: [
+                'Ward Members: added a Sustained column showing each person\'s most recent calling date directly in the table, no need to expand the row. Name, Birth Date, Temple Recommend, Gender, Callings, and Sustained column headers are all now individually sortable (click to sort ascending, click again for descending).',
+                'Dashboard and Ward Council Dashboard: fixed the Missionaries panel showing empty — it was still filtering on the old missionary status names from before the LCR status vocabulary update. Now shows anyone not yet serving, in the MTC, released, or canceled.',
+                'Missionary Pipeline: removed the "Papers Started" status (unused) and fixed the status color legend, which still referenced the old status names.',
+                'Internal: fixed a recurring bug where the LCR callings sync could falsely mark someone "released" from a calling they still actively hold, whenever the tracked calling\'s wording didn\'t exactly match LCR\'s own text (e.g. "Nursery" vs LCR\'s "Nursery Worker") — this could happen on every sync run for affected callings, not just once. Cleaned up 16 more falsely-released callings this caused.',
+                'Added a new All Callings page: one row per calling LCR reports for the ward (sortable by calling, sustain date, or member name), with a "Consider for release" button on each; and a Members Without a Calling table below it, sortable by name, age, or whether they\'re already in the Calling Pipeline, with an "Add for calling consideration" button that starts a Discussion-stage entry for them.',
+                'Ward Members: the Callings and Sustained columns now show only LCR\'s own record for that person, not callings tracked in the Calling Pipeline that haven\'t (yet) shown up in an LCR sync — see the new All Callings page for the pipeline-tracked view.',
+                'All Callings: added a Time in Calling column to the LCR Callings table (e.g. "2 yrs 3 mos"), sortable like the rest.',
+                'Removed the old manually-maintained "Members Without Callings" list from Calling Pipeline — superseded by All Callings\' auto-derived version.',
+                'All Callings: the "In Calling Pipeline?" flag on Members Without a Calling now only reflects being considered for a new calling, not being tracked for release from an existing one.',
+                'All Callings: LCR Callings, Members Without a Calling, and Unfilled Callings are now separate tabs on the same page instead of stacked sections.',
+                'All Callings: added an Unfilled Callings tab — vacant, non-custom callings LCR reports for the ward, with an "Add to Calling Pipeline" button on each that starts a Discussion-stage entry with no one assigned yet.',
+                'Internal: extended the LCR callings sync to also report vacant (non-custom) callings — no UI changes to the sync script beyond what feeds the new Unfilled Callings tab.',
+                'All Callings: clicking "Consider for release" on an LCR calling now also starts a second Calling Pipeline entry, "Replacement for {name}", for finding whoever will take over that calling.',
+              ],
+            },
+            {
+              date: 'Jul 28, 2026',
+              items: [
+                'Ward Members: the Callings column and expandable row now show every calling LCR reports for that person, not just the ones tracked in Calling Pipeline. Untracked callings show read-only with a "Consider for release" button that starts tracking them, flagged as needing release.',
+                'Ward Members: added a review list for members the LCR roster sync could no longer find — flag them "records elsewhere", remove them from the ward, or dismiss as a false alarm, right from the page.',
+                'Internal: LCR sync now only ever updates callings the bishopric already tracks in Calling Pipeline — it no longer auto-creates a row for every filled calling ward-wide (~150+ of them). Also fixed a bug where backfilling a newly-linked calling from old free-text data could falsely mark it "released" if the wording didn\'t exactly match LCR\'s.',
+                'Ward Members: members flagged "records elsewhere" are no longer listed as missing from the roster during an LCR sync, since their membership record legitimately lives in another unit.',
+              ],
+            },
+            {
+              date: 'Jul 26, 2026',
+              items: [
+                'Hub Suggestions: added a "Deferred" status, between Planned and Implemented, for suggestions that are on hold for later.',
+                'Adult Temple Interviews: added a "With the stake" checkbox for interviews conducted with the stake, with a toggle to hide those from the list.',
+                'Youth Council hub: removed the Action Items page from the sidebar — My Actions remains for YC-assigned items.',
+                'Bishop Schedule and Counselor Schedule: appointments can now be shared across calendars — check any combination of Bishop/First Counselor/Second Counselor on an appointment, and editing it in one place updates it everywhere it appears.',
+                'Current Bishopric Meeting: added five new prep sections — Updates/Announcements (with a "copy from last week" option), a Calendaring Items box showing upcoming events, Move-ins/Move-outs and Other Items lists (move-ins can be added to the sacrament agenda in one click), and an Interviews Needed section pulling in interviews flagged from the Youth/Adult Temple/Other Interviews pages.',
+                'Interview list pages (Youth/Adult Temple/Other Interviews): added a flag toggle to mark an interview for discussion at the next bishopric meeting.',
+                'Internal: cleaned up the app\'s lint warnings (component structure, effect usage) with no functional changes.',
+                'Current Bishopric Meeting: the Calendaring Items box now has a "+ Add" button to create a new calendar event directly from this page, defaulting to the meeting\'s date.',
+                'Babies: once a baby\'s blessing date has passed, an Action Item is now automatically created for the clerk to create the church record in LCR (skipped if "Church record created" is already checked).',
+                'Internal: added a bulk temple-recommend-status import endpoint (/api/ward-members/import-recommends) to support an automated weekly sync from LCR — no UI changes yet.',
+                'Ward Members: fixed a bug where clicking between the two fields of an inline edit (Name, Preferred Name, or Recommend status/expiration) would close the edit before you could finish — editing now only closes when you click fully away from the pair.',
+                'Internal: extended the LCR sync with a full roster reconciliation (new members, filling in missing birth date/gender, reporting members absent from the LCR export) and a "with the stake" sync from LCR\'s Recommend Activations report — no UI changes yet.',
+              ],
+            },
+            {
+              date: 'Jul 27, 2026',
+              items: [
+                'Automation & Notifications: added an "LCR Sync History" panel showing every run of the weekly LCR sync script — new members created, details filled in, members missing from the LCR roster, recommends updated, and stake activations flagged/cleared, with unmatched names listed for review.',
+                'Ward Members: added a Callings column — click a row to expand it and see/edit each of that member\'s current callings (status, sustained date, set apart) inline.',
+                'Missionary Pipeline: replaced the generic mid/late-stage statuses with ones that match the church\'s own missionary tracking stages (Candidate Completing Forms, With the Stake President, With Church Headquarters, Assignment Made, Entered the MTC, Entered the Mission Field, On Leave, Released from Mission Field, Canceled).',
+                'Internal: extended the LCR sync with callings (sustained date, set-apart status, auto-recorded releases) and missionary status, matched to ward members by roster link rather than name text so near-miss spellings don\'t create duplicates.',
+              ],
+            },
+            {
+              date: 'Jul 25, 2026',
+              items: [
+                'Current Bishopric Meeting: added a free-form Notes box (auto-grows) alongside the Minutes field for anything that doesn\'t fit the standard meeting fields, stored per meeting.',
+                'Dashboard: Opening Prayer, Handbook Topic, Closing Prayer, and Spiritual Thought on the Bishopric Meeting panel can now be edited directly in place — click any value to edit it, no need to visit Bishopric Meeting Planning.',
+                'My Actions: fixed a bug where a dual-access account viewing Ward Council could see Bishopric-only action items instead of Ward Council ones. Added a scoped My Actions page (and Action Items) to the Youth Council hub as well, showing only items explicitly shared with Youth Council.',
+                'Hub Suggestions: suggestions are now scoped to the hub they were submitted from — Ward Council no longer sees Bishopric\'s suggestions and vice versa.',
+              ],
+            },
+            {
+              date: 'Jul 21, 2026',
+              items: [
+                'Ward Council Discussion Topics: added a General Topics box (10 rows, auto-grows) above the organization table for anything that doesn\'t fit the Status/Next Steps/Help Needed columns. Removed the old "General Topics" row from the table since it\'s now covered by this box.',
+              ],
+            },
+            {
+              date: 'Jul 20, 2026',
+              items: [
+                'Bishop Schedule: new appointments now default to 15 minutes instead of 30, since 15-minute appointments are the more common case.',
+                'Bishop Schedule: appointments can now be deleted directly from the calendar grid with a small delete icon that appears on hover, without opening the full editor first.',
+                'Youth Interviews: added a toggle to hide interviews that are already "Up to date," so the list can default to showing only those that need attention.',
+                'Bishopric Meeting Planning: added a "Jump to month" picker next to the week navigation so future or past meetings don\'t require clicking Next/Previous one month at a time. (All previously entered meetings were safe — this was a display limitation, not data loss.)',
+                'Current Sacrament Meeting: the exported agenda page can now be edited directly (click any text) before printing, instead of only reflecting exactly what was saved.',
+                'Added Counselor Schedule: First and Second Counselor each get their own appointment calendar, separate from the Bishop Schedule and from each other.',
+              ],
+            },
+            {
+              date: 'Jul 19, 2026',
+              items: [
+                'Bishopric Meeting Planning: adding or editing a meeting now jumps the calendar to its month, so saving a meeting in a different month than the one you\'re viewing no longer looks like it silently failed.',
+                'Bishop Schedule: two appointments starting at the exact same time now render side by side instead of stacking fully on top of each other, so the one underneath is no longer hidden and unreachable for editing or deleting.',
+                'Bishop Schedule: opening the page on a Saturday now defaults to next week instead of the week that\'s ending, since tomorrow\'s Sunday already belongs to next week.',
+                'Bishop Schedule: short (e.g. 15-minute) appointments had a click target so small that a near-miss would silently open a blank New Appointment form instead of editing the one you meant to click. Clicking anywhere in that appointment\'s row now opens it correctly.',
+                'Security: the Ward Council hub could see bishopric members\' email addresses and login activity (e.g. on the Ward Council Members page), and the Youth Council hub could see everyone\'s email, role, and login activity across all hubs. Both now only see names and callings for anyone outside their own hub.',
+                'Bishopric/dual-access accounts switching to the Ward Council or Youth Council hub view no longer see bishopric data leak through: the Youth Council view is now fully scoped to youth-only pages, and My Actions on the Ward Council view no longer lists bishopric-only items (calling pipeline, interviews, clerk follow-ups, rotating assignments).',
+                'Fixed: My Actions never generated a "Record release in LCR" item for the ward clerk, even when someone was fully Released and not yet recorded — Calling Pipeline tracks a release as its own pipeline entry (separate from the original calling), and the clerk check was accidentally skipping every one of those entries.',
+                'Calling Pipeline: deleting an entry (or a Member Without a Calling) now asks for confirmation first instead of deleting immediately on click.',
+              ],
+            },
+            {
+              date: 'Jul 13, 2026',
+              items: [
+                'Fixed: editing an adult\'s "Recommend Expires" directly on their Adult Temple Interviews row didn\'t update Ward Members, so the next resync could re-stamp the old date back onto the interview. Editing it from either place now keeps both in sync, matching how youth interviews already worked.',
+              ],
+            },
+            {
+              date: 'Jul 12, 2026',
+              items: [
+                'Fixed: editing a temple recommend expiration date for an adult on Ward Members wasn\'t reaching their existing Adult Temple Interviews row — a resync now keeps that date current instead of leaving the old one in place.',
+                'Adult Temple Interviews: a member who receives a new recommend that pushes their expiration date beyond the usual 2-month window is now removed from the list on resync, since they no longer need an interview soon.',
+                'Adult Temple Interviews: resync now also removes anyone from the list whose recommend type/date was cleared, who went inactive, or who aged into the youth interview track — not just those who renewed past the window.',
+              ],
+            },
+            {
+              date: 'Jul 11, 2026 (13)',
+              items: [
+                'Temple recommend interviews: deleting an auto-created interview row now sticks — it won\'t be recreated by a resync (manual or automatic) unless the member\'s recommend date changes to a new date that\'s within the usual 2-month window.',
+              ],
+            },
+            {
+              date: 'Jul 11, 2026 (12)',
+              items: [
+                'My Actions now only lists calling pipeline items in "Approved and assigned" or "Need to release" status for the assigned person, instead of every non-released/declined calling.',
+              ],
+            },
+            {
+              date: 'Jul 11, 2026 (11)',
+              items: [
+                'The app\'s title is now configurable — set a Ward Name under Automation & Notifications and the login page/sidebar show "<Ward Name> Ward Leadership Hub" instead of a fixed "Bishopric Hub".',
+                'Guest accounts (the youth and sacrament read-only logins) no longer appear on the Users page and can\'t be deleted — they\'re login shortcuts, not real people.',
+              ],
+            },
+            {
+              date: 'Jul 11, 2026 (10)',
+              items: [
+                'Only one user account can hold the Bishop calling, and likewise for First Counselor and Second Counselor — assigning one of these to a new person is blocked until the previous holder\'s calling is changed first.',
+                'Sacrament meeting Presiding now defaults to "Bishop [Lastname]" for every future meeting. Assigning a new Bishop immediately updates Presiding on all future meetings to the new Bishop\'s name.',
+              ],
+            },
+            {
+              date: 'Jul 11, 2026 (9)',
+              items: [
+                'Action Items are now scoped per hub: the Bishopric list only shows Bishopric items, the Ward Council list only shows Ward Council items, and a new Youth Council Action Items page (and list) shows only Youth Council items — no more seeing every hub\'s items mixed together.',
+              ],
+            },
+            {
+              date: 'Jul 11, 2026 (8)',
+              items: [
+                'Ward Members: added a Temple Recommend field (type — Endowed or Limited-use — and expiration date). Removed the separate Unendowed Temple Rec interview category.',
+                'When a member\'s temple recommend expires within 2 months (or has already expired), they\'re now added to Adult Temple Interviews automatically, unassigned — no duplicate entry is created if one already exists.',
+              ],
+            },
+            {
+              date: 'Jul 11, 2026 (7)',
+              items: [
+                'Missionary Pipeline: added a "Papers with Stake" status between Papers Started and Papers Submitted.',
+                'Removed the Annual category from Adult Temple Interviews (it wasn\'t in use).',
+                'Setting Apart interviews now use their own simpler status list (Unassigned, Assigned, Scheduled, Complete) and show the linked calling. Marking one Complete automatically moves that calling to "Set apart" status.',
+                'Youth Interviews: removed the redundant 12-15/16-17 labels from the Last/Next Interview columns — age is already shown in its own column.',
+              ],
+            },
+            {
+              date: 'Jul 11, 2026 (6)',
+              items: [
+                'Ordinances: each December, young men who will turn 12, 14, or 16 next year (Deacon, Teacher, or Priest) are now added to the tracker automatically, a month ahead of the new year (in addition to the existing "suggested this year" box).',
+                'Interview setup assignment can now be given to the executive secretary or an assistant executive secretary, not just the bishop and counselors — who actually conducts the interview is unaffected.',
+              ],
+            },
+            {
+              date: 'Jul 11, 2026 (5)',
+              items: [
+                'Ward Members: split the single Name field into separate First Name and Last Name fields, plus separate Preferred First Name and Preferred Last Name fields (previously one combined Preferred Name field). Existing preferred names were carried over automatically; anyone without one had it filled in from their legal name.',
+                'Speakers & Prayers counting now matches history entries to the roster using fuzzy name matching (case-insensitive, either name order, legal or preferred name) instead of requiring an exact text match — some previously-uncounted entries (typos, nicknames, name-order differences) will now show up, so counts may increase slightly for some people.',
+                'CSV import, the youth-interview auto-sync, and the interview pages were all updated to work with the new first/last name fields.',
+              ],
+            },
+            {
+              date: 'Jul 11, 2026 (4)',
+              items: [
+                'My Actions: added clerk-only reminders to record sustainings, settings apart, releases, and baby church records in LCR — these show regardless of who a calling or baby is otherwise assigned to, and disappear once checked off on Calling Pipeline / Babies.',
+                'Calling Pipeline: added a "Release recorded in LCR" checkbox alongside the existing sustain/setting-apart ones.',
+                'Babies: added a "Church record created (LCR)" checkbox; checking it while a baby is Blessed also advances their status to Recorded.',
+                'Dashboard: babies still Expecting (due within about a month) now also appear in the Upcoming Events panel.',
+              ],
+            },
+            {
+              date: 'Jul 11, 2026 (3)',
+              items: [
+                'Interview Pipeline is now three pages — Youth Interviews, Adult Temple Interviews, and Other Interviews — so each is easier to scan; every category always shows, even with nothing pending, so it\'s clear what\'s covered. The old Interview Pipeline link redirects to Youth Interviews.',
+                'Interviews now have two separate assignments: an Interviewer (conducts the interview) and a Setup assignment (schedules it, with its own Not started/Contacted/Scheduled/Done status, settable individually or in bulk). Only the setup assignment shows up on My Actions going forward — the interview itself is no longer a separate reminder there.',
+                'Fixed: bulk "Set status" could be applied to youth interviews even though their status is computed automatically, not set by hand — it now skips those rows and tells you how many were skipped.',
+                'Edit Interview: swapped the field order so Last Interview Date comes before Next Interview Date.',
+                'Added Post-Mission and Setting Apart interview types. Setting Apart entries are now created automatically (unassigned) once a calling reaches Sustained, and removed once its setting apart is recorded in LCR or the calling is deleted.',
+                'The Rec. Expires field/column no longer shows for interview types where it doesn\'t apply (patriarchal blessing referrals, mission prep, setting apart, other) — it still always treats a recommend as expiring on the last day of its stated month.',
+              ],
+            },
+            {
+              date: 'Jul 11, 2026 (2)',
+              items: [
+                'Renamed "Bishopric Meetings" to "Bishopric Meeting Planning" (scheduling, recurring series, minutes — unchanged) and added a new "Current Bishopric Meeting" page for actually running the next meeting: agenda items you can add, check off, reorder, and attach notes to, plus quick editing of that meeting\'s own fields, all in one place.',
+              ],
+            },
+            {
+              date: 'Jul 11, 2026',
+              items: [
+                'Sacrament Program (the read-only page shown to the sacrament guest account) now follows the order used in the Church handbook: Presiding, Conducting, Chorister, Organist, Opening Hymn, Opening Prayer, Ward and Stake Business, Sacrament Hymn, Administration of the Sacrament, Speakers (interleaved with any intermediate musical number), Closing Hymn, Closing Prayer. Prayer names are now shown; Ward and Stake Business and Administration of the Sacrament appear as headings only, with no details.',
+                'Fixed: the youth guest account could reach the Youth Council Meetings page, which was never meant to be part of its view — it now only sees the Youth Calendar.',
+                'Fixed: Ward Council members can now open Youth Council Meetings (read-only) — previously it redirected them to the Ward Council dashboard instead.',
+                'Ward Members: "Deactivate"/"Reactivate" are now called "Remove from ward"/"Add back to ward", and the status badge reads "In Ward"/"Removed" — same behavior, clearer wording.',
+                'Ward Members: added an "Out of ward" flag for someone who attends the ward but whose membership record is in another ward. It\'s an informational badge only and doesn\'t change how that person is treated anywhere else in the app.',
+                'Ward Members: relabeled the "out of ward" toggle to "Flag: records elsewhere" (was confusingly similar to "Remove from ward") and added hover tooltips explaining what each button actually does.',
+                'Youth Interviews: the temple recommend expiration date entered on a youth\'s interview now stays in sync with their Temple Recommend field on Ward Members, in both directions.',
+                'Adult Temple Interviews: added a "Sync now" button to immediately check for recommends expiring within 2 months and add them to the list, instead of waiting for the once-a-day automatic check.',
+                'Backfilled every youth\'s Temple Recommend field on Ward Members from their existing Youth Interview recommend expiration date.',
+                'Temple recommend expiration is now month/year only (recommends expire at month\'s end, so the exact day never mattered) — on Ward Members and on Youth/Adult Temple Interviews alike. Cleaned up previously stored dates to match.',
+                'Fixed: the daily/manual temple-recommend sync was mistakenly adding current youth to the Adult Temple Interviews list as duplicate entries — it now only ever applies to adults; youth stay tracked solely on their Youth Interview row.',
+                'Ward Members: removed the Temple Recommend column from the Children section — children don\'t hold recommends.',
+                'Interviews: "Setup" can now be assigned directly from the list with one click (a dropdown right in the row) — no need to open the interview to set who\'s scheduling it.',
+                'Setting Apart interviews now show a single "Scheduled Date" instead of separate Last/Next Interview fields, since a setting apart only happens once.',
+                'Other Interviews: "Calling" entries are now created automatically once a calling reaches "Approved and assigned," assigned to whoever is assigned on that calling — kept in sync if reassigned, and removed once the calling moves on.',
+              ],
+            },
+            {
+              date: 'Jul 10, 2026',
+              items: [
+                'Added a live "who\'s online" indicator: the sidebar now shows which other users are currently in the app and what page they\'re on, and a banner appears at the top of a page when someone else is viewing it (or actively editing it, shown in amber) — helps avoid two people working on the same thing at once.',
+                'Speakers & Prayers and Interview Pipeline now show a card layout on phones instead of a hard-to-read sideways-scrolling table, with all the same actions (notes, include/exclude, select, delete) available.',
+                'Faster loading: pages now load on demand instead of all at once, so the initial page load is noticeably faster, especially on phones.',
+                'Action Items, Member Needs, Calendar Events, and Calling Pipeline now show "Last edited by [name]" in the edit form once a record has been saved by someone.',
+                'Fixed: a user\'s "Last Access" on the Users page could lag a day behind if they had logged in less than 24 hours after their previous visit — it now updates as soon as they access the app on a new calendar day (in the ward\'s configured time zone).',
+                'Admins can set the ward\'s time zone on the Automation & Notifications page — used to determine calendar-day boundaries like the one above.',
+                'Added an Ordinances page tracking baptisms and Aaronic Priesthood advancement, with suggested candidates computed automatically from birth dates (and a new Gender field) on Ward Members.',
+                'Added an Annual Duties page (tithing declaration, ward conference, annual budget, and similar) with a Dashboard panel showing what\'s due; window months are editable per duty.',
+                'Added a Youth Council Meetings page (agenda and notes), available to both the Bishopric and Youth Council hubs.',
+                'Ward Members: added an editable Gender field, used to suggest Aaronic Priesthood advancement candidates.',
+                'Security: security question answers now use the same strong hashing as passwords (existing answers upgrade automatically the next time they\'re used to reset a password).',
+                'Removed two unused legacy pages (Prayer List, an older Member Needs variant) that were no longer reachable from any menu.',
+                'Added short descriptions under several page titles, and friendlier "nothing here yet" messages on a few pages that previously showed an empty table.',
+                'Interview Pipeline: reworked youth interview tracking — Annual and Semi-Annual Youth are now one merged, roster-linked "Youth Interviews" section instead of two separate lists; every active youth is added automatically (no more manual entry, and no more duplicate rows), and their status is now computed from the interview dates (Scheduled / Up to date / Due) instead of set by hand. Editing a linked youth\'s name updates their name on Ward Members directly. Removed the old "Youth Interviews Due" box now that the table itself always reflects who\'s current.',
+                'Added a Preferred Name field on Ward Members. When set, it\'s shown instead of the legal name on Interview Pipeline and My Actions; Ward Members itself always shows the legal name.',
+                'Added a "My Actions" page — everything currently assigned to you (action items, a calling to extend, an interview to conduct, an upcoming prayer or speaking assignment, and more) in one place, with a red count badge on its sidebar link so you know at a glance whether anything needs your attention.',
+                'My Actions no longer includes WC/Bishopric Meeting opening/closing prayer and spiritual thought assignments — those are routine meeting logistics rather than something that needed a separate reminder.',
+                'Action Items and Interview Pipeline: "Assigned To" is now a "Select or type name…" list of accounts instead of a free-text field, so assignments match reliably on the My Actions page (typos and nicknames like "Rich" instead of "Rich Barry" were silently failing to match before).',
+                'Interview Pipeline: the Next Interview and Last Interview columns now show which interview type (Annual/Semi-Annual) each date belongs to; added a Preferred Name field to the edit form for linked youth (separate from the legal-name field, which still updates Ward Members).',
+                'Fixed: youth interview cadence was wrong for ages 12–15 — per the Handbook, that age group is also interviewed every 6 months (bishop, then an assigned counselor), not once a year. Renamed "Annual Youth"/"Semi-Annual Youth" to "Youth 12-15"/"Youth 16-17" since the real distinction is who conducts, not how often; new entries default to the bishop as a starting point.',
+              ],
+            },
+            {
+              date: 'Jul 9, 2026',
+              items: [
+                'Current Sacrament Meeting: each person in "To Be Sustained" and "To Be Thanked" can now be removed individually for just that week (click the × next to their name) — useful when a sustaining or release is deferred to a later Sunday. They stay off that week\'s agenda and history, but reappear automatically the following week since their calling status hasn\'t changed.',
+              ],
+            },
+            {
+              date: 'Jul 8, 2026',
+              items: [
+                'Youth Activities: an activity no longer moves to the "past" list until 24 hours after its date, so it stays visible as upcoming for viewers in any time zone through the day of the event',
+                'Multi-user editing safety: the app now checks every 30 seconds for changes made by other users, and if two people edit the same record at the same time, the second save is blocked with a "reloaded — please re-apply your change" message instead of silently overwriting the first person\'s edit',
+                'Every delete button across the app now asks for confirmation before removing anything, and saves show a "Saved" confirmation so it\'s clear when a change has gone through',
+                'Ward Members: birth date and Speakers/Prayers eligibility can now be edited directly on the page, and admins can bulk-update the roster with "Import CSV" — it matches names against the existing roster, flags anything it can\'t confidently match for manual review, and lets you choose which members no longer on the list should be deactivated',
+                'Add User no longer requires typing a password — a temporary one is generated automatically and shown once, the same way password resets already worked',
+                'Adding a user (or approving a request) with a calling not on the standard list now requires explicitly choosing which hub they should access, instead of silently defaulting to Ward Council',
+                '"Email Notifications" renamed to "Automation & Notifications" and now shows when background jobs (sacrament conducting sync, expired-session cleanup) last ran and whether they succeeded — these run automatically once a day',
+                'Dashboard panels now stack into a single column on narrow screens instead of squeezing side by side',
+                'Help now shows Ward Council- and Youth Council-specific content instead of the bishopric-centric list for those hubs',
+                'Close (×) and remove buttons across the app now have accessible labels for screen readers',
+                'Security: passwords are now stored with a much stronger hash (existing passwords upgrade automatically the next time you sign in — no action needed), and repeated failed sign-in attempts are now temporarily blocked',
+              ],
+            },
+            {
+              date: 'Jul 7, 2026',
+              items: [
+                'Missionary Pipeline: removed automatic Farewell/Homecoming talk syncing to Sacrament Planning — name-format mismatches (nicknames, "First Last" vs "Last, First") were creating duplicate/confusing speaker entries; add these talks directly in Sacrament Planning instead',
+                'Users page: "Last Login" column replaced with "Last Access", which updates as users use the app (not just when they sign in) — more informative now that sessions stay active for weeks at a time',
+              ],
+            },
+            {
+              date: 'Jul 6, 2026',
+              items: [
+                'Bishop\'s Schedule: added recurring appointments (daily, weekly, or monthly on the same weekday) with a stop date instead of a fixed count; edit one occurrence independently, "Save + apply to future" to update the rest of the series, and "Delete this and future" to remove upcoming occurrences without touching past ones',
+              ],
+            },
+            {
+              date: 'Jul 5, 2026',
+              items: [
+                'Guest login flows added for viewing the youth schedule and sacrament program without an account',
+                'Hub Suggestions page added for submitting feature/bug ideas, with an Implemented status; added to Ward Council nav',
+                'Ward Council can now edit Youth Activities and Babies directly',
+                'Ward Council dashboard: Member Needs split into separate Health Needs and Other Needs panels',
+                'Wins for the Ward reworked to a weekly table view',
+                'Discussion Topics: organization categories are now admin-editable instead of fixed',
+                'Sacrament agenda: added Introductory Remarks, Recognize, and Closing Remarks fields, included in Copy Text and Export PDF',
+                'Escape key now closes all popup dialogs',
+                'Sacrament guest view no longer shows announcements',
+                'Calling Pipeline: new "Pray About" section',
+                'Missionary Pipeline: sortable columns',
+                'Sacrament Planning: warns before discarding unsaved agenda changes',
+                'Fixed: Hub Suggestions link in Ward Council nav no longer redirects to the dashboard',
+                'Ward Council sidebar now grouped into categories (Ward Council, Ward Care, Sacrament Meeting, Calendar, Administration), matching the Bishopric Hub layout',
+                'Discussion Topics: "Manage Categories" is now available to all users, not just admins',
+                'Sacrament agenda: Introductory Remarks and Recognize now pre-fill with a welcome message and the stake High Councilor/music/door-greeter thanks; Recognize items can be added or removed individually',
+                'Sacrament agenda: added a Fast & Testimony Meeting toggle that replaces assigned speakers with a Bearing of Testimonies item, in both Current Sacrament and Sacrament Planning',
+                'Sacrament export: "To Be Thanked" section now includes standard release wording before the names',
+                'Sacrament export: removed the "Note:" prefix on custom agenda items',
+                'Sacrament agenda: added an editable "Preparing for the Sacrament" line just before the Sacrament Hymn',
+                'Guests and Ward Council now see only the core meeting structure (Presiding, Conducting, Chorister, Organist, Opening Hymn, Sacrament Hymn, Speakers/Testimonies, Closing Hymn)',
+                'Sacrament export: "To Be Sustained" section now includes standard sustaining vote wording after the names',
+                'Sacrament export: "Bearing of Testimonies" now bolded like other section headers',
+                'Sacrament agenda: Recognize items are now multi-line text fields so longer entries are fully visible',
+                'Fixed: High Councilor recognition sometimes missing from Recognize defaults due to a data-loading race condition',
+                'Sacrament agenda: music thanks in Recognize now automatically follows that week\'s current Organist/Chorister fields instead of being frozen in at save time',
+                'Sacrament agenda: added a dedicated High Councilor field, pre-filled from the current High Councilor user and editable per week; feeds the Recognize section in the export automatically',
+                'Sacrament agenda: added an "Other Stake Representatives" field for recognizing additional stake guests when present; left blank by default and omitted from the export when empty',
+                'Export PDF no longer auto-opens the print dialog — print manually from the opened tab when ready',
+                'Sacrament export: "Bearing of Testimonies" no longer shows a trailing colon, but still bolds correctly',
+                'Sacrament export: "To Be Sustained" now introduces the names with "The following have been called to positions in the ward. We ask that if they are present that they please stand and remain standing until the sustaining vote is complete." before listing name — calling',
+                'Sacrament export: "Closing Remarks" now always appears in the export, even when the field is left blank',
+                'Sacrament export: High Councilor recognition now reads "Brother [Last Name]" instead of the full name',
+                'Auto-filled Conducting for future sacrament meetings now shows "Bishop [Last Name]" or "Brother [Last Name]" instead of the full name, including retroactively fixing already-scheduled future weeks',
+                'Fixed: prayers and speakers entered in Current Sacrament now match ward member records the same way Sacrament Planning already did, so they correctly show up in the Speakers & Prayers count history',
+                'Bishopric Meetings: added recurring meetings (weekly, every 2/3/4 weeks) with a set number of occurrences; edit one occurrence independently, or "Save + apply to future meetings" to update the rest of the series at once',
+              ],
+            },
+            {
+              date: 'Jun 28, 2026',
+              items: [
+                'Toast notifications replace browser alerts for save errors',
+                'Interview Pipeline: overdue row highlighting, interview-type filter, bulk status update, unsaved-changes indicator',
+                'Calling Pipeline: Timeline view showing days in current status',
+                'Tasks: due-date field with overdue/due-soon indicators; assignee filter',
+                'Member Needs: last-updated date column',
+                'Sacrament agenda: auto-save unsaved indicator; prayer saves correctly when navigating away; print stylesheet expands all text fields',
+                'Dashboard: last-visited quick-return link; due-date indicators on pending tasks',
+                'Youth age cutoff corrected to September 1 of the year a member turns 18',
+                'WC hub: ward business, stake business, and calling data correctly hidden',
+                'YC hub access added for Ward Council and Bishopric users',
+                'Hub switching navigates to the default page for that hub',
+                'Version number displayed in Help',
+              ],
+            },
+            {
+              date: 'Jun 27, 2026',
+              items: [
+                'Age column added to Annual Youth and Semi-Annual Youth interview tables',
+                'Copy announcements from prior week button in Current Sacrament',
+                'Ward business and stake business hidden from Ward Council hub view',
+              ],
+            },
+            {
+              date: 'Jun 26, 2026',
+              items: [
+                'Future sacrament meetings locked from editing until the current week',
+                'Dashboard panels resizable; ward business moved to its own field',
+                'Ward Members page added',
+                'Speakers & Prayers history page added with age display and notes',
+                'Member name normalization on import',
+              ],
+            },
+            {
+              date: 'Earlier',
+              items: [
+                'Auto-fill sacrament conducting from monthly assignments (sync-conduct)',
+                'GitHub Actions continuous deploy workflow',
+                'Calendar date timezone fix',
+                'Initial release: Dashboard, Calling Pipeline, Interview Pipeline, Sacrament Planning, Current Sacrament, Tasks, Member Needs, Missionary Pipeline, Calendaring, Babies, Out of Town, Bishop Schedule, Assignments, Prayer List, Important Links, Users',
+              ],
+            },
+];
+
+/** "Nov 11, 2026" → "2026-11-11" (empty string if it doesn't parse). */
+export function versionDateIso(date: string): string {
+  const d = new Date(`${date} 12:00 UTC`);
+  if (isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+}

@@ -417,7 +417,7 @@ function MailerStatus() {
               <div key={run.id} className="py-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-700">
-                    {formatWhen(run.ran_at)} — {run.kind === 'weekly' ? 'Weekly digest' : run.kind === 'seed' ? 'Initial backlog recorded' : 'New assignments'}
+                    {formatWhen(run.ran_at)} — {run.kind === 'weekly' ? 'Weekly digest' : run.kind === 'updates' ? 'Hub updates (admins)' : run.kind === 'seed' ? 'Initial backlog recorded' : 'New assignments'}
                   </span>
                   <span className="text-gray-500 text-xs">{run.emails_sent} email{run.emails_sent === 1 ? '' : 's'} sent</span>
                 </div>

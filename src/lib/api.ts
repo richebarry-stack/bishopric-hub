@@ -679,7 +679,7 @@ export interface LcrSyncRun {
 export interface MailerRun {
   id: number;
   ran_at: string;
-  kind: string; // 'new-items' | 'weekly'
+  kind: string; // 'new-items' | 'weekly' | 'seed' | 'updates'
   emails_sent: number;
   items_notified: number;
   errors: string | null; // JSON-stringified {recipient, error}[]
