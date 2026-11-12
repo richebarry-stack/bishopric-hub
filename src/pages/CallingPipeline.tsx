@@ -157,6 +157,24 @@ function orgOptions(current: string | undefined): string[] {
   return v && !ORGANIZATIONS.includes(v) ? [v, ...ORGANIZATIONS] : ORGANIZATIONS;
 }
 
+// The usual next step for each status (On hold, 4.5 and Declined are side paths).
+const NEXT_STATUS: Record<'Calling' | 'Release', Record<string, string>> = {
+  Calling: {
+    '1. Discussion': '2. Pray about', '1.5 On hold': '2. Pray about', '2. Pray about': '3. Approved and assigned',
+    '3. Approved and assigned': '4. Called & accepted', '4. Called & accepted': '5. Sustained',
+    '4.5 Call & accepted, handle in class/quorum': '5. Sustained', '5. Sustained': '6. Set apart',
+  },
+  Release: {
+    '7. In release discussion': '2. Pray about', '1.5 On hold': '2. Pray about', '2. Pray about': '8. Need to release',
+    '8. Need to release': '9. Need to thank at pulpit', '9. Need to thank at pulpit': '10. Released',
+  },
+};
+/** Moving into these needs someone from the bishopric assigned. */
+const NEEDS_ASSIGNEE = new Set(['3. Approved and assigned', '8. Need to release']);
+const nextStatus = (r: CallingType) => NEXT_STATUS[r.type === 'Release' ? 'Release' : 'Calling'][r.status ?? ''];
+/** "3. Approved and assigned" → "Approved and assigned". */
+const statusLabel = (s: string) => s.replace(/^\d+(\.\d+)?\.?\s*/, '');
+
 const EMPTY_NEW_CALL = { calling: '', organization: '' };
 /** Calling entries: also release the person from a current calling. `pick` is the chosen LCR calling's index, or 'other'. */
 const EMPTY_RELEASE_CURRENT = { on: false, pick: '' as string, calling: '', organization: '', findReplacement: false };
@@ -383,6 +401,10 @@ export default function CallingPipeline() {
     });
   };
 
+  const advance = (r: CallingType, status: string, assignee?: string) =>
+    update(r.id, assignee !== undefined ? { status, assigned_to: assignee } : { status });
+  const tableProps = { onEdit: setEditing, onDelete: remove, onAdvance: advance, assignees: bishopricOptions };
+
   const renderGrouped = (items: CallingType[]) =>
     groupByStatus(items).map(([status, rows]) => (
       <div key={status} className="mb-6">
@@ -390,7 +412,7 @@ export default function CallingPipeline() {
           <StatusBadge status={status} colors={CALLING_STATUS_COLORS} />
           <span>({rows.length})</span>
         </h3>
-        <Table rows={rows} onEdit={setEditing} onDelete={remove} />
+        <Table rows={rows} {...tableProps} />
       </div>
     ));
 
@@ -407,13 +429,13 @@ export default function CallingPipeline() {
           {callingRows.length > 0 && (
             <div className="mb-3">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Callings ({callingRows.length})</p>
-              <Table rows={callingRows} onEdit={setEditing} onDelete={remove} />
+              <Table rows={callingRows} {...tableProps} />
             </div>
           )}
           {releaseRows.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-1.5 ml-1">Releases ({releaseRows.length})</p>
-              <Table rows={releaseRows} onEdit={setEditing} onDelete={remove} />
+              <Table rows={releaseRows} {...tableProps} />
             </div>
           )}
         </div>
@@ -476,7 +498,7 @@ export default function CallingPipeline() {
           <h2 className="text-sm font-bold uppercase tracking-widest text-violet-700 mb-3">
             Pray About ({prayAboutRows.length})
           </h2>
-          <Table rows={prayAboutRows} onEdit={setEditing} onDelete={remove} />
+          <Table rows={prayAboutRows} {...tableProps} />
         </div>
       )}
 
@@ -485,14 +507,14 @@ export default function CallingPipeline() {
           <h2 className="text-sm font-bold uppercase tracking-widest text-amber-700 mb-3">
             Needs Action ({actionRows.length})
           </h2>
-          <Table rows={actionRows} onEdit={setEditing} onDelete={remove} />
+          <Table rows={actionRows} {...tableProps} />
         </div>
       )}
 
       {isLoading ? (
         <p className="text-gray-400 text-sm">Loading...</p>
       ) : statusFilter ? (
-        <Table rows={filtered} onEdit={setEditing} onDelete={remove} />
+        <Table rows={filtered} {...tableProps} />
       ) : groupBy === 'sustained' ? (() => {
           const sustainedRows = filtered.filter(r => r.status === '5. Sustained');
           return (
@@ -603,7 +625,7 @@ export default function CallingPipeline() {
             <div role="radiogroup" aria-label="Type" className="grid grid-cols-2 rounded-lg border border-gray-200 bg-gray-100 p-1 gap-1">
               {(['Calling', 'Release'] as const).map(t => {
                 const on = (editing.type || 'Calling') === t;
-                const onClass = t === 'Release' ? 'bg-amber-500 text-white shadow' : 'bg-blue-600 text-white shadow';
+                const onClass = t === 'Release' ? 'bg-red-600 text-white shadow' : 'bg-green-600 text-white shadow';
                 return (
                   <button key={t} type="button" role="radio" aria-checked={on}
                     onClick={() => {
@@ -632,7 +654,7 @@ export default function CallingPipeline() {
               const rc = releaseCurrent;
               const set = (patch: Partial<typeof rc>) => setReleaseCurrent(prev => ({ ...prev, ...patch }));
               return (
-                <div className="rounded-md border border-blue-200 bg-blue-50/50 p-2.5 space-y-1.5">
+                <div className="rounded-md border border-green-200 bg-green-50/40 p-2.5 space-y-1.5">
                   <Checkbox label={`Also release ${who} from a current calling`} checked={rc.on}
                     onChange={v => set({ on: v })} />
                   {rc.on && (
@@ -671,7 +693,7 @@ export default function CallingPipeline() {
               );
             })()}
             {editing.type === 'Release' && (
-              <div className="rounded-md border border-amber-200 bg-amber-50/50 p-2.5 space-y-1.5">
+              <div className="rounded-md border border-red-200 bg-red-50/40 p-2.5 space-y-1.5">
                 <Checkbox label="Also find someone new for this calling" checked={findReplacement}
                   onChange={setFindReplacement} />
                 {findReplacement && (
@@ -737,8 +759,17 @@ function Th({ col, label, sortKey, sortAsc, onSort }: {
   );
 }
 
-function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: CallingType) => void; onDelete: (id: number) => void }) {
+function Table({ rows, onEdit, onDelete, onAdvance, assignees }: {
+  rows: CallingType[];
+  onEdit: (r: CallingType) => void;
+  onDelete: (id: number) => void;
+  onAdvance: (r: CallingType, status: string, assignee?: string) => void;
+  assignees: string[];
+}) {
   const confirm = useConfirm();
+  // Row whose "next status" needs an assignee picked first.
+  // Positioned against the window so the table's scroll box can't clip it.
+  const [assigning, setAssigning] = useState<{ id: number; left: number; top: number } | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('member');
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -788,7 +819,50 @@ function Table({ rows, onEdit, onDelete }: { rows: CallingType[]; onEdit: (r: Ca
                   ? <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-50 text-red-700">Release</span>
                   : <span className="text-xs font-semibold px-2 py-0.5 rounded bg-green-50 text-green-700">Call</span>}
               </td>
-              <td className="px-3 py-2"><StatusBadge status={r.status} colors={CALLING_STATUS_COLORS} /></td>
+              <td className="px-3 py-2">
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
+                  <StatusBadge status={r.status} colors={CALLING_STATUS_COLORS} />
+                  {(() => {
+                    const next = nextStatus(r);
+                    if (!next) return null;
+                    const needsAssignee = NEEDS_ASSIGNEE.has(next) && assignees.length > 0;
+                    return (
+                      <span>
+                        <button type="button" title={`Move to ${next}`}
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (needsAssignee) {
+                              const b = e.currentTarget.getBoundingClientRect();
+                              setAssigning(a => a?.id === r.id ? null : { id: r.id, left: Math.min(b.left, window.innerWidth - 200), top: b.bottom + 4 });
+                            }
+                            else onAdvance(r, next);
+                          }}
+                          className="text-xs px-1.5 py-0.5 rounded border border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-700 hover:bg-blue-50">
+                          ▸ {statusLabel(next)}
+                        </button>
+                        {assigning?.id === r.id && (
+                          <>
+                            {/* Click anywhere else to cancel. */}
+                            <span className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); setAssigning(null); }} />
+                            <span className="fixed z-50 w-48 rounded-md border border-gray-200 bg-white shadow-lg p-1.5 block"
+                              style={{ left: assigning.left, top: assigning.top }}
+                              onClick={e => e.stopPropagation()}>
+                              <span className="block text-xs text-gray-500 px-1.5 pb-1">Assign to:</span>
+                              {assignees.map(a => (
+                                <button key={a} type="button"
+                                  onClick={() => { setAssigning(null); onAdvance(r, next, a); }}
+                                  className={`block w-full text-left text-sm px-1.5 py-1 rounded hover:bg-blue-50 ${a === r.assigned_to ? 'font-semibold text-blue-700' : 'text-gray-800'}`}>
+                                  {a}
+                                </button>
+                              ))}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    );
+                  })()}
+                </div>
+              </td>
               <td className="px-3 py-2 text-gray-600">{r.assigned_to}</td>
               <td className="px-3 py-2 text-gray-600">{r.organization}</td>
               <td className="px-3 py-2 text-gray-600">
