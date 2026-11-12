@@ -372,6 +372,7 @@ const FULL_SECTIONS: Section[] = [
     content: (
       <div className="space-y-2">
         <p>Rotating monthly assignments for who plans and conducts sacrament meeting and who gives the primary message.</p>
+        <p>Month, Plan &amp; Conduct and Primary Message are dropdowns. The names come from whoever has the Church Role <strong>Bishop</strong>, <strong>First Counselor</strong> or <strong>Second Counselor</strong> on the Users page, so update those roles when the bishopric changes. A saved name that's no longer in the bishopric shows as &ldquo;(not current)&rdquo; until you change it.</p>
         <p>When an assignment is saved for a month, the system automatically fills in the <strong>Conducting</strong> field for every Sunday in that month — up to 12 months ahead. Individual Sundays can always be overridden.</p>
         <p>The auto-fill runs in the background each time someone logs in.</p>
       </div>

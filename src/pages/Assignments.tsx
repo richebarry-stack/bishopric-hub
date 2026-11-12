@@ -2,20 +2,49 @@ import { useState } from 'react';
 import { useTable } from '../lib/useTable';
 import type { RotatingAssignment, User } from '../lib/api';
 import Modal from '../components/Modal';
-import { Input } from '../components/FormFields';
 import { useConfirm } from '../components/ConfirmDialog';
 
-const DL_ID = 'bishopric-names-dl';
 const CLS = 'mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500';
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** The bishopric, in order, by the Church Role set on the Users page. */
+const BISHOPRIC_ROLES = ['Bishop', 'First Counselor', 'Second Counselor'];
+
+/**
+ * A dropdown that also keeps a saved value that isn't one of the choices
+ * (for example a former counselor's name), so opening an entry never loses it.
+ */
+function PickField({ label, value, onChange, options, placeholder }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  placeholder: string;
+}) {
+  const known = options.some(o => o.value === value);
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <select value={value} onChange={e => onChange(e.target.value)} className={CLS}>
+        <option value="">{placeholder}</option>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        {value && !known && <option value={value}>{value} (not current)</option>}
+      </select>
+    </label>
+  );
+}
 
 const EMPTY: Partial<RotatingAssignment> = { month: '', plan_conduct: '', primary_message: '' };
 
 export default function Assignments() {
   const { rows, isLoading, create, update, remove } = useTable<RotatingAssignment>('rotating-assignments');
   const { rows: users } = useTable<User>('users');
-  const bishopricNames = users
-    .filter(u => u.church_role && /bishop|counselor/i.test(u.church_role))
-    .map(u => u.name);
+  // Whoever currently holds Bishop, First Counselor and Second Counselor (Users page → Church Role).
+  const bishopric = users
+    .filter(u => u.church_role && BISHOPRIC_ROLES.includes(u.church_role))
+    .sort((a, b) => BISHOPRIC_ROLES.indexOf(a.church_role!) - BISHOPRIC_ROLES.indexOf(b.church_role!) || a.name.localeCompare(b.name))
+    .map(u => ({ value: u.name, label: `${u.name} — ${u.church_role}` }));
+  const monthOptions = MONTHS.map(m => ({ value: m, label: m }));
   const [editing, setEditing] = useState<Partial<RotatingAssignment> | null>(null);
   const confirm = useConfirm();
 
@@ -69,21 +98,18 @@ export default function Assignments() {
       <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? 'Edit' : 'New Assignment'}>
         {editing && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-3">
-            <Input label="Month" value={editing.month || ''} onChange={v => setEditing({ ...editing, month: v })} required />
-            <label className="block">
-              <span className="text-sm font-medium text-gray-700">Plan &amp; Conduct</span>
-              <input list={DL_ID} value={editing.plan_conduct || ''} onChange={e => setEditing({ ...editing, plan_conduct: e.target.value })} placeholder="Name" className={CLS} />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium text-gray-700">Primary Message</span>
-              <input list={DL_ID} value={editing.primary_message || ''} onChange={e => setEditing({ ...editing, primary_message: e.target.value })} placeholder="Name" className={CLS} />
-            </label>
-            <datalist id={DL_ID}>
-              {bishopricNames.map(n => <option key={n} value={n} />)}
-            </datalist>
+            <PickField label="Month" value={editing.month || ''} onChange={v => setEditing({ ...editing, month: v })}
+              options={monthOptions} placeholder="Choose a month…" />
+            <PickField label="Plan & Conduct" value={editing.plan_conduct || ''} onChange={v => setEditing({ ...editing, plan_conduct: v })}
+              options={bishopric} placeholder="Choose a member of the bishopric…" />
+            <PickField label="Primary Message" value={editing.primary_message || ''} onChange={v => setEditing({ ...editing, primary_message: v })}
+              options={bishopric} placeholder="Choose a member of the bishopric…" />
+            {bishopric.length === 0 && (
+              <p className="text-xs text-amber-700">No one has the Church Role Bishop, First Counselor or Second Counselor yet. Set it on the Users page.</p>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
-              <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">Save</button>
+              <button type="submit" disabled={!editing.month} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">Save</button>
             </div>
           </form>
         )}
