@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && node tools/check-scrollbars.mjs && vite build",
+    "check:scroll": "node tools/check-scrollbars.mjs",
     "lint": "eslint .",
     "deploy": "npm run build && wrangler pages deploy dist --branch main",
     "deploy:demo": "npm run build && bash deploy-demo.sh",

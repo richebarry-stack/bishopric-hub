@@ -23,7 +23,7 @@ class Boundary extends Component<Props, State> {
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <div className={`${this.props.page ? 'min-h-[50vh]' : 'min-h-screen bg-gray-50'} flex items-center justify-center p-6`}>
+      <div className={`${this.props.page ? 'min-h-[50dvh]' : 'min-h-dvh bg-gray-50'} flex items-center justify-center p-6`}>
         <div className="max-w-sm text-center">
           <p className="text-gray-700 font-medium mb-1">This page didn't load correctly.</p>
           <p className="text-gray-500 text-sm mb-4">{this.state.error.message}</p>

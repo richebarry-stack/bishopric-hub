@@ -22,7 +22,7 @@ export default function ForceResetPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-dvh flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm">
         <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">Set Your Password</h1>
         <p className="text-sm text-gray-500 text-center mb-6">Your password has been reset by an admin. Please set a new password to continue.</p>

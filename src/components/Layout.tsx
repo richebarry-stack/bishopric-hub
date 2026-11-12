@@ -156,7 +156,7 @@ function RenameLinksModal({ labels, onSave, onClose }: {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90dvh] flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <h2 className="font-semibold text-gray-900">Rename Page Links</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
@@ -337,7 +337,7 @@ export default function Layout() {
         : 'bg-blue-50 text-blue-700 font-medium';
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-dvh bg-gray-50 flex">
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
       {showSecurityQ && <SecurityQuestionsModal onClose={() => setShowSecurityQ(false)} />}
       {showRename && !isWc && (
@@ -348,7 +348,7 @@ export default function Layout() {
         <div className="fixed inset-0 bg-black/30 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      <aside className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform lg:translate-x-0 flex flex-col h-screen lg:h-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform lg:translate-x-0 flex flex-col h-dvh lg:h-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className={`p-4 border-b shrink-0 ${isCal ? 'border-violet-200 bg-violet-50' : isYc ? 'border-amber-200 bg-amber-50' : isWc ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200'}`}>
           <h1 className={`text-lg font-bold ${isCal ? 'text-violet-800' : isYc ? 'text-amber-800' : isWc ? 'text-emerald-800' : 'text-gray-900'}`}>
             {isCal ? 'Calendar Hub' : isYc ? 'Youth Council Hub' : isWc ? 'Ward Council Hub' : appTitle}

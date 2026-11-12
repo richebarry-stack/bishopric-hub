@@ -117,7 +117,7 @@ export default function Login() {
 
   if (needsHubChoice) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-dvh flex items-center justify-center bg-gray-50 px-4">
         <div className="max-w-sm w-full text-center space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
@@ -145,7 +145,7 @@ export default function Login() {
 
   if (forgotStep === 'email') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-dvh flex items-center justify-center bg-gray-50 px-4">
         <div className="max-w-sm w-full">
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Reset Password</h1>
@@ -173,7 +173,7 @@ export default function Login() {
 
   if (forgotStep === 'answers' && questions) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-dvh flex items-center justify-center bg-gray-50 px-4">
         <div className="max-w-sm w-full">
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Reset Password</h1>
@@ -217,7 +217,7 @@ export default function Login() {
 
   if (forgotStep === 'done') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-dvh flex items-center justify-center bg-gray-50 px-4">
         <div className="max-w-sm w-full text-center space-y-4">
           <div className="text-4xl">✅</div>
           <h1 className="text-xl font-bold text-gray-900">Password Reset</h1>
@@ -233,7 +233,7 @@ export default function Login() {
   // Register request — success screen
   if (mode === 'register' && regDone) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-dvh flex items-center justify-center bg-gray-50 px-4">
         <div className="max-w-sm w-full text-center space-y-4">
           <div className="text-4xl">✅</div>
           <h1 className="text-xl font-bold text-gray-900">Request Submitted</h1>
@@ -252,7 +252,7 @@ export default function Login() {
   // Register request form
   if (mode === 'register') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-dvh flex items-center justify-center bg-gray-50 px-4">
         <div className="max-w-sm w-full">
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Request Access</h1>
@@ -305,7 +305,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-dvh flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-sm w-full">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900">{appTitle}</h1>

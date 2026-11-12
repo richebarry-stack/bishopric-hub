@@ -55,7 +55,7 @@ const TithingDeclarationSchedule = lazyWithReload(() => import('./pages/TithingD
 const TithingDeclarationPublic = lazyWithReload(() => import('./pages/TithingDeclarationPublic'));
 
 const FullScreenLoading = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+  <div className="min-h-dvh flex items-center justify-center bg-gray-50">
     <p className="text-gray-400">Loading...</p>
   </div>
 );

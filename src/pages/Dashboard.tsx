@@ -189,7 +189,7 @@ function DashboardSettingsModal({ config, onSave, onClose }: {
           <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
         </div>
 
-        <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+        <div className="p-4 space-y-3 max-h-[70dvh] overflow-y-auto">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Top panels</p>
 
           <SettingsSection title="Bishopric Meeting"
@@ -350,7 +350,7 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="flex flex-col lg:h-[calc(100vh-7rem)]">
+    <div className="flex flex-col [@media(min-width:1024px)_and_(min-height:56rem)]:h-[calc(100dvh-7rem)]">
 
       {showSettings && (
         <DashboardSettingsModal config={config} onSave={setConfig} onClose={() => setShowSettings(false)} />

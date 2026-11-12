@@ -215,7 +215,7 @@ export default function WardMemberImport({ roster, onClose, onImported }: {
       )}
 
       {step === 'preview' && (
-        <div className="space-y-5 max-h-[65vh] overflow-y-auto">
+        <div className="space-y-5 max-h-[65dvh] overflow-y-auto">
           <p className="text-xs text-gray-400">{fileName} — {parsedRows.length} rows parsed</p>
 
           <section>

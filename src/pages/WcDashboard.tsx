@@ -108,7 +108,7 @@ function SettingsModal({ config, onSave, onClose }: {
           <h2 className="font-bold text-gray-900">Dashboard Settings</h2>
           <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
         </div>
-        <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+        <div className="p-4 space-y-3 max-h-[70dvh] overflow-y-auto">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Top panels</p>
           <SettingsSection title="WC Meeting" visible={draft.meeting.visible} onVisibleChange={v => upd('meeting', { visible: v })}
             fontSize={draft.meeting.fontSize} onFontSizeChange={v => upd('meeting', { fontSize: v })}>
@@ -222,7 +222,7 @@ export default function WcDashboard() {
   const bottomCount = [cfg.actionItems.visible, cfg.events.visible].filter(Boolean).length;
 
   return (
-    <div className="flex flex-col lg:h-[calc(100vh-7rem)]">
+    <div className="flex flex-col [@media(min-width:1024px)_and_(min-height:56rem)]:h-[calc(100dvh-7rem)]">
       {showSettings && <SettingsModal config={config} onSave={setConfig} onClose={() => setShowSettings(false)} />}
 
       <div className="flex items-center justify-between mb-3">

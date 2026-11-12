@@ -79,7 +79,7 @@ export default function TithingDeclarationPublic() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-dvh bg-gray-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Tithing Declaration</h1>
         <p className="text-sm text-gray-600 mb-1">Pick a time below to reserve your appointment. No login required.</p>
