@@ -642,6 +642,29 @@ export default function CallingPipeline() {
               })}
             </div>
             <MemberInput value={editing.member || ''} onChange={v => setEditing({ ...editing, member: v })} />
+            {editing.type === 'Release' && editingMemberCallings.length > 0 && (
+              // The member's current LCR callings, so the one they're released from is one click.
+              <div className="rounded-md border border-red-200 bg-red-50/40 p-2.5">
+                <p className="text-xs text-gray-600 mb-1.5">Current callings in LCR — pick the one to release from:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {editingMemberCallings.map(c => {
+                    const on = stripBold(editing.calling || '').trim().toLowerCase() === c.calling.trim().toLowerCase();
+                    return (
+                      <button key={c.id} type="button" aria-pressed={on}
+                        onClick={() => setEditing(e => e && { ...e, calling: c.calling, organization: handbookOrganization(c.calling, c.organization) })}
+                        className={`text-sm px-2.5 py-1 rounded-full border transition-colors ${on
+                          ? 'bg-red-600 border-red-600 text-white'
+                          : 'bg-white border-gray-300 text-gray-700 hover:border-red-400 hover:text-red-700'}`}>
+                        {c.calling}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {editing.type === 'Release' && editingMember && editingMemberCallings.length === 0 && (
+              <p className="text-xs text-gray-500 -mt-1">LCR shows no current callings for {stripBold(editing.member || '').trim()}.</p>
+            )}
             <CallingNameInput label={editing.type === 'Release' ? 'Calling they are being released from' : 'Calling'} value={editing.calling || ''}
               onChange={v => setEditing(e => e && { ...e, calling: v })}
               onPick={org => setEditing(e => e && { ...e, organization: org })} />
