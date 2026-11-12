@@ -1,3 +1,4 @@
+import { CALLING_GROUPS } from './callingGroups';
 export const SECURITY_QUESTIONS = [
   'What was the name of your first pet?',
   "What is your mother's maiden name?",
@@ -257,23 +258,8 @@ export const SPEAKER_TYPES = ['Youth Speaker', 'Adult Speaker'];
 // Sundays with no sacrament meeting at all — stored as-is in sacrament_themes.no_meeting.
 export const NO_MEETING_TYPES = ['Stake Conference', 'General Conference'];
 
-export const ORGANIZATIONS = [
-  'Bishopric',
-  'Elders Quorum',
-  'Relief Society',
-  'Aaronic Priesthood Quorums',
-  'Young Men',
-  'Young Women',
-  'Primary',
-  'Sunday School',
-  'Young Single Adult',
-  'Ward Missionaries',
-  'Temple and Family History',
-  'Music',
-  'Technology',
-  'Welfare and Self-Reliance',
-  'Other',
-];
+// The General Handbook's ward organizations (see shared/callingGroups.ts).
+export const ORGANIZATIONS: string[] = [...CALLING_GROUPS];
 
 export const SHARE_WITH_OPTIONS = ['Bishopric', 'Ward Council', 'Youth Council'];
 

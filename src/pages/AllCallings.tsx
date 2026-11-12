@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useTable } from '../lib/useTable';
 import { legalName } from '../lib/displayName';
 import { stripBold } from '../lib/richText';
+import { handbookOrganization } from '../lib/callingGroups';
 import type { WardMember, CallingPipeline, MemberCalling, UnfilledCalling } from '../lib/api';
 
 // Matches the server's normalisation in sync-callings — pipeline calling text can
@@ -128,7 +129,7 @@ export default function AllCallings() {
     createCalling({
       member: memberName,
       calling: c.calling,
-      organization: c.organization,
+      organization: handbookOrganization(c.calling, c.organization),
       status: '7. In release discussion',
       assigned_to: '',
       sustain_recorded: 0,
@@ -141,7 +142,7 @@ export default function AllCallings() {
     createCalling({
       member: `Replacement for ${memberName}`,
       calling: c.calling,
-      organization: c.organization,
+      organization: handbookOrganization(c.calling, c.organization),
       status: '1. Discussion',
       assigned_to: '',
       sustain_recorded: 0,
@@ -171,7 +172,7 @@ export default function AllCallings() {
     createCalling({
       member: '',
       calling: c.calling,
-      organization: c.organization,
+      organization: handbookOrganization(c.calling, c.organization),
       status: '1. Discussion',
       assigned_to: '',
       sustain_recorded: 0,
@@ -393,7 +394,7 @@ export default function AllCallings() {
             </thead>
             <tbody>
               {sortedUnfilled.map(c => {
-                const added = addedUnfilledKeys.has(`${normCalling(c.calling)}|${c.organization}`);
+                const added = addedUnfilledKeys.has(`${normCalling(c.calling)}|${handbookOrganization(c.calling, c.organization)}`);
                 return (
                   <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="px-4 py-2 text-gray-900">{c.calling}</td>

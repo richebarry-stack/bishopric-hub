@@ -149,8 +149,8 @@ function HistoryList({ entries }: { entries: CallingPipelineHistoryEntry[] }) {
   );
 }
 
-// LCR organization names (e.g. "Other Callings") aren't all in the fixed list —
-// keep whatever an entry already has selectable instead of showing it blank.
+// An entry can carry an organization outside the handbook list (an older value) —
+// keep it selectable instead of showing it blank.
 function orgOptions(current: string | undefined): string[] {
   const v = (current || '').trim();
   return v && !ORGANIZATIONS.includes(v) ? [v, ...ORGANIZATIONS] : ORGANIZATIONS;

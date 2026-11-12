@@ -1,3 +1,4 @@
+import { handbookOrganization } from '../../shared/callingGroups';
 import { syncConduct, runDailyJobs, syncSettingApartInterviews, syncTempleRecommendInterviews } from './jobs';
 import { matchRosterMember, matchRosterMemberExact, splitLastFirstCased, toLastFirst, stripBold, type RosterMember, type RosterMemberNames } from './nameMatch';
 
@@ -1889,7 +1890,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         if (!existing.sustain_recorded) updates.sustain_recorded = 1;
         if (row.set_apart && !existing.set_apart_recorded) updates.set_apart_recorded = 1;
         if (row.sustained_date && row.sustained_date !== existing.sustained_date) updates.sustained_date = row.sustained_date;
-        if ((row.organization || '') !== (existing.organization || '')) updates.organization = row.organization;
+        // Pipeline entries carry the handbook organization, not LCR's section name.
+        const org = handbookOrganization(row.calling, row.organization);
+        if (org !== (existing.organization || '')) updates.organization = org;
         const reportableChange = Object.keys(updates).length > 0;
         // This row's free-text calling wording just matched LCR's own text for
         // this org — safe to trust an absence next time as a real release.

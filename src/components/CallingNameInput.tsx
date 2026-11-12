@@ -1,25 +1,19 @@
 import { useEffect, useMemo, useRef, useState, useId } from 'react';
 import { useTable } from '../lib/useTable';
 import type { MemberCalling, UnfilledCalling } from '../lib/api';
-import { ORGANIZATIONS } from '../lib/constants';
+import { CALLING_GROUPS, callingGroups, type CallingGroup } from '../lib/callingGroups';
 
 const MAX_SUGGESTIONS = 10;
 /** With an organization filter on, show more so the whole org can be browsed. */
 const MAX_FILTERED = 100;
-const NO_ORG = '(No organization)';
 
-interface KnownCalling { calling: string; organization: string }
-
-/** Hub order first, then any other LCR organization alphabetically. */
-const orgRank = (o: string) => {
-  const i = ORGANIZATIONS.indexOf(o);
-  return i === -1 ? ORGANIZATIONS.length : i;
-};
+interface KnownCalling { calling: string; organization: string; groups: CallingGroup[] }
 
 /**
  * A calling field that suggests the ward's callings from LCR (filled and unfilled)
- * as you type (hub suggestion #40). Picking one fills in its organization too.
- * The Filter button limits suggestions to chosen organizations; with a filter on,
+ * as you type (hub suggestion #40). Picking one fills in its handbook organization too.
+ * The Filter button limits suggestions to chosen organizations (grouped the way the
+ * General Handbook organizes a ward, not by LCR's section names); with a filter on,
  * clicking into the empty field lists every calling in those organizations.
  * Any other text can still be typed — it doesn't have to be a church-defined calling.
  */
@@ -27,14 +21,14 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  /** Called with the calling's LCR organization when a known calling is picked or typed exactly. */
+  /** Called with the calling's handbook organization when a known calling is picked or typed exactly. */
   onPick: (organization: string) => void;
 }) {
   const { rows: filled } = useTable<MemberCalling>('member-callings');
   const { rows: unfilled } = useTable<UnfilledCalling>('unfilled-callings');
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
-  const [orgFilter, setOrgFilter] = useState<string[]>([]);
+  const [orgFilter, setOrgFilter] = useState<CallingGroup[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
   const listId = useId();
@@ -47,14 +41,14 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
       if (!calling) continue;
       const organization = (c.organization || '').trim();
       const key = `${calling.toLowerCase()}|${organization.toLowerCase()}`;
-      if (!seen.has(key)) seen.set(key, { calling, organization });
+      if (!seen.has(key)) seen.set(key, { calling, organization, groups: callingGroups(calling, organization) });
     }
     return [...seen.values()].sort((a, b) => a.calling.localeCompare(b.calling) || a.organization.localeCompare(b.organization));
   }, [filled, unfilled]);
 
   const orgs = useMemo(() => {
-    const set = new Set(known.map(k => k.organization || NO_ORG));
-    return [...set].sort((a, b) => orgRank(a) - orgRank(b) || a.localeCompare(b));
+    const present = new Set(known.flatMap(k => k.groups));
+    return CALLING_GROUPS.filter(g => present.has(g));
   }, [known]);
 
   // Close the filter panel on a click outside it.
@@ -73,7 +67,7 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
     if (!query && !filtering) return [];
     const words = query ? query.split(/\s+/) : [];
     return known
-      .filter(k => !filtering || orgFilter.includes(k.organization || NO_ORG))
+      .filter(k => !filtering || k.groups.some(g => orgFilter.includes(g)))
       .filter(k => {
         const hay = `${k.calling} ${k.organization}`.toLowerCase();
         return words.every(w => hay.includes(w));
@@ -90,7 +84,7 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
 
   const pick = (k: KnownCalling) => {
     onChange(k.calling);
-    if (k.organization) onPick(k.organization);
+    onPick(k.groups[0]);
     setOpen(false);
   };
 
@@ -100,10 +94,10 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
     setHighlight(0);
     // Typing a known calling in full fills its organization when there's only one.
     const matches = known.filter(k => k.calling.toLowerCase() === v.trim().toLowerCase());
-    if (matches.length === 1 && matches[0].organization) onPick(matches[0].organization);
+    if (matches.length === 1) onPick(matches[0].groups[0]);
   };
 
-  const toggleOrg = (o: string) => {
+  const toggleOrg = (o: CallingGroup) => {
     setOrgFilter(f => f.includes(o) ? f.filter(x => x !== o) : [...f, o]);
     setHighlight(0);
   };
