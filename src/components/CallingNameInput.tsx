@@ -1,20 +1,25 @@
-import { useEffect, useMemo, useRef, useState, useId } from 'react';
+import { useMemo, useRef, useState, useId } from 'react';
 import { useTable } from '../lib/useTable';
 import type { MemberCalling, UnfilledCalling } from '../lib/api';
 import { CALLING_GROUPS, callingGroups, isStakeLeadership, type CallingGroup } from '../lib/callingGroups';
 
 const MAX_SUGGESTIONS = 10;
-/** With an organization filter on, show more so the whole org can be browsed. */
-const MAX_FILTERED = 100;
+/** With a filter on, show more so a whole organization can be browsed. */
+const MAX_FILTERED = 150;
 
-interface KnownCalling { calling: string; organization: string; groups: CallingGroup[] }
+interface KnownCalling { calling: string; organization: string; groups: CallingGroup[]; unfilled: boolean }
+
+const pillClass = (on: boolean) =>
+  `text-xs px-2 py-0.5 rounded-full border transition-colors ${on
+    ? 'bg-blue-600 border-blue-600 text-white'
+    : 'bg-white border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-700'}`;
 
 /**
  * A calling field that suggests the ward's callings from LCR (filled and unfilled)
  * as you type (hub suggestion #40). Picking one fills in its handbook organization too.
- * The Filter button limits suggestions to chosen organizations (grouped the way the
- * General Handbook organizes a ward, not by LCR's section names); with a filter on,
- * clicking into the empty field lists every calling in those organizations.
+ * Pills under the field filter the suggestions by organization (grouped the way the
+ * General Handbook organizes a ward) and to unfilled callings; with a filter on,
+ * clicking into the empty field lists every matching calling.
  * Any other text can still be typed — it doesn't have to be a church-defined calling.
  */
 export default function CallingNameInput({ label, value, onChange, onPick }: {
@@ -25,52 +30,48 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
   onPick: (organization: string) => void;
 }) {
   const { rows: filled } = useTable<MemberCalling>('member-callings');
-  const { rows: unfilled } = useTable<UnfilledCalling>('unfilled-callings');
+  const { rows: unfilledRows } = useTable<UnfilledCalling>('unfilled-callings');
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [orgFilter, setOrgFilter] = useState<CallingGroup[]>([]);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const filterRef = useRef<HTMLDivElement>(null);
+  const [unfilledOnly, setUnfilledOnly] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const listId = useId();
 
-  // One entry per distinct calling + organization.
+  // One entry per distinct calling + organization; marked unfilled when LCR lists it as vacant.
   const known = useMemo(() => {
     const seen = new Map<string, KnownCalling>();
-    for (const c of [...filled, ...unfilled]) {
-      const calling = (c.calling || '').trim();
-      if (!calling) continue;
-      const organization = (c.organization || '').trim();
-      if (isStakeLeadership(calling, organization)) continue;
+    const add = (rawCalling: string | null, rawOrg: string | null, unfilled: boolean) => {
+      const calling = (rawCalling || '').trim();
+      if (!calling) return;
+      const organization = (rawOrg || '').trim();
+      if (isStakeLeadership(calling, organization)) return;
       const key = `${calling.toLowerCase()}|${organization.toLowerCase()}`;
-      if (!seen.has(key)) seen.set(key, { calling, organization, groups: callingGroups(calling, organization) });
-    }
+      const prev = seen.get(key);
+      if (prev) { if (unfilled) prev.unfilled = true; return; }
+      seen.set(key, { calling, organization, groups: callingGroups(calling, organization), unfilled });
+    };
+    for (const c of filled) add(c.calling, c.organization, false);
+    for (const c of unfilledRows) add(c.calling, c.organization, true);
     return [...seen.values()].sort((a, b) => a.calling.localeCompare(b.calling) || a.organization.localeCompare(b.organization));
-  }, [filled, unfilled]);
+  }, [filled, unfilledRows]);
 
   const orgs = useMemo(() => {
     const present = new Set(known.flatMap(k => k.groups));
     return CALLING_GROUPS.filter(g => present.has(g));
   }, [known]);
+  const unfilledCount = useMemo(() => known.filter(k => k.unfilled).length, [known]);
 
-  // Close the filter panel on a click outside it.
-  useEffect(() => {
-    if (!filterOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [filterOpen]);
-
-  const filtering = orgFilter.length > 0;
+  const filtering = orgFilter.length > 0 || unfilledOnly;
   const query = value.replace(/\*\*/g, '').trim().toLowerCase();
   const suggestions = useMemo(() => {
     if (!query && !filtering) return [];
     const words = query ? query.split(/\s+/) : [];
     return known
-      .filter(k => !filtering || k.groups.some(g => orgFilter.includes(g)))
+      .filter(k => orgFilter.length === 0 || k.groups.some(g => orgFilter.includes(g)))
+      .filter(k => !unfilledOnly || k.unfilled)
       .filter(k => {
-        const hay = `${k.calling} ${k.organization}`.toLowerCase();
+        const hay = `${k.calling} ${k.organization} ${k.groups.join(' ')}`.toLowerCase();
         return words.every(w => hay.includes(w));
       })
       // Callings that start with what's typed come first.
@@ -78,7 +79,7 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
         ? Number(!a.calling.toLowerCase().startsWith(query)) - Number(!b.calling.toLowerCase().startsWith(query))
         : 0)
       .slice(0, filtering ? MAX_FILTERED : MAX_SUGGESTIONS);
-  }, [query, known, filtering, orgFilter]);
+  }, [query, known, filtering, orgFilter, unfilledOnly]);
 
   const exactOnly = suggestions.length === 1 && suggestions[0].calling.toLowerCase() === query;
   const showList = open && suggestions.length > 0 && !exactOnly;
@@ -98,48 +99,25 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
     if (matches.length === 1) onPick(matches[0].groups[0]);
   };
 
+  // After a pill changes the filter, show the updated list right away.
+  const refocus = () => { setHighlight(0); inputRef.current?.focus(); setOpen(true); };
   const toggleOrg = (o: CallingGroup) => {
     setOrgFilter(f => f.includes(o) ? f.filter(x => x !== o) : [...f, o]);
-    setHighlight(0);
+    refocus();
   };
 
   return (
-    <div className="block">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-gray-700">{label}</span>
-        {orgs.length > 1 && (
-          <div className="relative" ref={filterRef}>
-            <button type="button" onClick={() => setFilterOpen(o => !o)} aria-expanded={filterOpen}
-              className={`text-xs px-1.5 py-0.5 rounded border ${filtering ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:text-gray-700'}`}>
-              Filter{filtering ? ` (${orgFilter.length})` : ''} ▾
-            </button>
-            {filterOpen && (
-              <div className="absolute z-50 right-0 mt-1 w-60 max-h-72 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg p-2 text-sm">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-medium text-gray-500">Organizations</span>
-                  {filtering && (
-                    <button type="button" className="text-xs text-blue-600 hover:underline" onClick={() => setOrgFilter([])}>Clear</button>
-                  )}
-                </div>
-                {orgs.map(o => (
-                  <label key={o} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" checked={orgFilter.includes(o)} onChange={() => toggleOrg(o)} />
-                    <span className="text-gray-800">{o}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      <div className="relative">
+    <div className="block relative">
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <div>
         <input
+          ref={inputRef}
           value={value}
           autoComplete="off"
           role="combobox"
           aria-expanded={showList}
           aria-controls={listId}
-          placeholder={filtering ? 'Click to browse, or type…' : 'Type to search LCR callings…'}
+          placeholder={filtering ? 'Click to see matching callings, or type…' : 'Type to search, or pick filters below…'}
           className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           onChange={e => handleChange(e.target.value)}
           onFocus={() => setOpen(true)}
@@ -155,22 +133,46 @@ export default function CallingNameInput({ label, value, onChange, onPick }: {
             } else if (e.key === 'Escape') setOpen(false);
           }}
         />
-        {showList && (
-          <ul id={listId} role="listbox"
-            className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg text-sm">
-            {suggestions.map((k, i) => (
-              <li key={`${k.calling}|${k.organization}`} role="option" aria-selected={i === highlight}
-                // onMouseDown (not onClick) so the pick lands before the input's blur closes the list.
-                onMouseDown={e => { e.preventDefault(); pick(k); }}
-                onMouseEnter={() => setHighlight(i)}
-                className={`px-3 py-1.5 cursor-pointer ${i === highlight ? 'bg-blue-50 text-blue-800' : 'text-gray-800'}`}>
-                {k.calling}
-                {k.organization && <span className="text-xs text-gray-400 ml-2">{k.organization}</span>}
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
+      {known.length > 0 && (
+        // onMouseDown preventDefault keeps focus in the field so the list stays open while filtering.
+        <div className="mt-1.5 flex flex-wrap items-center gap-1" onMouseDown={e => e.preventDefault()}>
+          <span className="text-xs text-gray-500 mr-0.5">Filter:</span>
+          <button type="button" className={pillClass(unfilledOnly)} aria-pressed={unfilledOnly}
+            onClick={() => { setUnfilledOnly(u => !u); refocus(); }}>
+            Unfilled only ({unfilledCount})
+          </button>
+          <span className="text-gray-300 mx-0.5">|</span>
+          {orgs.map(o => (
+            <button key={o} type="button" className={pillClass(orgFilter.includes(o))} aria-pressed={orgFilter.includes(o)}
+              onClick={() => toggleOrg(o)}>
+              {o}
+            </button>
+          ))}
+          {filtering && (
+            <button type="button" className="text-xs text-blue-600 hover:underline ml-1"
+              onClick={() => { setOrgFilter([]); setUnfilledOnly(false); refocus(); }}>
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+      {showList && (
+        <ul id={listId} role="listbox"
+          className="absolute z-50 left-0 right-0 top-full mt-1 max-h-64 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg text-sm">
+          {suggestions.map((k, i) => (
+            <li key={`${k.calling}|${k.organization}`} role="option" aria-selected={i === highlight}
+              // onMouseDown (not onClick) so the pick lands before the input's blur closes the list.
+              onMouseDown={e => { e.preventDefault(); pick(k); }}
+              onMouseEnter={() => setHighlight(i)}
+              className={`px-3 py-1.5 cursor-pointer flex items-baseline gap-2 ${i === highlight ? 'bg-blue-50 text-blue-800' : 'text-gray-800'}`}>
+              <span>{k.calling}</span>
+              <span className="text-xs text-gray-400">{k.groups.join(' · ')}</span>
+              {k.unfilled && <span className="ml-auto text-[10px] font-medium uppercase tracking-wide text-amber-700 bg-amber-50 rounded px-1">Unfilled</span>}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -539,9 +539,11 @@ export default function CallingPipeline() {
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} className="space-y-2.5">
             <MemberInput value={editing.member || ''} onChange={v => setEditing({ ...editing, member: v })} />
             <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-              <CallingNameInput label="Calling" value={editing.calling || ''}
-                onChange={v => setEditing(e => e && { ...e, calling: v })}
-                onPick={org => setEditing(e => e && { ...e, organization: org })} />
+              <div className="col-span-2">
+                <CallingNameInput label="Calling" value={editing.calling || ''}
+                  onChange={v => setEditing(e => e && { ...e, calling: v })}
+                  onPick={org => setEditing(e => e && { ...e, organization: org })} />
+              </div>
               <div>
                 <span className="text-sm font-medium text-gray-700">Type</span>
                 <div className="flex gap-4 mt-1 py-2">
@@ -568,9 +570,11 @@ export default function CallingPipeline() {
               <div className="rounded-md border border-green-200 bg-green-50/50 p-2.5 space-y-2">
                 <p className="text-xs text-gray-600">Optional: start a new calling for this person. Saving adds a separate Calling entry in 1. Discussion.</p>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-                  <CallingNameInput label="New calling" value={newCall.calling}
-                    onChange={v => setNewCall(n => ({ ...n, calling: v }))}
-                    onPick={org => setNewCall(n => ({ ...n, organization: org }))} />
+                  <div className="col-span-2">
+                    <CallingNameInput label="New calling" value={newCall.calling}
+                      onChange={v => setNewCall(n => ({ ...n, calling: v }))}
+                      onPick={org => setNewCall(n => ({ ...n, organization: org }))} />
+                  </div>
                   <Select label="New calling organization" value={newCall.organization}
                     onChange={v => setNewCall(n => ({ ...n, organization: v }))} options={orgOptions(newCall.organization)} />
                 </div>
