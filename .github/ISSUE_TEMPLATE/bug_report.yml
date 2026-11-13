@@ -1,0 +1,44 @@
+name: Bug report
+description: Something isn't working the way it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Please don't include real member names or ward data.** Use made-up examples.
+        Report security problems privately instead (see SECURITY.md).
+  - type: input
+    id: page
+    attributes:
+      label: Page or feature
+      placeholder: e.g. Calling Pipeline, sign-in, weekly email
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. Click …
+        3. See …
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      placeholder: e.g. iPhone 15 with Safari, or a Windows laptop with Chrome
+  - type: dropdown
+    id: copy
+    attributes:
+      label: Which copy are you running?
+      options:
+        - The original project's site
+        - My ward's own copy (fork or self-hosted)
+        - Not sure

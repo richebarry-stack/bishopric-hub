@@ -1,0 +1,24 @@
+name: Idea or feature request
+description: Suggest something new or a better way to do something
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: "**Please don't include real member names or ward data.** Use made-up examples."
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would this help with?
+      description: The task or problem, as your bishopric or council experiences it.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you do today instead?

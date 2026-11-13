@@ -284,4 +284,6 @@ bishopric-hub/
 
 ## License
 
-MIT — free to use, modify, and deploy for your own ward or unit.
+MIT — free to use, modify, and deploy for your own ward or unit. See [LICENSE](LICENSE).
+
+Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md) and the [Security Policy](SECURITY.md).
