@@ -1,0 +1,18 @@
+{
+  // Typechecks the Pages Functions API (functions/) and the shared code it uses.
+  // The web app has its own config (tsconfig.app.json); the mailer has workers/mailer/tsconfig.json.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["@cloudflare/workers-types"],
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true
+  },
+  "include": ["functions", "shared"]
+}

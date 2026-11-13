@@ -1,15 +1,14 @@
 import { useState, useMemo, useCallback } from 'react';
+import { normCallingKey } from '../../shared/callingNames';
 import { useTable } from '../lib/useTable';
 import { legalName } from '../lib/displayName';
-import { stripBold } from '../lib/richText';
 import { handbookOrganization } from '../lib/callingGroups';
 import type { WardMember, CallingPipeline, MemberCalling, UnfilledCalling } from '../lib/api';
 
 // Matches the server's normalisation in sync-callings — pipeline calling text can
 // carry bold markers from the Calling Pipeline editor.
-function normCalling(s: string): string {
-  return stripBold(s || '').trim().toLowerCase();
-}
+// Ignores LCR's "Custom Calling" ending so a hand-typed pipeline entry still matches.
+const normCalling = normCallingKey;
 
 function currentAge(birthDate: string | null): number | null {
   if (!birthDate) return null;

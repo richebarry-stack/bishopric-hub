@@ -82,7 +82,7 @@ export function matchRosterMemberExact(rawName: string, roster: RosterMemberName
 }
 
 /** Resolves a raw LCR name string to a single roster member, or null if ambiguous/no match. */
-export function matchRosterMember(rawName: string, roster: RosterMember[]): RosterMember | null {
+export function matchRosterMember<T extends RosterMember>(rawName: string, roster: T[]): T | null {
   const normalized = toLastFirst(rawName);
   const byExact = new Map(roster.map(m => [`${m.last_name}, ${m.first_name}`.toLowerCase(), m]));
   const exact = byExact.get(normalized.toLowerCase());

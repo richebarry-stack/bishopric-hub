@@ -13,6 +13,9 @@ export const VERSION_HISTORY: VersionEntry[] = [
                 'Calling Pipeline: the Calling field now suggests the ward’s callings from LCR as you type. Picking one fills in its organization. You can still type any calling.',
                 'Calling Pipeline: filter buttons under the Calling field. Click one or more organizations, and/or "Unfilled only" for LCR’s vacant callings. The suggestions narrow to match, and clicking into the empty field lists every matching calling. Unfilled callings are marked in the list.',
                 'Calling Pipeline: the entry window now starts with a large Calling someone / Releasing someone switch, and its title says New/Edit Calling or Release. The filter buttons only show while you are in the Calling field. On a release, the two extra options are checkboxes: "Also find someone new for this calling" and "Also give [person] a new calling" (which opens the New calling fields).',
+                'Sign-in: your email address now works however it’s capitalized, and with stray spaces (phones often capitalize the first letter). The same goes for Forgot password. The lockout after wrong passwords now really allows 5 tries per account, and people sharing one home or building network no longer lock each other out.',
+                'All Callings and the LCR sync: a calling LCR marks “Custom Calling” now matches the same calling typed without that ending, so “Consider for release” no longer makes a duplicate entry.',
+                'Calling Pipeline: FSY callings (like Ward FSY Rep) are now filed with the youth (Aaronic Priesthood and Young Women) instead of Primary.',
                 'Bishopric Assignments: Month, Plan & Conduct and Primary Message are now dropdowns. The names list whoever currently has the Church Role Bishop, First Counselor or Second Counselor on the Users page. A saved name that’s no longer in the bishopric shows as “(not current)” so it isn’t lost.',
                 'New weekly email for Bishopric Hub admins: a summary of what changed in the hub that week, taken from this Version History. It goes out with the weekly assignments digest, is skipped when nothing changed, and follows each admin’s Email Notifications setting.',
                 'Calling Pipeline: when releasing someone, their current LCR callings show as buttons under their name. Click one to fill in the calling and its organization.',
@@ -282,6 +285,15 @@ export const VERSION_HISTORY: VersionEntry[] = [
               ],
             },
             {
+              date: 'Jul 27, 2026',
+              items: [
+                'Automation & Notifications: added an "LCR Sync History" panel showing every run of the weekly LCR sync script — new members created, details filled in, members missing from the LCR roster, recommends updated, and stake activations flagged/cleared, with unmatched names listed for review.',
+                'Ward Members: added a Callings column — click a row to expand it and see/edit each of that member\'s current callings (status, sustained date, set apart) inline.',
+                'Missionary Pipeline: replaced the generic mid/late-stage statuses with ones that match the church\'s own missionary tracking stages (Candidate Completing Forms, With the Stake President, With Church Headquarters, Assignment Made, Entered the MTC, Entered the Mission Field, On Leave, Released from Mission Field, Canceled).',
+                'Internal: extended the LCR sync with callings (sustained date, set-apart status, auto-recorded releases) and missionary status, matched to ward members by roster link rather than name text so near-miss spellings don\'t create duplicates.',
+              ],
+            },
+            {
               date: 'Jul 26, 2026',
               items: [
                 'Hub Suggestions: added a "Deferred" status, between Planned and Implemented, for suggestions that are on hold for later.',
@@ -296,15 +308,6 @@ export const VERSION_HISTORY: VersionEntry[] = [
                 'Internal: added a bulk temple-recommend-status import endpoint (/api/ward-members/import-recommends) to support an automated weekly sync from LCR — no UI changes yet.',
                 'Ward Members: fixed a bug where clicking between the two fields of an inline edit (Name, Preferred Name, or Recommend status/expiration) would close the edit before you could finish — editing now only closes when you click fully away from the pair.',
                 'Internal: extended the LCR sync with a full roster reconciliation (new members, filling in missing birth date/gender, reporting members absent from the LCR export) and a "with the stake" sync from LCR\'s Recommend Activations report — no UI changes yet.',
-              ],
-            },
-            {
-              date: 'Jul 27, 2026',
-              items: [
-                'Automation & Notifications: added an "LCR Sync History" panel showing every run of the weekly LCR sync script — new members created, details filled in, members missing from the LCR roster, recommends updated, and stake activations flagged/cleared, with unmatched names listed for review.',
-                'Ward Members: added a Callings column — click a row to expand it and see/edit each of that member\'s current callings (status, sustained date, set apart) inline.',
-                'Missionary Pipeline: replaced the generic mid/late-stage statuses with ones that match the church\'s own missionary tracking stages (Candidate Completing Forms, With the Stake President, With Church Headquarters, Assignment Made, Entered the MTC, Entered the Mission Field, On Leave, Released from Mission Field, Canceled).',
-                'Internal: extended the LCR sync with callings (sustained date, set-apart status, auto-recorded releases) and missionary status, matched to ward members by roster link rather than name text so near-miss spellings don\'t create duplicates.',
               ],
             },
             {

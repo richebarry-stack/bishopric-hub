@@ -6,6 +6,8 @@
 // the LCR sync, so pipeline entries carry the handbook organization rather than
 // LCR's section name. Shared by the browser bundle and the API.
 
+import { stripCustomCalling } from './callingNames';
+
 /** Handbook organizations, in roughly handbook chapter order. */
 export const CALLING_GROUPS = [
   'Bishopric and Clerks',
@@ -104,11 +106,14 @@ const BY_PREFIX: [RegExp, CallingGroup][] = [
   [/^young single adult/, 'Young Single Adults'],
   [/^ward mission/, 'Missionary Work'],
   [/^ward temple and family history/, 'Temple and Family History'],
+  // FSY conference representatives serve the youth of both organizations.
+  [/\bfsy\b/, AP],
+  [/\bfsy\b/, 'Young Women'],
 ];
 
 /** The handbook organization(s) a calling belongs to. Usually one; a few youth callings serve two. */
 export function callingGroups(calling: string, lcrOrg: string): CallingGroup[] {
-  const name = calling.trim().toLowerCase();
+  const name = stripCustomCalling(calling).toLowerCase();
   const org = lcrOrg.trim().toLowerCase();
   const out = new Set<CallingGroup>();
   for (const g of BY_CALLING[name] || []) out.add(g);

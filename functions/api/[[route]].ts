@@ -1,4 +1,5 @@
 import { handbookOrganization } from '../../shared/callingGroups';
+import { normCallingKey } from '../../shared/callingNames';
 import { syncConduct, runDailyJobs, syncSettingApartInterviews, syncTempleRecommendInterviews } from './jobs';
 import { matchRosterMember, matchRosterMemberExact, splitLastFirstCased, toLastFirst, stripBold, type RosterMember, type RosterMemberNames } from './nameMatch';
 
@@ -424,6 +425,24 @@ function generateTempPassword(): string {
   return Array.from(bytes, b => b.toString(36).padStart(2, '0')).join('').slice(0, 10);
 }
 
+/** Emails are matched ignoring case and surrounding spaces (phones often capitalize the first letter). */
+function normEmail(email: unknown): string {
+  return String(email ?? '').trim().toLowerCase();
+}
+
+/**
+ * Sign-in lockout. Each failed try records one row for the email and one for the
+ * network (IP), counted separately: 5 tries per email in 15 minutes, and a looser
+ * 20 per network, since a whole household or building can share one IP.
+ */
+async function tooManyAttempts(db: D1Database, identifier: string, ip: string): Promise<boolean> {
+  const { results } = await db.prepare(
+    "SELECT identifier, COUNT(*) as cnt FROM login_attempts WHERE identifier IN (?, ?) AND attempted_at > datetime('now', '-15 minutes') GROUP BY identifier"
+  ).bind(identifier, ip).all<{ identifier: string; cnt: number }>();
+  const count = (id: string) => results.find(r => r.identifier === id)?.cnt ?? 0;
+  return count(identifier) >= 5 || count(ip) >= 20;
+}
+
 export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env, params, waitUntil } = context;
   const db = env.DB;
@@ -436,17 +455,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (routeParts[1] === 'login' && method === 'POST') {
       const { email, password } = await request.json() as { email: string; password: string };
       const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-      const emailLower = email.toLowerCase();
-      const attempts = await db.prepare(
-        "SELECT COUNT(*) as cnt FROM login_attempts WHERE identifier IN (?, ?) AND attempted_at > datetime('now', '-15 minutes')"
-      ).bind(emailLower, ip).first<{ cnt: number }>();
-      if (attempts && attempts.cnt >= 5) {
+      const emailLower = normEmail(email);
+      if (await tooManyAttempts(db, emailLower, ip)) {
         return json({ error: 'Too many attempts — please try again in a few minutes.' }, 429);
       }
 
       const user = await db.prepare(
-        'SELECT id, name, email, role, church_role, hub, must_reset_password, email_notifications, password_hash FROM users WHERE email = ?'
-      ).bind(email).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number; email_notifications: number; password_hash: string }>();
+        'SELECT id, name, email, role, church_role, hub, must_reset_password, email_notifications, password_hash FROM users WHERE LOWER(email) = ?'
+      ).bind(emailLower).first<{ id: number; name: string; email: string; role: string; church_role: string; hub: string; must_reset_password: number; email_notifications: number; password_hash: string }>();
       const check = user ? await verifyPassword(password, user.password_hash) : { valid: false, legacy: false };
       if (!user || !check.valid) {
         await db.prepare('INSERT INTO login_attempts (identifier) VALUES (?)').bind(emailLower).run();
@@ -545,7 +561,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (routeParts[1] === 'security-questions' && method === 'GET') {
       const email = url.searchParams.get('email');
       if (!email) return json({ error: 'Email required' }, 400);
-      const user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: number }>();
+      const user = await db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').bind(normEmail(email)).first<{ id: number }>();
       if (!user) return json({ error: 'No account found for that email' }, 404);
       const sq = await db.prepare('SELECT question1, question2 FROM security_questions WHERE user_id = ?').bind(user.id).first<{ question1: string; question2: string }>();
       if (!sq) return json({ error: 'This account has no security questions set up' }, 404);
@@ -576,15 +592,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // Public: verify answers and reset password
     if (routeParts[1] === 'reset-by-questions' && method === 'POST') {
       const { email, answer1, answer2, new_password } = await request.json() as { email: string; answer1: string; answer2: string; new_password: string };
-      const emailLower = email.toLowerCase();
+      const emailLower = normEmail(email);
       const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-      const attempts = await db.prepare(
-        "SELECT COUNT(*) as cnt FROM login_attempts WHERE identifier IN (?, ?) AND attempted_at > datetime('now', '-15 minutes')"
-      ).bind('rbq:' + emailLower, ip).first<{ cnt: number }>();
-      if (attempts && attempts.cnt >= 5) return json({ error: 'Too many attempts — please try again in a few minutes.' }, 429);
+      if (await tooManyAttempts(db, 'rbq:' + emailLower, ip)) return json({ error: 'Too many attempts — please try again in a few minutes.' }, 429);
 
       if (!new_password || new_password.length < 6) return json({ error: 'Password must be at least 6 characters' }, 400);
-      const user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: number }>();
+      const user = await db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').bind(emailLower).first<{ id: number }>();
       const sq = user ? await db.prepare('SELECT answer1_hash, answer2_hash FROM security_questions WHERE user_id = ?').bind(user.id).first<{ answer1_hash: string; answer2_hash: string }>() : null;
       const check1 = sq ? await verifyAnswer(answer1, sq.answer1_hash) : { valid: false, legacy: false };
       const check2 = sq ? await verifyAnswer(answer2, sq.answer2_hash) : { valid: false, legacy: false };
@@ -608,7 +621,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (routeParts[1] === 'emergency-reset' && method === 'POST') {
       const { email, new_password, recovery_key } = await request.json() as { email: string; new_password: string; recovery_key: string };
       if (!env.RECOVERY_KEY || recovery_key !== env.RECOVERY_KEY) return json({ error: 'Invalid recovery key' }, 403);
-      const user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: number }>();
+      const user = await db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').bind(normEmail(email)).first<{ id: number }>();
       if (!user) return json({ error: 'User not found' }, 404);
       if (!new_password || new_password.length < 6) return json({ error: 'Password must be at least 6 characters' }, 400);
       const newHash = await hashPasswordSecure(new_password);
@@ -629,7 +642,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const hash = await hashPasswordSecure(password);
       await db.prepare(
         'INSERT INTO registration_requests (name, email, church_role, password_hash, requested_at) VALUES (?, ?, ?, ?, ?)'
-      ).bind(name, email, church_role, hash, new Date().toISOString()).run();
+      ).bind(name, normEmail(email), church_role, hash, new Date().toISOString()).run();
       return json({ ok: true });
     }
 
@@ -644,7 +657,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       try {
         await db.prepare(
           'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)'
-        ).bind(name, email, hash, role || 'user').run();
+        ).bind(name, normEmail(email), hash, role || 'user').run();
         return json({ ok: true });
       } catch {
         return json({ error: 'User already exists' }, 400);
@@ -787,7 +800,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       try {
         const result = await db.prepare(
           'INSERT INTO users (name, email, password_hash, role, church_role, hub, must_reset_password) VALUES (?, ?, ?, ?, ?, ?, 1)'
-        ).bind(name, email, hash, newRole, church_role || '', newHub).run();
+        ).bind(name, normEmail(email), hash, newRole, church_role || '', newHub).run();
         const newUser = await db.prepare('SELECT id, name, email, role, church_role, hub, last_login, last_access FROM users WHERE id = ?').bind(result.meta.last_row_id).first();
         if (church_role === 'Bishop') await resetFuturePresidingToBishop(db, name);
         if (newHub === 'bh' || newHub === 'both' || newHub === 'wc') await registerEmailDestination(env, email);
@@ -846,7 +859,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const body = await request.json() as { name?: string; email?: string };
       if (!isAdmin && body.name !== undefined) return json({ error: 'Only admins can change names' }, 403);
       if (body.email) {
-        const existing = await db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').bind(body.email, targetId).first();
+        body.email = normEmail(body.email);
+        const existing = await db.prepare('SELECT id FROM users WHERE LOWER(email) = ? AND id != ?').bind(body.email, targetId).first();
         if (existing) return json({ error: 'Email already in use' }, 400);
       }
       const updates: string[] = [];
@@ -1263,7 +1277,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
       await db.prepare(
         "INSERT INTO users (name, email, password_hash, role, church_role, hub, last_login, last_access) VALUES (?, ?, ?, 'user', ?, ?, '', '')"
-      ).bind(req.name, req.email, req.password_hash, req.church_role, hub).run();
+      ).bind(req.name, normEmail(req.email), req.password_hash, req.church_role, hub).run();
       await db.prepare('DELETE FROM registration_requests WHERE id = ?').bind(reqId).run();
       if (req.church_role === 'Bishop') await resetFuturePresidingToBishop(db, req.name);
       return json({ ok: true });
@@ -1829,7 +1843,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       '7. In release discussion', '8. Need to release', '9. Need to thank at pulpit', '10. Released', '11. Declined',
     ];
     const statusIdx = (s: string) => { const i = CALLING_STATUS_ORDER.indexOf(s); return i === -1 ? 0 : i; };
-    const normCalling = (s: string) => stripBold(s).trim().toLowerCase();
+    const normCalling = normCallingKey;
 
     const roster = (await db.prepare('SELECT id, first_name, last_name FROM ward_members WHERE active = 1').all<RosterMember>()).results;
 

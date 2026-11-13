@@ -1,0 +1,22 @@
+name: Checks
+
+# Lint, typecheck (web app, API and mailer), tests and build on every pull request.
+# Pushes to master run the same build inside deploy.yml before anything deploys.
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
