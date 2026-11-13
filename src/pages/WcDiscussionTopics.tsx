@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { CouncilCovenantAgenda } from '../components/CovenantAgenda';
 import { useTable } from '../lib/useTable';
 import { useAuth } from '../lib/auth';
 import type { WcMeeting, WcDiscussionTopic } from '../lib/api';
@@ -423,6 +424,12 @@ export default function WcDiscussionTopics() {
         </button>
       </div>
       <p className="text-sm text-gray-500">Status, next steps, and help needed for each organization ahead of ward council.</p>
+
+      <section className="bg-white rounded-lg border border-gray-200 px-4 py-3">
+        <h2 className="text-sm font-semibold text-gray-700">From the bishopric</h2>
+        <p className="text-xs text-gray-500 mb-1">Members the bishopric asked the council to help with. They stay here until the bishopric takes them off.</p>
+        <CouncilCovenantAgenda />
+      </section>
 
       {manageOpen && (
         <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">

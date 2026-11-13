@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTable } from '../lib/useTable';
-import type { CovenantPathExclusion, MissionaryPipeline, PartMemberHousehold, WardMember } from '../lib/api';
+import type { CovenantAgendaRow, CovenantPathExclusion, MissionaryPipeline, PartMemberHousehold, WardMember } from '../lib/api';
 import {
   buildCovenantPath, DEFAULT_COVENANT_SETTINGS, PB_STATUSES,
   type CovenantCategory, type CovenantItem, type CovenantSettings,
@@ -50,6 +50,13 @@ export default function CovenantPath() {
   const { rows: households } = useTable<PartMemberHousehold>('part-member-households');
   const { rows: missionaries } = useTable<MissionaryPipeline>('missionary-pipeline');
   const { rows: exclusions, create: createExclusion, remove: removeExclusion } = useTable<CovenantPathExclusion>('covenant-path-exclusions');
+  const { rows: agenda, create: createAgenda, update: updateAgenda } = useTable<CovenantAgendaRow>('covenant-path-agenda');
+  const agendaFor = (category: string, key: string) => agenda.find(a => a.category === category && a.subject_key === key);
+  const toggleAgenda = async (cat: CovenantCategory, it: CovenantItem, field: 'for_bishopric' | 'for_ward_council') => {
+    const row = agendaFor(cat.id, it.key);
+    if (row) await updateAgenda(row.id, { [field]: row[field] ? 0 : 1 });
+    else await createAgenda({ category: cat.id, subject_key: it.key, subject_name: it.name, [field]: 1, note: '' });
+  };
   const [settings, setSettings] = useState<CovenantSettings>(DEFAULT_COVENANT_SETTINGS);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [showHidden, setShowHidden] = useState<Set<string>>(new Set());
@@ -108,12 +115,36 @@ export default function CovenantPath() {
               {PB_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           )}
+          {!exclusion && (['for_bishopric', 'for_ward_council'] as const).map(field => {
+            const on = !!agendaFor(cat.id, it.key)?.[field];
+            const label = field === 'for_bishopric' ? 'Bishopric' : 'Ward Council';
+            return (
+              <button key={field} type="button" aria-pressed={on}
+                title={on ? `On the ${label} agenda. Click to take off.` : `Add to upcoming ${label} meetings`}
+                onClick={() => toggleAgenda(cat, it, field)}
+                className={`text-xs rounded-full border px-2 py-0.5 ${on
+                  ? (field === 'for_bishopric' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-emerald-600 border-emerald-600 text-white')
+                  : 'border-gray-300 text-gray-600 hover:border-gray-500'}`}>
+                {on ? '✓ ' : '+ '}{label}
+              </button>
+            );
+          })}
           {exclusion ? (
             <button type="button" onClick={() => removeExclusion(exclusion.id)} className="text-xs text-blue-600 hover:underline">Restore</button>
           ) : !isHiding && (
             <button type="button" onClick={() => setHiding({ category: cat.id, key: it.key, reason: '' })} className="text-xs text-gray-500 hover:text-gray-800">Hide</button>
           )}
         </span>
+        {(() => {
+          const row = !exclusion ? agendaFor(cat.id, it.key) : undefined;
+          if (!row || (!row.for_bishopric && !row.for_ward_council)) return null;
+          return (
+            <input key={`note-${row.id}-${row.updated_at}`} defaultValue={row.note}
+              placeholder={row.for_ward_council ? 'Note for the agenda (the ward council sees this)' : 'Note for the agenda (optional)'}
+              onBlur={e => { if (e.target.value !== row.note) updateAgenda(row.id, { note: e.target.value }); }}
+              className="basis-full rounded-md border border-gray-200 px-2 py-1 text-xs" />
+          );
+        })()}
         {isHiding && (
           <form className="basis-full flex flex-wrap items-center gap-2" onSubmit={e => { e.preventDefault(); hide(); }}>
             <input autoFocus value={hiding.reason} onChange={e => setHiding({ ...hiding, reason: e.target.value })}

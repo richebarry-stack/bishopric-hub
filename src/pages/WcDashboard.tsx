@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { CouncilCovenantAgenda } from '../components/CovenantAgenda';
 import { Link } from 'react-router-dom';
 import { useTable } from '../lib/useTable';
 import { useAuth } from '../lib/auth';
@@ -130,6 +131,8 @@ function SettingsModal({ config, onSave, onClose }: {
             fontSize={draft.actionItems.fontSize} onFontSizeChange={v => upd('actionItems', { fontSize: v })}>
             <SubToggle label="Show assigned to" checked={draft.actionItems.showAssignedTo} onChange={v => upd('actionItems', { showAssignedTo: v })} />
           </SettingsSection>
+          <SettingsSection title="From the Bishopric (Covenant Path)" visible={draft.covenantPath.visible} onVisibleChange={v => upd('covenantPath', { visible: v })}
+            fontSize={draft.covenantPath.fontSize} onFontSizeChange={v => upd('covenantPath', { fontSize: v })} />
           <SettingsSection title="Upcoming Events" visible={draft.events.visible} onVisibleChange={v => upd('events', { visible: v })}
             fontSize={draft.events.fontSize} onFontSizeChange={v => upd('events', { fontSize: v })}>
             <SubToggle label="Show date" checked={draft.events.showDate} onChange={v => upd('events', { showDate: v })} />
@@ -219,7 +222,7 @@ export default function WcDashboard() {
 
   const cfg = config;
   const topCount = [cfg.meeting.visible, cfg.healthNeeds.visible, cfg.otherNeeds.visible, cfg.missionaries.visible].filter(Boolean).length;
-  const bottomCount = [cfg.actionItems.visible, cfg.events.visible].filter(Boolean).length;
+  const bottomCount = [cfg.actionItems.visible, cfg.events.visible, cfg.covenantPath.visible].filter(Boolean).length;
 
   return (
     <div className="flex flex-col [@media(min-width:1024px)_and_(min-height:56rem)]:h-[calc(100dvh-7rem)]">
@@ -411,6 +414,18 @@ export default function WcDashboard() {
                       {cfg.events.showDate && (
                         <span className="text-xs text-gray-400 whitespace-nowrap">{formatDate(e.dates)}</span>
                       )}
+
+          {cfg.covenantPath.visible && (
+            <div className="bg-white rounded-xl border border-gray-200 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 flex-shrink-0">
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-400">From the Bishopric</span>
+                <Link to="/wc-discussion-topics" className="text-xs text-blue-400 hover:text-blue-600">↗</Link>
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 py-1 min-h-0">
+                <CouncilCovenantAgenda textClass={FONT_SIZE_CLASS[cfg.covenantPath.fontSize]} />
+              </div>
+            </div>
+          )}
                     </div>
                   ))
                 }

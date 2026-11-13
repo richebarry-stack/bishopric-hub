@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { BishopricCovenantAgenda } from '../components/CovenantAgenda';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTable } from '../lib/useTable';
@@ -245,9 +246,9 @@ function DashboardSettingsModal({ config, onSave, onClose }: {
               onChange={v => upd('events', { showDate: v })} />
           </SettingsSection>
 
-          <SettingsSection title="Annual Duties Due"
-            visible={draft.annualDuties.visible} onVisibleChange={v => upd('annualDuties', { visible: v })}
-            fontSize={draft.annualDuties.fontSize} onFontSizeChange={v => upd('annualDuties', { fontSize: v })} />
+          <SettingsSection title="Covenant Path"
+            visible={draft.covenantPath.visible} onVisibleChange={v => upd('covenantPath', { visible: v })}
+            fontSize={draft.covenantPath.fontSize} onFontSizeChange={v => upd('covenantPath', { fontSize: v })} />
         </div>
 
         <div className="flex items-center justify-between px-4 py-3 border-t">
@@ -340,7 +341,7 @@ export default function Dashboard() {
 
   const cfg = config;
   const topCount = [cfg.bishopricMeeting.visible, cfg.healthNeeds.visible, cfg.supportNeeds.visible, cfg.missionaries.visible].filter(Boolean).length;
-  const bottomCount = [cfg.tasks.visible, cfg.callings.visible, cfg.events.visible, cfg.annualDuties.visible].filter(Boolean).length;
+  const bottomCount = [cfg.tasks.visible, cfg.callings.visible, cfg.events.visible, cfg.covenantPath.visible].filter(Boolean).length;
 
   const lastVisited = useMemo(() => {
     const path = localStorage.getItem(LAST_VISITED_KEY);
@@ -506,11 +507,18 @@ export default function Dashboard() {
           {cfg.tasks.visible && (
             <div className="bg-white rounded-xl border border-gray-200 flex flex-col overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 flex-shrink-0">
-                <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Action Items ({pendingTasks.length})</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Action Items ({pendingTasks.length + dutiesDue.length})</span>
                 <Link to="/tasks" className="text-xs text-blue-400 hover:text-blue-600">↗</Link>
               </div>
               <div className="flex-1 overflow-y-auto px-4 py-2 min-h-0">
-                {pendingTasks.length === 0
+                {/* Annual duties due this time of year (they used to have their own panel). */}
+                {dutiesDue.map(d => (
+                  <div key={`duty-${d.id}`} className="flex items-baseline justify-between py-1 gap-2">
+                    <Link to="/annual-duties" className={`${FONT_SIZE_CLASS[cfg.tasks.fontSize]} text-gray-800 truncate hover:underline`}>{d.title}</Link>
+                    <span className="text-xs text-indigo-600 font-semibold whitespace-nowrap shrink-0">annual duty</span>
+                  </div>
+                ))}
+                {pendingTasks.length === 0 && dutiesDue.length === 0
                   ? <p className="text-xs text-gray-400 py-2">All done!</p>
                   : pendingTasks.map(t => {
                     const isOverdue = t.due_date && t.due_date < TODAY;
@@ -579,21 +587,14 @@ export default function Dashboard() {
             </div>
           )}
 
-          {cfg.annualDuties.visible && (
+          {cfg.covenantPath.visible && (
             <div className="bg-white rounded-xl border border-gray-200 flex flex-col overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 flex-shrink-0">
-                <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Annual Duties Due ({dutiesDue.length})</span>
-                <Link to="/annual-duties" className="text-xs text-blue-400 hover:text-blue-600">↗</Link>
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Covenant Path</span>
+                <Link to="/covenant-path" className="text-xs text-blue-400 hover:text-blue-600">↗</Link>
               </div>
-              <div className="flex-1 overflow-y-auto px-4 py-2 min-h-0">
-                {dutiesDue.length === 0
-                  ? <p className="text-xs text-gray-400 py-2">None</p>
-                  : dutiesDue.map(d => (
-                    <div key={d.id} className="py-1">
-                      <span className={`${FONT_SIZE_CLASS[cfg.annualDuties.fontSize]} text-gray-800 truncate block`}>{d.title}</span>
-                    </div>
-                  ))
-                }
+              <div className="flex-1 overflow-y-auto px-4 py-1 min-h-0">
+                <BishopricCovenantAgenda textClass={FONT_SIZE_CLASS[cfg.covenantPath.fontSize]} />
               </div>
             </div>
           )}

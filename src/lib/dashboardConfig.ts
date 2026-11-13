@@ -47,7 +47,8 @@ export interface DashboardConfig {
   tasks: TasksConfig;
   callings: CallingsConfig;
   events: EventsConfig;
-  annualDuties: SectionConfig;
+  /** People the bishopric added from the Covenant Path page (replaced the Annual Duties panel, whose items are now in Action Items). */
+  covenantPath: SectionConfig;
 }
 
 export const DEFAULT_CONFIG: DashboardConfig = {
@@ -61,7 +62,7 @@ export const DEFAULT_CONFIG: DashboardConfig = {
   tasks:         { visible: true, fontSize: 'sm',  showAssignedTo: true },
   callings:      { visible: true, fontSize: 'sm',  showStatusBadge: true },
   events:        { visible: true, fontSize: 'sm',  showDate: true },
-  annualDuties:  { visible: true, fontSize: 'sm' },
+  covenantPath:  { visible: true, fontSize: 'sm' },
 };
 
 const CONFIG_KEY = 'dashboard_config_v1';
@@ -79,7 +80,7 @@ export function loadDashboardConfig(): DashboardConfig {
       tasks:            { ...DEFAULT_CONFIG.tasks,            ...saved.tasks            },
       callings:         { ...DEFAULT_CONFIG.callings,         ...saved.callings         },
       events:           { ...DEFAULT_CONFIG.events,           ...saved.events           },
-      annualDuties:     { ...DEFAULT_CONFIG.annualDuties,     ...saved.annualDuties     },
+      covenantPath:     { ...DEFAULT_CONFIG.covenantPath,     ...saved.covenantPath     },
     };
   } catch {
     return DEFAULT_CONFIG;

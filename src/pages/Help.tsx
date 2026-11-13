@@ -293,6 +293,7 @@ const FULL_SECTIONS: Section[] = [
         <p>Lists of members who may be ready for their next ordinance or blessing, built from the nightly LCR sync: patriarchal blessing, children approaching baptism, not baptized, priesthood office behind age, not endowed, married but not sealed, endowed without a current recommend, mission-age young men, part-member households (from LCR’s report), and households without a Melchizedek Priesthood holder.</p>
         <p>Click a list to open it. The ages for the patriarchal blessing, not baptized and not endowed lists can be changed at the top.</p>
         <p><strong>Hide</strong> takes someone off one list (for example a member who isn’t accountable), with an optional reason. Hidden people stay hidden for everyone until you click <strong>Show hidden</strong> and <strong>Restore</strong>.</p>
+        <p>Click <strong>+ Bishopric</strong> or <strong>+ Ward Council</strong> on anyone to put them on that group’s upcoming meetings: the Covenant Path section of the Current Bishopric Meeting, and “From the bishopric” on the Ward Council’s Discussion Topics page, plus a panel on each Dashboard. Add an optional note for the agenda. They stay on until you click the button again (or Remove on the agenda), or until they drop off the list because the step is done. The ward council only sees people you add for them, with the name, a general topic such as “Temple preparation”, and your note; it never sees the list name, ages or other details.</p>
         <p>LCR has no field for patriarchal blessings, so their status (Not received, Recommend issued, Received) is kept in the hub. Set it on the Patriarchal blessing list or in the Ordinances column on Ward Members.</p>
       </div>
     ),
@@ -406,7 +407,7 @@ const FULL_SECTIONS: Section[] = [
       <div className="space-y-2">
         <p>Recurring seasonal duties — tithing declaration, ward conference, annual budget, youth camp planning, and ward history. Each has a month window (edit it to match your ward's actual schedule).</p>
         <p>Duties are grouped into <strong>In Window Now</strong>, <strong>Upcoming</strong>, and <strong>Done This Year</strong>. Click <strong>Mark done</strong> once completed; it resets automatically the following year.</p>
-        <p>An <strong>Annual Duties Due</strong> panel on the Dashboard shows what's currently in-window and not yet done.</p>
+        <p>Duties that are currently in their window and not yet done show in the Dashboard’s <strong>Action Items</strong> panel, marked “annual duty”.</p>
       </div>
     ),
   },

@@ -1,5 +1,9 @@
 import { handbookOrganization } from '../../shared/callingGroups';
 import { normCallingKey } from '../../shared/callingNames';
+import {
+  buildCovenantPath, COUNCIL_TOPICS, DEFAULT_COVENANT_SETTINGS,
+  type CovenantAgendaEntry, type CovenantMember, type CovenantSettings,
+} from '../../shared/covenantPath';
 import { syncConduct, runDailyJobs, syncSettingApartInterviews, syncTempleRecommendInterviews } from './jobs';
 import { matchRosterMember, matchRosterMemberExact, splitLastFirstCased, toLastFirst, stripBold, type RosterMember, type RosterMemberNames } from './nameMatch';
 
@@ -78,6 +82,7 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'important-links': { name: 'important_links', orderBy: 'id ASC' },
   'ward-members': { name: 'ward_members', orderBy: 'last_name ASC, first_name ASC' },
   'covenant-path-exclusions': { name: 'covenant_path_exclusions', orderBy: 'id ASC' },
+  'covenant-path-agenda': { name: 'covenant_path_agenda', orderBy: 'id ASC' },
   'part-member-households': { name: 'part_member_households', orderBy: 'household ASC' },
   'lcr-sync-runs': { name: 'lcr_sync_runs', orderBy: 'id DESC' },
   'mailer-runs': { name: 'mailer_runs', orderBy: 'id DESC' },
@@ -427,6 +432,44 @@ async function resetFuturePresidingToBishop(db: D1Database, bishopName: string):
 function generateTempPassword(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   return Array.from(bytes, b => b.toString(36).padStart(2, '0')).join('').slice(0, 10);
+}
+
+/**
+ * Covenant Path agenda entries that are still on their list. Entries whose person
+ * has dropped off the list (the action is done) or been hidden from it are deleted.
+ */
+async function activeCovenantAgenda(db: D1Database): Promise<CovenantAgendaEntry[]> {
+  const [agenda, members, households, pipeline, exclusions, settingsRow, tzRow] = await Promise.all([
+    db.prepare('SELECT * FROM covenant_path_agenda ORDER BY id').all<{ id: number; category: string; subject_key: string; subject_name: string; note: string; for_bishopric: number; for_ward_council: number }>(),
+    db.prepare(`SELECT id, first_name, last_name, preferred_first_name, preferred_last_name, active, out_of_ward, birth_date, gender,
+      baptized, priesthood_office, endowed, recommend_type, recommend_expires, spouse_name, sealed_to_current_spouse,
+      head_of_house, returned_missionary, pb_status FROM ward_members WHERE active = 1`).all<CovenantMember>(),
+    db.prepare('SELECT household, relationships FROM part_member_households').all<{ household: string; relationships: string }>(),
+    db.prepare('SELECT ward_member_id FROM missionary_pipeline WHERE ward_member_id IS NOT NULL').all<{ ward_member_id: number }>(),
+    db.prepare('SELECT category, subject_key FROM covenant_path_exclusions').all<{ category: string; subject_key: string }>(),
+    db.prepare("SELECT value FROM ui_settings WHERE key = 'covenant_path_settings'").first<{ value: string }>(),
+    db.prepare("SELECT value FROM ui_settings WHERE key = 'app_timezone'").first<{ value: string }>(),
+  ]);
+  if (agenda.results.length === 0) return [];
+  let settings: CovenantSettings = DEFAULT_COVENANT_SETTINGS;
+  try { if (settingsRow?.value) settings = { ...DEFAULT_COVENANT_SETTINGS, ...JSON.parse(settingsRow.value) }; } catch { /* keep defaults */ }
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: tzRow?.value || 'America/Denver', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const categories = buildCovenantPath(members.results, households.results, new Set(pipeline.results.map(p => p.ward_member_id)), settings, today);
+  const hidden = new Set(exclusions.results.map(e => `${e.category}|${e.subject_key}`));
+  const out: CovenantAgendaEntry[] = [];
+  const stale: number[] = [];
+  for (const a of agenda.results) {
+    const cat = categories.find(c => c.id === a.category);
+    const item = cat?.items.find(i => i.key === a.subject_key);
+    if (!cat || !item || hidden.has(`${a.category}|${a.subject_key}`) || (!a.for_bishopric && !a.for_ward_council)) { stale.push(a.id); continue; }
+    out.push({
+      id: a.id, category: a.category, categoryTitle: cat.title, subject_key: a.subject_key,
+      subject_name: item.name, detail: item.detail, topic: COUNCIL_TOPICS[a.category] || 'Ward council discussion',
+      note: a.note || '', for_bishopric: a.for_bishopric, for_ward_council: a.for_ward_council,
+    });
+  }
+  if (stale.length > 0) await db.batch(stale.map(id => db.prepare('DELETE FROM covenant_path_agenda WHERE id = ?').bind(id)));
+  return out;
 }
 
 /** Emails are matched ignoring case and surrounding spaces (phones often capitalize the first letter). */
@@ -1307,6 +1350,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     return json({ error: 'Method not allowed' }, 405);
+  }
+
+  // Covenant Path agenda as each group sees it. The ward council only gets entries the
+  // bishopric opted in, with the name, a neutral topic and the note — nothing else.
+  if (routeParts[0] === 'covenant-path-agenda' && routeParts[1] === 'active' && method === 'GET') {
+    const hub = session.hub || 'both';
+    if (hub !== 'both' && hub !== 'bh' && hub !== 'wc') return json({ error: 'Forbidden' }, 403);
+    const entries = await activeCovenantAgenda(db);
+    if (hub === 'wc') {
+      return json(entries.filter(e => e.for_ward_council).map(e => ({ id: e.id, subject_name: e.subject_name, topic: e.topic, note: e.note })));
+    }
+    return json(entries);
   }
 
   // WC-only users: full CRUD on WC-owned tables; read-only on shared tables

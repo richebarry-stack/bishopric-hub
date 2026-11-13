@@ -1,4 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { BishopricCovenantAgenda } from '../components/CovenantAgenda';
 import { useTable } from '../lib/useTable';
 import type { BishopricMeeting, BishopricAgendaItem, BishopricMoveItem, SacramentTheme } from '../lib/api';
 import { Input, Textarea } from '../components/FormFields';
@@ -407,6 +409,16 @@ export default function CurrentBishopricMeeting() {
           <MoveItemsSection kind="other" date={date} title="Other Items" meetingDates={meetings} />
 
           <InterviewsNeededSection />
+
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold text-gray-700">Covenant Path</h2>
+              <Link to="/covenant-path" className="text-xs text-blue-500 hover:text-blue-700">Open Covenant Path</Link>
+            </div>
+            <div className="bg-white rounded-lg border border-gray-200 px-3 py-1">
+              <BishopricCovenantAgenda />
+            </div>
+          </section>
 
           <section>
             <div className="flex items-center justify-between mb-2">

@@ -54,6 +54,40 @@ export interface CovenantCategory {
 
 export interface PartMemberHousehold { household: string; relationships: string }
 
+/**
+ * The neutral topic the ward council sees for each list, so sensitive wording
+ * (not baptized, expired recommend, ages) stays with the bishopric.
+ */
+export const COUNCIL_TOPICS: Record<string, string> = {
+  'patriarchal-blessing': 'Patriarchal blessing',
+  'approaching-baptism': 'Baptism preparation',
+  'not-baptized': 'Gospel learning and support',
+  'priesthood': 'Priesthood preparation',
+  'not-endowed': 'Temple preparation',
+  'married-not-sealed': 'Temple preparation',
+  'no-recommend': 'Temple preparation',
+  'mission-age': 'Mission preparation',
+  'part-member': 'Family support',
+  'no-mp-holder': 'Ministering support',
+};
+
+/** An agenda entry as the bishopric sees it (still on its list). */
+export interface CovenantAgendaEntry {
+  id: number;
+  category: string;
+  categoryTitle: string;
+  subject_key: string;
+  subject_name: string;
+  detail: string;
+  topic: string;
+  note: string;
+  for_bishopric: number;
+  for_ward_council: number;
+}
+
+/** What ward council members get: no list name, detail or flags. */
+export interface CouncilAgendaEntry { id: number; subject_name: string; topic: string; note: string }
+
 /** Age in whole years on `today` (YYYY-MM-DD), or null without a full birth date. */
 export function ageOn(birthDate: string | null | undefined, today: string): number | null {
   if (!birthDate || !/^\d{4}-\d{2}-\d{2}/.test(birthDate)) return null;

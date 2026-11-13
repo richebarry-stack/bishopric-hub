@@ -716,6 +716,18 @@ export interface CovenantPathExclusion {
   updated_by?: string;
 }
 
+export interface CovenantAgendaRow {
+  id: number;
+  category: string;
+  subject_key: string;
+  subject_name: string;
+  for_bishopric: number;
+  for_ward_council: number;
+  note: string;
+  updated_at?: string;
+  updated_by?: string;
+}
+
 export interface PartMemberHousehold {
   id: number;
   household: string;

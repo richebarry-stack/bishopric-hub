@@ -20,6 +20,7 @@ export interface WcDashboardConfig {
   missionaries: WcMissionariesConfig;
   actionItems: TasksConfig;
   events: EventsConfig;
+  covenantPath: SectionConfig;
 }
 
 export const WC_DEFAULT_CONFIG: WcDashboardConfig = {
@@ -29,6 +30,7 @@ export const WC_DEFAULT_CONFIG: WcDashboardConfig = {
   missionaries: { visible: true, fontSize: 'base', showStatus: false },
   actionItems:  { visible: true, fontSize: 'sm', showAssignedTo: true },
   events:       { visible: true, fontSize: 'sm', showDate: true },
+  covenantPath: { visible: true, fontSize: 'sm' },
 };
 
 const CONFIG_KEY = 'wc_dashboard_config_v1';
@@ -46,6 +48,7 @@ export function loadWcDashboardConfig(): WcDashboardConfig {
       missionaries: { ...WC_DEFAULT_CONFIG.missionaries, ...saved.missionaries },
       actionItems:  { ...WC_DEFAULT_CONFIG.actionItems,  ...saved.actionItems  },
       events:       { ...WC_DEFAULT_CONFIG.events,       ...saved.events       },
+      covenantPath: { ...WC_DEFAULT_CONFIG.covenantPath, ...saved.covenantPath },
     };
   } catch {
     return WC_DEFAULT_CONFIG;
