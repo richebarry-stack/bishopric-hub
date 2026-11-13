@@ -300,7 +300,9 @@ export default function CallingPipeline() {
       delete (data as Record<string, unknown>).id;
       if (editing.id) await update(editing.id, data as Record<string, unknown>);
       else await create(data as Record<string, unknown>);
-      if (editing.type === 'Release' && giveNewCall && newCall.calling.trim()) {
+      // A blank new calling still adds the person for consideration, like
+      // "Add for calling consideration" on All Callings.
+      if (editing.type === 'Release' && giveNewCall && stripBold(editing.member || '').trim()) {
         await create({
           member: editing.member || '',
           calling: newCall.calling.trim(),
@@ -313,7 +315,9 @@ export default function CallingPipeline() {
           type: 'Calling',
           ward_member_id: editing.ward_member_id ?? null,
         }, { silent: true });
-        toast.success(`Also added a Calling entry for ${newCall.calling.trim()}`);
+        toast.success(newCall.calling.trim()
+          ? `Also added a Calling entry for ${newCall.calling.trim()}`
+          : `Also added ${stripBold(editing.member || '').trim()} for calling consideration`);
       }
       if (editing.type === 'Release' && findReplacement && (editing.calling || '').trim()) {
         // Same placeholder wording as "Consider for release" on All Callings.
@@ -744,6 +748,7 @@ export default function CallingPipeline() {
                     </div>
                     <Select label="New calling organization" value={newCall.organization}
                       onChange={v => setNewCall(n => ({ ...n, organization: v }))} options={orgOptions(newCall.organization)} />
+                    <p className="col-span-2 text-xs text-gray-600">Leave the calling blank to add them for calling consideration without one picked yet.</p>
                   </div>
                 )}
               </div>

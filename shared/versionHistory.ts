@@ -8,6 +8,7 @@ export const VERSION_HISTORY: VersionEntry[] = [
             {
               date: 'Nov 11, 2026',
               items: [
+                'Calling Pipeline: on a release, ticking “Also give [person] a new calling” and leaving the calling blank now adds them for calling consideration (like “Add for calling consideration” on All Callings). Before, nothing was added.',
                 'New page: My Notes & To-Dos (under My Actions in the menu). A private scratch pad only you can see. Add an item as a To-Do or a Note, with an optional due date and an importance of High, Medium or Low. Check off To-Dos when finished; they move to a Done list. Overdue To-Dos are marked in red.',
                 'Calling Pipeline: new "1.5 On hold" status, between Discussion and Pray about, for both callings and releases.',
                 'Calling Pipeline: the Calling field now suggests the ward’s callings from LCR as you type. Picking one fills in its organization. You can still type any calling.',
