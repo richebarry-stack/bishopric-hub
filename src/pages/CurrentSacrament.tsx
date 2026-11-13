@@ -778,14 +778,16 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
     const dateLabel = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
       weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
     });
+    // Agenda text is typed by users, so escape it before building the print page's HTML.
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const bodyLines = generateText().split('\n').map(l => {
       if (!l.trim()) return '<br>';
-      if (l.startsWith('    ')) return `<p style="margin:0.05rem 0 0.1rem 2.5rem;color:#555;font-size:12pt">${l.trim()}</p>`;
-      if (l.startsWith('  •')) return `<p style="margin:0.15rem 0 0.15rem 1.5rem">• ${l.trim().slice(1).trim()}</p>`;
-      if (l === 'Bearing of Testimonies') return `<p style="margin:0.3rem 0"><strong>${l}</strong></p>`;
+      if (l.startsWith('    ')) return `<p style="margin:0.05rem 0 0.1rem 2.5rem;color:#555;font-size:12pt">${esc(l.trim())}</p>`;
+      if (l.startsWith('  •')) return `<p style="margin:0.15rem 0 0.15rem 1.5rem">• ${esc(l.trim().slice(1).trim())}</p>`;
+      if (l === 'Bearing of Testimonies') return `<p style="margin:0.3rem 0"><strong>${esc(l)}</strong></p>`;
       const ci = l.indexOf(':');
-      if (ci > -1) return `<p style="margin:0.3rem 0"><strong>${l.slice(0, ci)}:</strong>${l.slice(ci + 1)}</p>`;
-      return `<p style="margin:0.3rem 0">${l}</p>`;
+      if (ci > -1) return `<p style="margin:0.3rem 0"><strong>${esc(l.slice(0, ci))}:</strong>${esc(l.slice(ci + 1))}</p>`;
+      return `<p style="margin:0.3rem 0">${esc(l)}</p>`;
     }).join('');
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${dateLabel} — Sacrament Meeting</title>
 <style>body{font-family:Georgia,serif;max-width:580px;margin:2rem auto;color:#111;font-size:13pt}h1{font-size:1.1rem;text-align:center;border-bottom:1px solid #ccc;padding-bottom:0.6rem;margin-bottom:1.2rem}@media print{@page{margin:1.5cm}.no-print{display:none}}</style>

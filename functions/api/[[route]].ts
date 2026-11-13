@@ -32,7 +32,9 @@ async function registerEmailDestination(env: Env, email: string): Promise<{ ok: 
     if (cfError?.code === 2025) return { ok: false, error: 'A verification email was already sent to this address recently — try again in a few minutes.' };
     return { ok: false, error: cfError ? `Cloudflare: ${cfError.message}` : `Cloudflare API returned ${res.status}` };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    // Keep internal error details out of the response; they go to the Worker log instead.
+    console.error('registerEmailDestination failed:', err);
+    return { ok: false, error: 'Could not reach Cloudflare to register this email address. Try again in a few minutes.' };
   }
 }
 
