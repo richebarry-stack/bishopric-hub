@@ -472,6 +472,26 @@ async function activeCovenantAgenda(db: D1Database): Promise<CovenantAgendaEntry
   return out;
 }
 
+// Column names per table, read once per Worker instance.
+const columnCache = new Map<string, Set<string>>();
+
+/**
+ * Drops request fields that aren't columns of `table` (and `id`), so field names from a
+ * request can't inject SQL when they're used as column names. Unknown fields were never
+ * valid anyway: the database would have rejected them.
+ */
+async function keepKnownColumns(db: D1Database, table: string, body: Record<string, unknown>): Promise<void> {
+  let cols = columnCache.get(table);
+  if (!cols) {
+    const { results } = await db.prepare('SELECT name FROM pragma_table_info(?)').bind(table).all<{ name: string }>();
+    cols = new Set(results.map(r => r.name));
+    if (cols.size > 0) columnCache.set(table, cols);
+  }
+  for (const k of Object.keys(body)) {
+    if (k === 'id' || !cols.has(k)) delete body[k];
+  }
+}
+
 /** Emails are matched ignoring case and surrounding spaces (phones often capitalize the first letter). */
 function normEmail(email: unknown): string {
   return String(email ?? '').trim().toLowerCase();
@@ -1083,16 +1103,29 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // Shared UI settings (any authenticated user reads; any authenticated user writes)
   if (routeParts[0] === 'ui-settings' && routeParts[1]) {
     const key = routeParts[1];
+    // Only page-layout settings go through here, each for the hubs that use it. Everything
+    // else (time zone, mailer schedule, email settings, ward name, job logs) has its own
+    // admin-checked endpoint, so it can't be read or overwritten from this one.
+    const UI_SETTING_HUBS: Record<string, string[]> = {
+      covenant_path_settings: ['both', 'bh'],
+      wc_discussion_col_widths: ['both', 'bh', 'wc'],
+      wc_discussion_orgs: ['both', 'bh', 'wc'],
+    };
+    const allowedHubs = UI_SETTING_HUBS[key];
+    if (!allowedHubs || !allowedHubs.includes(session.hub || 'both')) return json({ error: 'Forbidden' }, 403);
+    if (method === 'PUT' && session.role === 'guest') return json({ error: 'Forbidden' }, 403);
     if (method === 'GET') {
       const row = await db.prepare('SELECT value FROM ui_settings WHERE key = ?').bind(key).first<{ value: string }>();
       return json(row ? JSON.parse(row.value) : {});
     }
     if (method === 'PUT') {
       const body = await request.json() as Record<string, unknown>;
+      const value = JSON.stringify(body);
+      if (value.length > 20000) return json({ error: 'Setting is too large' }, 413);
       const now = new Date().toISOString();
       await db.prepare(
         'INSERT INTO ui_settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at'
-      ).bind(key, JSON.stringify(body), now).run();
+      ).bind(key, value, now).run();
       return json({ ok: true });
     }
     return json({ error: 'Method not allowed' }, 405);
@@ -1378,6 +1411,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         body.shared_with_wc = 1;
         body.updated_by = session.name;
         delete body.id;
+        await keepKnownColumns(db, 'member_needs', body);
         const keys = Object.keys(body);
         const result = await db.prepare(
           `INSERT INTO member_needs (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
@@ -1400,6 +1434,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           body.shared_with_wc = 1;
           body.updated_at = new Date().toISOString();
           body.updated_by = session.name;
+          await keepKnownColumns(db, 'member_needs', body);
           const keys = Object.keys(body);
           await db.prepare(`UPDATE member_needs SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`)
             .bind(...keys.map(k => body[k]), needId).run();
@@ -1428,6 +1463,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           }
           body.updated_by = session.name;
           delete body.id;
+          await keepKnownColumns(db, 'tasks', body);
           const keys = Object.keys(body);
           const result = await db.prepare(
             `INSERT INTO tasks (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
@@ -1452,6 +1488,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           const body = await request.json() as Record<string, unknown>;
           body.hub = 'Ward Council';
           delete body.id;
+          await keepKnownColumns(db, 'hub_suggestions', body);
           const keys = Object.keys(body);
           const result = await db.prepare(
             `INSERT INTO hub_suggestions (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
@@ -1533,6 +1570,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           }
           body.updated_by = session.name;
           delete body.id;
+          await keepKnownColumns(db, 'tasks', body);
           const keys = Object.keys(body);
           const result = await db.prepare(
             `INSERT INTO tasks (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
@@ -1576,6 +1614,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
       body.updated_by = session.name;
       delete body.id;
+      await keepKnownColumns(db, 'tasks', body);
       const keys = Object.keys(body);
       const result = await db.prepare(
         `INSERT INTO tasks (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
@@ -1607,6 +1646,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const body = await request.json() as Record<string, unknown>;
       if (!body.hub) body.hub = viewHub === 'wc' ? 'Ward Council' : 'Bishopric';
       delete body.id;
+      await keepKnownColumns(db, 'hub_suggestions', body);
       const keys = Object.keys(body);
       const result = await db.prepare(
         `INSERT INTO hub_suggestions (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`
@@ -2417,6 +2457,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (tableName === 'calling-pipeline') await linkCallingMember(db, body);
     const clash = await scheduleClash(db, tableName, body);
     if (clash) return clash;
+    await keepKnownColumns(db, tableConfig.name, body);
     const keys = Object.keys(body);
     const placeholders = keys.map(() => '?').join(', ');
     const values = keys.map(k => body[k]);
@@ -2463,6 +2504,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     body.updated_at = new Date().toISOString();
     body.updated_by = session.name;
     if (tableName === 'calling-pipeline') await linkCallingMember(db, body);
+    await keepKnownColumns(db, tableConfig.name, body);
     const keys = Object.keys(body);
     const setClause = keys.map(k => `${k} = ?`).join(', ');
     const values = keys.map(k => body[k]);
