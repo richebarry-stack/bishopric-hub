@@ -2113,6 +2113,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       name: string; full_name: string | null; birth_date: string | null;
       baptized?: boolean; baptism_date: string | null; priesthood_office: string | null; ordination_date: string | null;
       endowed: boolean; endowment_date: string | null; sealed_to_spouse: boolean; sealing_date: string | null;
+      spouse_name?: string | null; sealed_to_current_spouse?: boolean; sealed_to_prior_spouse?: boolean;
     };
     const body = await request.json() as { rows?: OrdRow[] };
     const rows = (body.rows || []).slice(0, 2000);
@@ -2125,17 +2126,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         if (d && !dateRe.test(d)) return json({ error: `Invalid date "${d}" for "${r.name}"` }, 400);
       }
       if (r.priesthood_office && r.priesthood_office.length > 60) return json({ error: `Priesthood office too long for "${r.name}"` }, 400);
+      if (r.spouse_name && r.spouse_name.length > 120) return json({ error: `Spouse name too long for "${r.name}"` }, 400);
     }
 
     interface OrdMember extends RosterMember {
       birth_date: string | null; baptized: number | null; baptism_date: string | null;
       priesthood_office: string | null; ordination_date: string | null; endowed: number | null;
       endowment_date: string | null; sealed_to_spouse: number | null; sealing_date: string | null;
+      spouse_name: string | null; sealed_to_current_spouse: number | null; sealed_to_prior_spouse: number | null;
       ordinances_synced_at: string | null;
     }
     const roster = (await db.prepare(
       `SELECT id, first_name, last_name, birth_date, baptized, baptism_date, priesthood_office, ordination_date,
-              endowed, endowment_date, sealed_to_spouse, sealing_date, ordinances_synced_at
+              endowed, endowment_date, sealed_to_spouse, sealing_date,
+              spouse_name, sealed_to_current_spouse, sealed_to_prior_spouse, ordinances_synced_at
        FROM ward_members WHERE active = 1`
     ).all<OrdMember>()).results;
 
@@ -2187,6 +2191,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         endowment_date: r.endowment_date || null,
         sealed_to_spouse: r.sealed_to_spouse || r.sealing_date ? 1 : 0,
         sealing_date: r.sealing_date || null,
+        // Older sync scripts don't send these; leave what's stored alone in that case.
+        ...(r.spouse_name !== undefined ? {
+          spouse_name: (r.spouse_name || '').trim() || null,
+          sealed_to_current_spouse: r.sealed_to_current_spouse ? 1 : 0,
+          sealed_to_prior_spouse: r.sealed_to_prior_spouse ? 1 : 0,
+        } : {}),
       };
       const keys = Object.keys(next) as (keyof typeof next)[];
       const diff = keys.filter(k => (m[k] ?? null) !== next[k]);

@@ -639,6 +639,9 @@ export interface WardMember {
   endowment_date: string | null;
   sealed_to_spouse: number | null;
   sealing_date: string | null;
+  spouse_name?: string | null;
+  sealed_to_current_spouse?: number | null;
+  sealed_to_prior_spouse?: number | null;
   updated_at: string;
 }
 
