@@ -164,7 +164,7 @@ export default function CovenantPath() {
         <h1 className="text-2xl font-bold text-gray-900">Covenant Path</h1>
         <p className="text-sm text-gray-500 mt-1">
           Members who may be ready for their next ordinance or blessing, from the nightly LCR sync
-          {lastSynced ? ` (last updated ${lastSynced.slice(0, 10)})` : ''}. Patriarchal blessings are tracked here in the hub.
+          {lastSynced ? ` (last updated ${lastSynced.slice(0, 10)})` : ''}. Patriarchal blessings come from LCR’s Patriarchal Blessing Status report; mark Recommend issued (or a blessing LCR doesn’t show yet) by hand.
           Hide anyone a list doesn’t fit; they stay hidden until restored.
         </p>
       </div>

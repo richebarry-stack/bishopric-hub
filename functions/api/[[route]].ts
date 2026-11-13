@@ -2205,6 +2205,51 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // (baptism, priesthood office, endowment, sealing to spouse). Rows are matched by
   // last name + birth date first — far more reliable than names alone — then by
   // name. Only writes members whose values actually changed.
+  // LCR's Patriarchal Blessing Status report, posted by the LCR sync. A "Yes" marks the
+  // member Received. A "No" changes nothing: the report only lists blessings already
+  // recorded at Church headquarters, so a status set by hand (a recent blessing, or
+  // Recommend issued) is kept.
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'sync-patriarchal-blessings' && method === 'POST') {
+    const body = await request.json() as { rows?: { name: string; gender?: string; age?: number | null; received: boolean }[] };
+    const rows = (body.rows || []).slice(0, 3000);
+    for (const r of rows) {
+      if (!r.name || typeof r.name !== 'string' || r.name.length > 160) return json({ error: 'Each row needs a name (160 characters or fewer)' }, 400);
+    }
+    type PbMember = RosterMember & { preferred_first_name: string | null; preferred_last_name: string | null; birth_date: string | null; pb_status: string | null };
+    const roster = (await db.prepare(
+      'SELECT id, first_name, last_name, preferred_first_name, preferred_last_name, birth_date, pb_status FROM ward_members WHERE active = 1'
+    ).all<PbMember>()).results;
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const ageOf = (b: string | null) => {
+      if (!b || !/^\d{4}-\d{2}-\d{2}/.test(b)) return null;
+      const [y, m, d] = b.split('-').map(Number);
+      const [ty, tm, td] = todayIso.split('-').map(Number);
+      return ty - y - (tm < m || (tm === m && td < d) ? 1 : 0);
+    };
+    const preferredKey = (m: PbMember) => `${(m.preferred_last_name || m.last_name).trim()}, ${(m.preferred_first_name || m.first_name).trim()}`.toLowerCase();
+    const byPreferred = new Map<string, PbMember[]>();
+    for (const m of roster) { const k = preferredKey(m); byPreferred.set(k, [...(byPreferred.get(k) || []), m]); }
+    const ageFits = (m: PbMember, age: number | null | undefined) => {
+      const a = ageOf(m.birth_date);
+      return age == null || a === null || Math.abs(a - age) <= 1;
+    };
+    const unmatched: string[] = [];
+    const ids: number[] = [];
+    let matched = 0;
+    for (const r of rows) {
+      const exact = (byPreferred.get(r.name.trim().toLowerCase()) || []).filter(m => ageFits(m, r.age));
+      const m = exact.length === 1 ? exact[0] : (() => { const f = matchRosterMember(r.name, roster); return f && ageFits(f, r.age) ? f : null; })();
+      if (!m) { unmatched.push(r.name); continue; }
+      matched++;
+      if (r.received && m.pb_status !== 'Received') ids.push(m.id);
+    }
+    const now = new Date().toISOString();
+    if (ids.length > 0) {
+      await db.batch(ids.map(id => db.prepare("UPDATE ward_members SET pb_status = 'Received', updated_at = ?, updated_by = ? WHERE id = ?").bind(now, session.name, id)));
+    }
+    return json({ ok: true, matched, updated: ids.length, unmatched });
+  }
+
   // LCR's Part-Member Households report, posted by the LCR sync; replaces the stored list.
   if (routeParts[0] === 'ward-members' && routeParts[1] === 'sync-part-member-households' && method === 'POST') {
     const body = await request.json() as { rows?: { household: string; relationships: string[] }[] };

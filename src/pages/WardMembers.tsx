@@ -219,9 +219,9 @@ function SortHeader({ label, sortKey, current, asc, onSort, align = 'left', clas
 
 // Read-only ordinance badges synced from LCR; dates show on hover.
 function OrdinancesCell({ member: m, onSavePb }: { member: WardMember; onSavePb: (status: string) => void }) {
-  // Patriarchal blessing status is tracked in the hub (LCR has no field for it), so it's editable here.
+  // Patriarchal blessing status: the LCR sync marks Received from LCR's report; Recommend issued or a recent blessing is set here.
   const pb = (
-    <select value={m.pb_status || ''} onChange={e => onSavePb(e.target.value)} title="Patriarchal blessing (tracked in the hub)"
+    <select value={m.pb_status || ''} onChange={e => onSavePb(e.target.value)} title="Patriarchal blessing (Received comes from LCR; set others here)"
       aria-label="Patriarchal blessing status"
       className={`text-xs rounded px-1 py-0.5 border ${m.pb_status === 'Received' ? 'bg-gray-100 text-gray-700 border-transparent' : 'bg-white text-gray-500 border-gray-200'}`}>
       <option value="">PB: not set</option>

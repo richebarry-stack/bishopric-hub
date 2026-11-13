@@ -294,7 +294,7 @@ const FULL_SECTIONS: Section[] = [
         <p>Click a list to open it. The ages for the patriarchal blessing, not baptized and not endowed lists can be changed at the top.</p>
         <p><strong>Hide</strong> takes someone off one list (for example a member who isn’t accountable), with an optional reason. Hidden people stay hidden for everyone until you click <strong>Show hidden</strong> and <strong>Restore</strong>.</p>
         <p>Click <strong>+ Bishopric</strong> or <strong>+ Ward Council</strong> on anyone to put them on that group’s upcoming meetings: the Covenant Path section of the Current Bishopric Meeting, and “From the bishopric” on the Ward Council’s Discussion Topics page, plus a panel on each Dashboard. Add an optional note for the agenda. They stay on until you click the button again (or Remove on the agenda), or until they drop off the list because the step is done. The ward council only sees people you add for them, with the name, a general topic such as “Temple preparation”, and your note; it never sees the list name, ages or other details.</p>
-        <p>LCR has no field for patriarchal blessings, so their status (Not received, Recommend issued, Received) is kept in the hub. Set it on the Patriarchal blessing list or in the Ordinances column on Ward Members.</p>
+        <p>Patriarchal blessing status (Not received, Recommend issued, Received) comes from LCR’s Patriarchal Blessing Status report each night: anyone LCR shows as received is marked Received. That report only lists blessings already recorded at Church headquarters, so mark a recent blessing or a Recommend issued by hand on the Patriarchal blessing list or in the Ordinances column on Ward Members.</p>
       </div>
     ),
   },
