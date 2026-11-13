@@ -47,6 +47,7 @@ const WcWins = lazyWithReload(() => import('./pages/WcWins'));
 const WcDiscussionTopics = lazyWithReload(() => import('./pages/WcDiscussionTopics'));
 const HubSuggestions = lazyWithReload(() => import('./pages/HubSuggestions'));
 const Ordinances = lazyWithReload(() => import('./pages/Ordinances'));
+const CovenantPath = lazyWithReload(() => import('./pages/CovenantPath'));
 const AnnualDuties = lazyWithReload(() => import('./pages/AnnualDuties'));
 const YcMeetings = lazyWithReload(() => import('./pages/YcMeetings'));
 const MyActions = lazyWithReload(() => import('./pages/MyActions'));
@@ -215,6 +216,7 @@ function AppRoutes() {
         <Route path="/ward-members" element={<WardMembers />} />
         <Route path="/all-callings" element={<AllCallings />} />
         <Route path="/ordinances" element={<Ordinances />} />
+        <Route path="/covenant-path" element={<CovenantPath />} />
         <Route path="/annual-duties" element={<AnnualDuties />} />
         <Route path="/yc-meetings" element={<YcMeetings />} />
         <Route path="/tithing-declarations" element={<TithingDeclarationSchedule />} />

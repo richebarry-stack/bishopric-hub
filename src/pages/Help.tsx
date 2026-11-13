@@ -286,6 +286,18 @@ const FULL_SECTIONS: Section[] = [
     ),
   },
   {
+    title: 'Covenant Path',
+    icon: '↗',
+    content: (
+      <div className="space-y-2">
+        <p>Lists of members who may be ready for their next ordinance or blessing, built from the nightly LCR sync: patriarchal blessing, children approaching baptism, not baptized, priesthood office behind age, not endowed, married but not sealed, endowed without a current recommend, mission-age young men, part-member households (from LCR’s report), and households without a Melchizedek Priesthood holder.</p>
+        <p>Click a list to open it. The ages for the patriarchal blessing, not baptized and not endowed lists can be changed at the top.</p>
+        <p><strong>Hide</strong> takes someone off one list (for example a member who isn’t accountable), with an optional reason. Hidden people stay hidden for everyone until you click <strong>Show hidden</strong> and <strong>Restore</strong>.</p>
+        <p>LCR has no field for patriarchal blessings, so their status (Not received, Recommend issued, Received) is kept in the hub. Set it on the Patriarchal blessing list or in the Ordinances column on Ward Members.</p>
+      </div>
+    ),
+  },
+  {
     title: 'Tasks',
     icon: '☑',
     content: (

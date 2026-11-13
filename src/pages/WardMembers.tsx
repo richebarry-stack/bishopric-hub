@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { PB_STATUSES } from '../../shared/covenantPath';
 import { useTable } from '../lib/useTable';
 import { toast } from '../lib/toast';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -217,8 +218,17 @@ function SortHeader({ label, sortKey, current, asc, onSort, align = 'left', clas
 }
 
 // Read-only ordinance badges synced from LCR; dates show on hover.
-function OrdinancesCell({ member: m }: { member: WardMember }) {
-  if (m.baptized === null || m.baptized === undefined) return <span className="text-gray-300 text-xs">—</span>;
+function OrdinancesCell({ member: m, onSavePb }: { member: WardMember; onSavePb: (status: string) => void }) {
+  // Patriarchal blessing status is tracked in the hub (LCR has no field for it), so it's editable here.
+  const pb = (
+    <select value={m.pb_status || ''} onChange={e => onSavePb(e.target.value)} title="Patriarchal blessing (tracked in the hub)"
+      aria-label="Patriarchal blessing status"
+      className={`text-xs rounded px-1 py-0.5 border ${m.pb_status === 'Received' ? 'bg-gray-100 text-gray-700 border-transparent' : 'bg-white text-gray-500 border-gray-200'}`}>
+      <option value="">PB: not set</option>
+      {PB_STATUSES.map(s => <option key={s} value={s}>PB: {s}</option>)}
+    </select>
+  );
+  if (m.baptized === null || m.baptized === undefined) return <div className="flex flex-wrap gap-1 items-center"><span className="text-gray-300 text-xs">—</span>{pb}</div>;
   const badge = (label: string, title: string, cls: string) => (
     <span key={label} title={title} className={`text-xs rounded px-1.5 py-0.5 whitespace-nowrap ${cls}`}>{label}</span>
   );
@@ -229,10 +239,10 @@ function OrdinancesCell({ member: m }: { member: WardMember }) {
   if (m.priesthood_office) badges.push(badge(m.priesthood_office, `Ordained ${m.priesthood_office}${m.ordination_date ? ` ${m.ordination_date}` : ''}`, on));
   if (m.endowed) badges.push(badge('Endowed', `Endowed${m.endowment_date ? ` ${m.endowment_date}` : ''}`, on));
   if (m.sealed_to_spouse) badges.push(badge('Sealed', `Sealed to spouse${m.sealing_date ? ` ${m.sealing_date}` : ''}`, on));
-  return <div className="flex flex-wrap gap-1">{badges}</div>;
+  return <div className="flex flex-wrap gap-1 items-center">{badges}{pb}</div>;
 }
 
-function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, lcrCallingsByMember, sortKey, sortAsc, onSort, showRecommend = true }: {
+function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclude, onSaveBirthDate, onSaveGender, onSaveName, onSavePreferredName, onToggleOutOfWard, onSaveRecommend, onSavePb, lcrCallingsByMember, sortKey, sortAsc, onSort, showRecommend = true }: {
   title: string;
   members: WardMember[];
   onToggleActive: (m: WardMember) => void;
@@ -244,6 +254,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
   onSavePreferredName: (m: WardMember, fields: { preferred_first_name: string; preferred_last_name: string }) => void;
   onToggleOutOfWard: (m: WardMember) => void;
   onSaveRecommend: (m: WardMember, fields: { recommend_type: string; recommend_expires: string }) => void;
+  onSavePb: (m: WardMember, status: string) => void;
   lcrCallingsByMember: Map<number, MemberCalling[]>;
   sortKey: SortKey;
   sortAsc: boolean;
@@ -303,7 +314,7 @@ function MemberSection({ title, members, onToggleActive, onDelete, onToggleExclu
                   <GenderCell member={m} onSave={v => onSaveGender(m, v)} />
                 </td>
                 <td className="px-4 py-2">
-                  <OrdinancesCell member={m} />
+                  <OrdinancesCell member={m} onSavePb={v => onSavePb(m, v)} />
                 </td>
                 <td className="px-4 py-2 text-center">
                   {m.active ? (
@@ -484,6 +495,10 @@ export default function WardMembers() {
     update(m.id, { out_of_ward: m.out_of_ward ? 0 : 1 } as unknown as Record<string, unknown>);
   }, [update]);
 
+  const savePb = useCallback((m: WardMember, status: string) => {
+    update(m.id, { pb_status: status || null } as unknown as Record<string, unknown>);
+  }, [update]);
+
   const saveRecommend = useCallback((m: WardMember, fields: { recommend_type: string; recommend_expires: string }) => {
     update(m.id, fields as unknown as Record<string, unknown>);
     const linkedYouthInterview = interviews.find(i => i.ward_member_id === m.id && YOUTH_TYPES.has(i.type_of_interview));
@@ -520,7 +535,7 @@ export default function WardMembers() {
   const sectionProps = {
     onToggleActive: toggleActive, onDelete: handleDelete, onToggleExclude: toggleExclude,
     onSaveBirthDate: saveBirthDate, onSaveGender: saveGender, onSaveName: saveName,
-    onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard, onSaveRecommend: saveRecommend,
+    onSavePreferredName: savePreferredName, onToggleOutOfWard: toggleOutOfWard, onSaveRecommend: saveRecommend, onSavePb: savePb,
     lcrCallingsByMember,
     sortKey, sortAsc, onSort: handleSort,
   };

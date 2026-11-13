@@ -77,6 +77,8 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'sacrament-agenda-exclusions': { name: 'sacrament_agenda_exclusions', orderBy: 'id ASC' },
   'important-links': { name: 'important_links', orderBy: 'id ASC' },
   'ward-members': { name: 'ward_members', orderBy: 'last_name ASC, first_name ASC' },
+  'covenant-path-exclusions': { name: 'covenant_path_exclusions', orderBy: 'id ASC' },
+  'part-member-households': { name: 'part_member_households', orderBy: 'household ASC' },
   'lcr-sync-runs': { name: 'lcr_sync_runs', orderBy: 'id DESC' },
   'mailer-runs': { name: 'mailer_runs', orderBy: 'id DESC' },
   'youth-activities': { name: 'youth_activities', orderBy: 'date ASC' },
@@ -2108,12 +2110,30 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // (baptism, priesthood office, endowment, sealing to spouse). Rows are matched by
   // last name + birth date first — far more reliable than names alone — then by
   // name. Only writes members whose values actually changed.
+  // LCR's Part-Member Households report, posted by the LCR sync; replaces the stored list.
+  if (routeParts[0] === 'ward-members' && routeParts[1] === 'sync-part-member-households' && method === 'POST') {
+    const body = await request.json() as { rows?: { household: string; relationships: string[] }[] };
+    const rows = (body.rows || []).slice(0, 1000);
+    for (const r of rows) {
+      if (!r.household || typeof r.household !== 'string' || r.household.length > 160) return json({ error: 'Each row needs a household name (160 characters or fewer)' }, 400);
+      if (!Array.isArray(r.relationships) || r.relationships.some(x => typeof x !== 'string' || x.length > 80)) return json({ error: `Bad relationships for "${r.household}"` }, 400);
+    }
+    const now = new Date().toISOString();
+    await db.batch([
+      db.prepare('DELETE FROM part_member_households'),
+      ...rows.map(r => db.prepare('INSERT INTO part_member_households (household, relationships, synced_at) VALUES (?, ?, ?)')
+        .bind(r.household.trim(), r.relationships.map(x => x.trim()).filter(Boolean).join('; '), now)),
+    ]);
+    return json({ ok: true, households: rows.length });
+  }
+
   if (routeParts[0] === 'ward-members' && routeParts[1] === 'sync-ordinances' && method === 'POST') {
     type OrdRow = {
       name: string; full_name: string | null; birth_date: string | null;
       baptized?: boolean; baptism_date: string | null; priesthood_office: string | null; ordination_date: string | null;
       endowed: boolean; endowment_date: string | null; sealed_to_spouse: boolean; sealing_date: string | null;
       spouse_name?: string | null; sealed_to_current_spouse?: boolean; sealed_to_prior_spouse?: boolean;
+      head_of_house?: string | null; household_position?: string | null; returned_missionary?: boolean;
     };
     const body = await request.json() as { rows?: OrdRow[] };
     const rows = (body.rows || []).slice(0, 2000);
@@ -2127,6 +2147,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
       if (r.priesthood_office && r.priesthood_office.length > 60) return json({ error: `Priesthood office too long for "${r.name}"` }, 400);
       if (r.spouse_name && r.spouse_name.length > 120) return json({ error: `Spouse name too long for "${r.name}"` }, 400);
+      if ((r.head_of_house && r.head_of_house.length > 120) || (r.household_position && r.household_position.length > 60)) return json({ error: `Household details too long for "${r.name}"` }, 400);
     }
 
     interface OrdMember extends RosterMember {
@@ -2134,12 +2155,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       priesthood_office: string | null; ordination_date: string | null; endowed: number | null;
       endowment_date: string | null; sealed_to_spouse: number | null; sealing_date: string | null;
       spouse_name: string | null; sealed_to_current_spouse: number | null; sealed_to_prior_spouse: number | null;
+      head_of_house: string | null; household_position: string | null; returned_missionary: number | null;
       ordinances_synced_at: string | null;
     }
     const roster = (await db.prepare(
       `SELECT id, first_name, last_name, birth_date, baptized, baptism_date, priesthood_office, ordination_date,
               endowed, endowment_date, sealed_to_spouse, sealing_date,
-              spouse_name, sealed_to_current_spouse, sealed_to_prior_spouse, ordinances_synced_at
+              spouse_name, sealed_to_current_spouse, sealed_to_prior_spouse,
+              head_of_house, household_position, returned_missionary, ordinances_synced_at
        FROM ward_members WHERE active = 1`
     ).all<OrdMember>()).results;
 
@@ -2196,6 +2219,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           spouse_name: (r.spouse_name || '').trim() || null,
           sealed_to_current_spouse: r.sealed_to_current_spouse ? 1 : 0,
           sealed_to_prior_spouse: r.sealed_to_prior_spouse ? 1 : 0,
+        } : {}),
+        ...(r.head_of_house !== undefined ? {
+          head_of_house: (r.head_of_house || '').trim() || null,
+          household_position: (r.household_position || '').trim() || null,
+          returned_missionary: r.returned_missionary ? 1 : 0,
         } : {}),
       };
       const keys = Object.keys(next) as (keyof typeof next)[];

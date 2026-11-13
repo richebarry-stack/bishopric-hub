@@ -642,6 +642,12 @@ export interface WardMember {
   spouse_name?: string | null;
   sealed_to_current_spouse?: number | null;
   sealed_to_prior_spouse?: number | null;
+  head_of_house?: string | null;
+  household_position?: string | null;
+  returned_missionary?: number | null;
+  /** 'Not received' | 'Recommend issued' | 'Received'; tracked in the hub (LCR has no field for it). */
+  pb_status?: string | null;
+  pb_date?: string | null;
   updated_at: string;
 }
 
@@ -698,6 +704,23 @@ export interface Ordinance {
   notes: string;
   updated_at: string;
   updated_by?: string;
+}
+
+export interface CovenantPathExclusion {
+  id: number;
+  category: string;
+  subject_key: string;
+  subject_name: string;
+  reason: string;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+export interface PartMemberHousehold {
+  id: number;
+  household: string;
+  relationships: string;
+  synced_at: string;
 }
 
 export interface OrdinanceSuggestionDismissal {
