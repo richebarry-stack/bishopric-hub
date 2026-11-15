@@ -85,6 +85,7 @@ function NeedList({ items, onToggle, newValue, onChangeNew, onAdd, placeholder, 
               title="Remove from prayer list"
             >🙏</button>
             <span className={`${FONT_SIZE_CLASS[fontSize]} font-medium text-gray-800 leading-tight`}>{n.who}</span>
+            {n.what && <span className="text-xs text-gray-400 truncate">{n.what}</span>}
           </div>
         ))}
       </div>
