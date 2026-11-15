@@ -37,6 +37,9 @@ const toKey = (s: string) => (s ? s.slice(0, 10) : '');
 // Speakers default just before the intermediate musical number when no explicit position is set.
 const REST_POS = 9;
 
+// Shown in place of a prayer that no one has been assigned to yet.
+const BY_INVITATION = 'By Invitation';
+
 export default function SacramentProgram() {
   const { guestType } = useAuth();
   const isSacGuest = guestType === 'sac';
@@ -121,7 +124,7 @@ export default function SacramentProgram() {
             {mus?.chorister    && <Row label="Chorister"   value={mus.chorister} />}
             {mus?.organist     && <Row label="Organist"    value={mus.organist} />}
             {mus?.opening_hymn && <Row label="Opening Hymn" value={mus.opening_hymn} />}
-            {openingPrayer     && <Row label="Opening Prayer" value={openingPrayer.name} />}
+            <Row label="Opening Prayer" value={openingPrayer?.name?.trim() || BY_INVITATION} />
 
             <StaticRow label="Ward and Stake Business" />
 
@@ -154,7 +157,7 @@ export default function SacramentProgram() {
             )}
 
             {mus?.closing_hymn && <Row label="Closing Hymn" value={mus.closing_hymn} />}
-            {closingPrayer     && <Row label="Closing Prayer" value={closingPrayer.name} />}
+            <Row label="Closing Prayer" value={closingPrayer?.name?.trim() || BY_INVITATION} />
           </div>
         </section>
       )}
