@@ -36,6 +36,7 @@ const YC_MEMBER_ITEMS = [
 
 const CAL_MEMBER_ITEMS = [
   'Calendar event details (names, dates, times, and descriptions)',
+  'Sacrament meeting music: hymns, and the names of the organist and chorister (Music Coordinator only)',
 ];
 
 const LEADER_ITEMS = [
@@ -47,7 +48,7 @@ const WHO_SEES: Record<'bh' | 'wc' | 'yc' | 'cal', string> = {
   bh: 'Only accounts assigned to the bishopric can view calling, interview, temple recommend, and full membership records. Ward Council and Youth Council accounts do not have access to any of it.',
   wc: 'This hub has no access to calling records, interview scheduling, or membership details like birth date, gender, or temple recommend status — those are visible only to the bishopric.',
   yc: 'This hub has no access to membership, calling, interview, or other ward records — only the youth activity calendar and youth council meeting assignments.',
-  cal: 'This hub has no access to membership, calling, interview, or other ward records — only calendar events.',
+  cal: 'This hub has no access to membership, calling, interview, or other ward records — only calendar events, or for the Music Coordinator, the sacrament meeting music.',
 };
 
 export default function PrivacyPolicy() {

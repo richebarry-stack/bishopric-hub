@@ -8,6 +8,8 @@ export const VERSION_HISTORY: VersionEntry[] = [
             {
               date: 'Nov 11, 2026',
               items: [
+                'New page: Sacrament Music (under Sacrament Meeting). A spreadsheet-style list of every Sunday in the year with Organist, Chorister, Opening, Sacrament, Rest/Special and Closing. Type in any cell, or copy rows from the ward’s music spreadsheet and paste them in; each row lands on its Sunday by date, and a combined “organist … chorister” cell is split in two. It’s the same music shown on Sacrament Planning and the agenda.',
+                'Music Coordinator: now signs in straight to the new Sacrament Music page, which is the only page in their hub. The calendar of events stays with the Ward Bulletin Specialist.',
                 'Security: updated the code-checking tools the hub is built with to fix a known security issue (it never reached the live site).',
                 'Calling Pipeline: on a release, ticking “Also give [person] a new calling” and leaving the calling blank now adds them for calling consideration (like “Add for calling consideration” on All Callings). Before, nothing was added.',
                 'New page: My Notes & To-Dos (under My Actions in the menu). A private scratch pad only you can see. Add an item as a To-Do or a Note, with an optional due date and an importance of High, Medium or Low. Check off To-Dos when finished; they move to a Done list. Overdue To-Dos are marked in red.',

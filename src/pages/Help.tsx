@@ -188,6 +188,19 @@ const YC_SECTIONS: Section[] = [
   },
 ];
 
+const SACRAMENT_MUSIC_SECTION: Section = {
+  title: 'Sacrament Music',
+  icon: '♬',
+  content: (
+    <div className="space-y-2">
+      <p>A spreadsheet-style page of every Sunday in the year, grouped by month: Organist, Chorister, Opening, Sacrament, Rest/Special and Closing. Click a cell to type; press Enter to move down to the next Sunday. Each change saves when you leave the cell, and shows on Sacrament Planning and the sacrament agenda.</p>
+      <p><strong>Pasting from the music spreadsheet:</strong> copy the rows <em>including the date column</em> (month rows like “January” and week rows like “Fast Sunday 4” are fine), click any cell, and paste. Each row lands on its Sunday by date, and blank cells are skipped so nothing already entered is erased. A combined cell like “Diane Krueger, organist Anna Grandil, chorister” is split into the two columns.</p>
+      <p>Copied without the date column, the block fills down from the cell you clicked, one Sunday per row. Use the arrows by the year to see other years.</p>
+      <p>The Music Coordinator signs in straight to this page; it’s the only page in their hub.</p>
+    </div>
+  ),
+};
+
 const FULL_SECTIONS: Section[] = [
   {
     title: 'Getting Started',
@@ -244,6 +257,7 @@ const FULL_SECTIONS: Section[] = [
       </div>
     ),
   },
+  SACRAMENT_MUSIC_SECTION,
   {
     title: 'Calling Pipeline',
     icon: '◉',
@@ -431,7 +445,7 @@ const FULL_SECTIONS: Section[] = [
             { label: 'Bishopric Hub', desc: 'Full bishopric + ward council access', color: 'border-blue-200 bg-blue-50', header: 'text-blue-800', callings: BISHOPRIC_CALLINGS },
             { label: 'Ward Council Hub', desc: 'Ward council access only', color: 'border-emerald-200 bg-emerald-50', header: 'text-emerald-800', callings: WC_CALLINGS },
             { label: 'Youth Council Hub', desc: 'Youth calendar only', color: 'border-amber-200 bg-amber-50', header: 'text-amber-800', callings: YC_CALLINGS },
-            { label: 'Calendar Hub', desc: 'Calendar of events only', color: 'border-violet-200 bg-violet-50', header: 'text-violet-800', callings: CAL_CALLINGS },
+            { label: 'Calendar Hub', desc: 'Calendar of events only (the Music Coordinator gets the Sacrament Music page instead)', color: 'border-violet-200 bg-violet-50', header: 'text-violet-800', callings: CAL_CALLINGS },
           ] as const).map(({ label, desc, color, header, callings }) => (
             <div key={label} className={`rounded-lg border p-3 ${color}`}>
               <p className={`text-xs font-bold uppercase tracking-wide mb-0.5 ${header}`}>{label}</p>
@@ -518,6 +532,7 @@ export default function Help() {
     ? (isMusicCoord ? VIEWER_SECTIONS : VIEWER_SECTIONS.filter(s => s.title !== 'Music Coordinator — Editing Music'))
     : effectiveHub === 'wc' ? WC_SECTIONS
     : effectiveHub === 'yc' ? YC_SECTIONS
+    : effectiveHub === 'cal' && isMusicCoord ? [SACRAMENT_MUSIC_SECTION]
     : FULL_SECTIONS;
 
   return (

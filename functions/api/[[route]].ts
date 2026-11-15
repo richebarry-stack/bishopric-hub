@@ -1657,9 +1657,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // fall through to generic TABLES handler for single GET/PUT/DELETE — bishopric keeps full access to any suggestion
   }
 
-  // Calendar hub: full CRUD on calendaring only
+  // Sacrament Music page: each Sunday's fast-Sunday / no-meeting flags and theme, so the
+  // page can label its rows. A narrow read so the Music Coordinator never needs the full
+  // sacrament_themes rows (ward and stake business).
+  if (routeParts[0] === 'music-sundays' && method === 'GET') {
+    const isMusic = session.hub === 'cal' && session.church_role === 'Music Coordinator';
+    if (!isMusic && session.hub !== 'both' && session.hub !== 'bh') return json({ error: 'Forbidden' }, 403);
+    const year = String(url.searchParams.get('year') || '').replace(/\D/g, '').slice(0, 4);
+    if (year.length !== 4) return json({ error: 'year is required' }, 400);
+    const { results } = await db.prepare(
+      'SELECT substr(meeting_date, 1, 10) AS date, is_fast_sunday, no_meeting, theme FROM sacrament_themes WHERE substr(meeting_date, 1, 4) = ? ORDER BY meeting_date'
+    ).bind(year).all();
+    return json(results);
+  }
+
+  // Calendar hub: the Music Coordinator gets the sacrament music only; everyone else
+  // (the Ward Bulletin Specialist) gets calendaring only.
   if (session.hub === 'cal') {
-    if (routeParts[0] !== 'calendaring') return json({ error: 'Forbidden' }, 403);
+    const allowed = session.church_role === 'Music Coordinator' ? 'sacrament-music' : 'calendaring';
+    if (routeParts[0] !== allowed) return json({ error: 'Forbidden' }, 403);
     // fall through to generic TABLES handler
   }
 

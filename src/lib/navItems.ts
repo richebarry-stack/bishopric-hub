@@ -21,6 +21,7 @@ export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?:
   { path: '/bishopric-meetings', label: 'Bishopric Meeting Planning', icon: '▦' },
   { path: '/important-links', label: 'Important Links', icon: '⇗' },
   { path: '/speakers-and-prayers', label: 'Speakers & Prayers', icon: '⊞' },
+  { path: '/sacrament-music', label: 'Sacrament Music', icon: '♬' },
   { path: '/covenant-path', label: 'Covenant Path', icon: '↗' },
   { path: '/ward-members', label: 'Ward Members', icon: '♟' },
   { path: '/users', label: 'Users', icon: '⊕' },
@@ -80,6 +81,13 @@ export const YC_NAV_ITEMS = [
   { path: '/privacy', label: 'Privacy Policy', icon: '🔒' },
 ];
 
+// The Music Coordinator's hub: the sacrament music only.
+export const MUSIC_NAV_ITEMS = [
+  { path: '/sacrament-music', label: 'Sacrament Music', icon: '♬' },
+  { path: '/help', label: 'Help', icon: '?' },
+  { path: '/privacy', label: 'Privacy Policy', icon: '🔒' },
+];
+
 export const CAL_NAV_ITEMS = [
   { path: '/calendaring', label: 'Calendar of Events', icon: '▣' },
   { path: '/help', label: 'Help', icon: '?' },
@@ -94,6 +102,7 @@ export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: s
       { path: '/sacrament-planning',   label: 'Sacrament Planning',        icon: 'ti-notebook'        },
       { path: '/current-sacrament',    label: 'Current Sacrament Meeting', icon: 'ti-music'           },
       { path: '/speakers-and-prayers', label: 'Speakers & Prayers',        icon: 'ti-microphone'      },
+      { path: '/sacrament-music',      label: 'Sacrament Music',           icon: 'ti-playlist'        },
     ],
   },
   {

@@ -8,7 +8,7 @@ import { useMyActionItems } from '../lib/myActions';
 import { useAppTitle } from '../lib/wardName';
 import { PageErrorBoundary } from './ErrorBoundary';
 import {
-  NAV_ITEMS, WC_DASHBOARD_ITEM, WC_NAV_CATEGORIES, YC_NAV_ITEMS, CAL_NAV_ITEMS,
+  NAV_ITEMS, WC_DASHBOARD_ITEM, WC_NAV_CATEGORIES, YC_NAV_ITEMS, CAL_NAV_ITEMS, MUSIC_NAV_ITEMS,
   BH_DASHBOARD_ITEM, BH_NAV_CATEGORIES, BH_ALL_ITEMS, pathLabel, NAV_ORDER_KEY, LAST_VISITED_KEY, loadOrder,
 } from '../lib/navItems';
 
@@ -258,6 +258,7 @@ export default function Layout() {
   };
 
   const isCal = user?.hub === 'cal';
+  const isMusic = isCal && user?.church_role === 'Music Coordinator';
   const isYc = user?.hub === 'yc' || selectedHub === 'yc';
   const isWc = !isYc && (selectedHub === 'wc' || user?.hub === 'wc');
   const isAdmin = user?.role === 'admin';
@@ -321,7 +322,7 @@ export default function Layout() {
     : YC_NAV_ITEMS;
 
   const navItems = isCal
-    ? CAL_NAV_ITEMS
+    ? (isMusic ? MUSIC_NAV_ITEMS : CAL_NAV_ITEMS)
     : isYc
       ? ycNavItems
       : navOrder.map(p => NAV_ITEMS.find(n => n.path === p)).filter(Boolean).filter(n => !n!.adminOnly || isAdmin) as typeof NAV_ITEMS;
@@ -351,7 +352,7 @@ export default function Layout() {
       <aside className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform lg:translate-x-0 flex flex-col h-dvh lg:h-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className={`p-4 border-b shrink-0 ${isCal ? 'border-violet-200 bg-violet-50' : isYc ? 'border-amber-200 bg-amber-50' : isWc ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200'}`}>
           <h1 className={`text-lg font-bold ${isCal ? 'text-violet-800' : isYc ? 'text-amber-800' : isWc ? 'text-emerald-800' : 'text-gray-900'}`}>
-            {isCal ? 'Calendar Hub' : isYc ? 'Youth Council Hub' : isWc ? 'Ward Council Hub' : appTitle}
+            {isMusic ? 'Music Hub' : isCal ? 'Calendar Hub' : isYc ? 'Youth Council Hub' : isWc ? 'Ward Council Hub' : appTitle}
           </h1>
           {user && <p className={`text-xs mt-1 ${isCal ? 'text-violet-600' : isYc ? 'text-amber-600' : isWc ? 'text-emerald-600' : 'text-gray-500'}`}>{user.name}</p>}
           {isGuest && (

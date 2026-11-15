@@ -107,6 +107,7 @@ export const api = {
         method: 'POST', body: JSON.stringify({ user_id }),
       }),
   },
+  musicSundays: (year: number) => request<MusicSunday[]>(`/music-sundays?year=${year}`),
   wardName: {
     get: () => request<{ wardName: string }>('/ward-name'),
     save: (wardName: string) =>
@@ -404,6 +405,9 @@ export interface WcDiscussionTopic {
   next_steps: string;
   help_needed: string;
 }
+
+/** What the hub knows about a Sunday, for labels on the Sacrament Music page. */
+export interface MusicSunday { date: string; is_fast_sunday: number | null; no_meeting: number | null; theme: string | null }
 
 export interface SacramentMusic {
   id: number;

@@ -48,6 +48,7 @@ const WcDiscussionTopics = lazyWithReload(() => import('./pages/WcDiscussionTopi
 const HubSuggestions = lazyWithReload(() => import('./pages/HubSuggestions'));
 const Ordinances = lazyWithReload(() => import('./pages/Ordinances'));
 const CovenantPath = lazyWithReload(() => import('./pages/CovenantPath'));
+const SacramentMusic = lazyWithReload(() => import('./pages/SacramentMusic'));
 const AnnualDuties = lazyWithReload(() => import('./pages/AnnualDuties'));
 const YcMeetings = lazyWithReload(() => import('./pages/YcMeetings'));
 const MyActions = lazyWithReload(() => import('./pages/MyActions'));
@@ -79,11 +80,11 @@ function WcGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function CalGuard({ children }: { children: React.ReactNode }) {
+function CalGuard({ home, children }: { home: string; children: React.ReactNode }) {
   const location = useLocation();
-  const calPaths = ['/calendaring', '/help', '/privacy'];
+  const calPaths = [home, '/help', '/privacy'];
   if (!calPaths.includes(location.pathname)) {
-    return <Navigate to="/calendaring" replace />;
+    return <Navigate to={home} replace />;
   }
   return <>{children}</>;
 }
@@ -107,6 +108,20 @@ function AppRoutes() {
   if (user.must_reset_password) return <ForceResetPassword />;
   if (!user.has_security_questions && !securitySkipped && user.role !== 'guest') return <SecurityQuestionsSetup onSkip={() => setSecuritySkipped(true)} />;
 
+  // Music Coordinator (calendar hub): the sacrament music page only.
+  if (user.hub === 'cal' && user.church_role === 'Music Coordinator') {
+    return (
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/sacrament-music" element={<SacramentMusic />} />
+          <Route path="/help" element={<Help />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="*" element={<CalGuard home="/sacrament-music"><SacramentMusic /></CalGuard>} />
+        </Route>
+      </Routes>
+    );
+  }
+
   // Calendar hub users
   if (user.hub === 'cal') {
     return (
@@ -115,7 +130,7 @@ function AppRoutes() {
           <Route path="/calendaring" element={<Calendaring />} />
           <Route path="/help" element={<Help />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="*" element={<CalGuard><Calendaring /></CalGuard>} />
+          <Route path="*" element={<CalGuard home="/calendaring"><Calendaring /></CalGuard>} />
         </Route>
       </Routes>
     );
@@ -213,6 +228,7 @@ function AppRoutes() {
         <Route path="/important-links" element={<ImportantLinks />} />
         <Route path="/youth-activities" element={<YouthActivities />} />
         <Route path="/speakers-and-prayers" element={<SpeakersAndPrayers />} />
+        <Route path="/sacrament-music" element={<SacramentMusic />} />
         <Route path="/ward-members" element={<WardMembers />} />
         <Route path="/all-callings" element={<AllCallings />} />
         <Route path="/ordinances" element={<Ordinances />} />
