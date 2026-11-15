@@ -259,6 +259,8 @@ export default function Layout() {
 
   const isCal = user?.hub === 'cal';
   const isMusic = isCal && user?.church_role === 'Music Coordinator';
+  // The sacrament program guest has a single page, so no sidebar of links.
+  const hideSidebar = isGuest && guestType === 'sac';
   const isYc = user?.hub === 'yc' || selectedHub === 'yc';
   const isWc = !isYc && (selectedHub === 'wc' || user?.hub === 'wc');
   const isAdmin = user?.role === 'admin';
@@ -349,7 +351,7 @@ export default function Layout() {
         <div className="fixed inset-0 bg-black/30 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      <aside className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform lg:translate-x-0 flex flex-col h-dvh lg:h-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      {!hideSidebar && <aside className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform lg:translate-x-0 flex flex-col h-dvh lg:h-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className={`p-4 border-b shrink-0 ${isCal ? 'border-violet-200 bg-violet-50' : isYc ? 'border-amber-200 bg-amber-50' : isWc ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200'}`}>
           <h1 className={`text-lg font-bold ${isCal ? 'text-violet-800' : isYc ? 'text-amber-800' : isWc ? 'text-emerald-800' : 'text-gray-900'}`}>
             {isMusic ? 'Music Hub' : isCal ? 'Calendar Hub' : isYc ? 'Youth Council Hub' : isWc ? 'Ward Council Hub' : appTitle}
@@ -580,10 +582,10 @@ export default function Layout() {
             </button>
           )}
         </div>
-      </aside>
+      </aside>}
 
       <div className="flex-1 min-w-0">
-        <header className={`border-b px-4 py-3 flex items-center gap-3 lg:hidden ${isGuest ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}>
+        <header className={`border-b px-4 py-3 flex items-center gap-3 ${hideSidebar ? '' : 'lg:hidden'} ${isGuest ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}>
           {isGuest ? (
             <button onClick={logout}
               className="px-3 py-1.5 text-sm border border-amber-300 rounded text-amber-700 hover:bg-amber-100 font-medium shrink-0">
