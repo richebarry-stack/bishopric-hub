@@ -8,6 +8,7 @@ export const VERSION_HISTORY: VersionEntry[] = [
             {
               date: 'Nov 15, 2026',
               items: [
+                'Dashboards: every panel on the Bishopric and Ward Council Dashboards now uses the Small (S) font size by default, and everyone’s panels were set to Small once. Your other dashboard settings (which panels show, and what each shows) are kept, and you can still change a panel’s size in the dashboard settings.',
                 'Calling Pipeline: new “3.5 With stake” status, right after Approved and assigned, for callings the stake is handling. Pick it from the Status dropdown when a calling needs it (▸ on Approved and assigned still goes to Called & accepted, and ▸ on With stake goes there too). While a calling is With stake, its Calling interview comes off Other Interviews and it leaves My Actions. Sorting the list by Status now also puts 10. Released and 11. Declined after the other statuses.',
                 'Current Bishopric Meeting: each agenda item now shows who added it (“Added by …”) under the item. Items copied from the prior meeting keep their original adder. Older items show whoever last changed them, the closest record the hub had.',
               ],

@@ -1,4 +1,5 @@
 import type { FontSize, SectionConfig, TasksConfig, EventsConfig } from './dashboardConfig';
+import { resetSavedFontSizesOnce } from './dashboardConfig';
 export type { FontSize };
 export { FONT_SIZE_LABELS, FONT_SIZE_CLASS } from './dashboardConfig';
 
@@ -24,19 +25,21 @@ export interface WcDashboardConfig {
 }
 
 export const WC_DEFAULT_CONFIG: WcDashboardConfig = {
-  meeting:      { visible: true, fontSize: '2xl', showDate: true, showSpiritualThought: true, showOpeningPrayer: true, showClosingPrayer: true },
-  healthNeeds:  { visible: true, fontSize: 'base' },
-  otherNeeds:   { visible: true, fontSize: 'base' },
-  missionaries: { visible: true, fontSize: 'base', showStatus: false },
+  meeting:      { visible: true, fontSize: 'sm', showDate: true, showSpiritualThought: true, showOpeningPrayer: true, showClosingPrayer: true },
+  healthNeeds:  { visible: true, fontSize: 'sm' },
+  otherNeeds:   { visible: true, fontSize: 'sm' },
+  missionaries: { visible: true, fontSize: 'sm', showStatus: false },
   actionItems:  { visible: true, fontSize: 'sm', showAssignedTo: true },
   events:       { visible: true, fontSize: 'sm', showDate: true },
   covenantPath: { visible: true, fontSize: 'sm' },
 };
 
 const CONFIG_KEY = 'wc_dashboard_config_v1';
+const FONT_RESET_KEY = 'wc_dashboard_font_reset_sm_2026_11';
 
 export function loadWcDashboardConfig(): WcDashboardConfig {
   try {
+    resetSavedFontSizesOnce(CONFIG_KEY, FONT_RESET_KEY);
     const raw = localStorage.getItem(CONFIG_KEY);
     if (!raw) return WC_DEFAULT_CONFIG;
     const saved = JSON.parse(raw);

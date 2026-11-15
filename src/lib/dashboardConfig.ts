@@ -53,12 +53,12 @@ export interface DashboardConfig {
 
 export const DEFAULT_CONFIG: DashboardConfig = {
   bishopricMeeting: {
-    visible: true, fontSize: '3xl',
+    visible: true, fontSize: 'sm',
     showDate: true, showSpiritualThought: false, showOpeningPrayer: true, showHandbookTopic: true, showClosingPrayer: true,
   },
-  healthNeeds:   { visible: true, fontSize: '2xl' },
-  supportNeeds:  { visible: true, fontSize: '2xl' },
-  missionaries:  { visible: true, fontSize: '2xl', showStatus: true },
+  healthNeeds:   { visible: true, fontSize: 'sm' },
+  supportNeeds:  { visible: true, fontSize: 'sm' },
+  missionaries:  { visible: true, fontSize: 'sm', showStatus: true },
   tasks:         { visible: true, fontSize: 'sm',  showAssignedTo: true },
   callings:      { visible: true, fontSize: 'sm',  showStatusBadge: true },
   events:        { visible: true, fontSize: 'sm',  showDate: true },
@@ -67,8 +67,30 @@ export const DEFAULT_CONFIG: DashboardConfig = {
 
 const CONFIG_KEY = 'dashboard_config_v1';
 
+/** Marker for the one-time reset of every Bishopric Dashboard panel's saved font size
+ * to Small (Nov 2026). The Ward Council dashboard has its own marker. */
+const FONT_RESET_KEY = 'dashboard_font_reset_sm_2026_11';
+
+/** Once per browser, set every saved panel's fontSize to 'sm' (keeping the
+ * rest of the saved settings) so everyone starts from Small. */
+export function resetSavedFontSizesOnce(key: string, resetKey: string): void {
+  try {
+    if (localStorage.getItem(resetKey)) return;
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const saved = JSON.parse(raw) as Record<string, unknown>;
+      for (const v of Object.values(saved)) {
+        if (v && typeof v === 'object' && 'fontSize' in v) (v as { fontSize: FontSize }).fontSize = 'sm';
+      }
+      localStorage.setItem(key, JSON.stringify(saved));
+    }
+    localStorage.setItem(resetKey, '1');
+  } catch { /* storage unavailable — defaults are already Small */ }
+}
+
 export function loadDashboardConfig(): DashboardConfig {
   try {
+    resetSavedFontSizesOnce(CONFIG_KEY, FONT_RESET_KEY);
     const raw = localStorage.getItem(CONFIG_KEY);
     if (!raw) return DEFAULT_CONFIG;
     const saved = JSON.parse(raw);
