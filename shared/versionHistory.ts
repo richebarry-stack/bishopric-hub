@@ -8,6 +8,7 @@ export const VERSION_HISTORY: VersionEntry[] = [
             {
               date: 'Nov 15, 2026',
               items: [
+                'Current Sacrament Meeting: the To Be Sustained and To Be Thanked lists no longer show each calling’s organization in brackets, just the name and calling.',
                 'Sacrament Program: the Opening and Closing Prayer lines now always show. A prayer no one has been assigned to yet shows “By Invitation”.',
                 'Bishopric Dashboard: the Health Needs and Support Needs panels now show each need’s reason in small grey text after the name, the same as the Ward Council Dashboard.',
                 'Dashboards: every panel on the Bishopric and Ward Council Dashboards now uses the Small (S) font size by default, and everyone’s panels were set to Small once. Your other dashboard settings (which panels show, and what each shows) are kept, and you can still change a panel’s size in the dashboard settings.',

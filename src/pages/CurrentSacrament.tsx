@@ -245,7 +245,6 @@ function CallingsList({ label, callings, script, onRemove }: {
           <p key={i} className="text-sm text-gray-800 flex items-start gap-1.5">
             <span className="flex-1">
               {renderRichText(c.member)}{c.calling ? ` — ${c.calling}` : ''}
-              {c.organization ? <span className="text-xs text-gray-400"> ({c.organization})</span> : null}
             </span>
             {onRemove && c.id !== undefined && (
               <button type="button" onClick={() => onRemove(c)} aria-label={`Not this week — remove ${c.member} from ${label}`}
