@@ -225,7 +225,7 @@ export default function CurrentBishopricMeeting() {
     const toAdd = missingItems(priorAgendaItems, dateItems);
     let pos = dateItems.length ? Math.max(...dateItems.map(i => i.position)) : 0;
     for (const i of toAdd) {
-      await createItem({ meeting_date: date, item: i.item, notes: i.notes, position: ++pos }, { silent: true });
+      await createItem({ meeting_date: date, item: i.item, notes: i.notes, position: ++pos, created_by: i.created_by }, { silent: true });
     }
     return toAdd.length;
   };
@@ -451,7 +451,12 @@ export default function CurrentBishopricMeeting() {
                     <div className="flex items-start gap-2">
                       <input type="checkbox" checked={!!item.done} onChange={() => toggleDone(item)}
                         className="mt-1 rounded border-gray-300" />
-                      <AgendaItemText item={item} onSave={v => saveItemText(item, v)} />
+                      <div className="flex-1 min-w-0 flex flex-col">
+                        <AgendaItemText item={item} onSave={v => saveItemText(item, v)} />
+                        {item.created_by && (
+                          <span className="text-xs text-gray-400">Added by {item.created_by}</span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button onClick={() => moveItem(item, -1)} disabled={idx === 0}
                           className="text-gray-400 hover:text-gray-600 disabled:opacity-30 text-xs px-1">▲</button>

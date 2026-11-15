@@ -6,6 +6,12 @@ export interface VersionEntry { date: string; items: string[] }
 
 export const VERSION_HISTORY: VersionEntry[] = [
             {
+              date: 'Nov 15, 2026',
+              items: [
+                'Current Bishopric Meeting: each agenda item now shows who added it (“Added by …”) under the item. Items copied from the prior meeting keep their original adder. Older items show whoever last changed them, the closest record the hub had.',
+              ],
+            },
+            {
               date: 'Nov 11, 2026',
               items: [
                 'Sacrament Program: the guest view now shows just the program, with no side menu, top bar or “Back to Login” button. The ward’s name now shows above the program’s title, and each speaker is labeled “Talk:”.',

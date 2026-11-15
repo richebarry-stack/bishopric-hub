@@ -330,6 +330,7 @@ export interface BishopricAgendaItem {
   position: number;
   updated_at: string;
   updated_by: string | null;
+  created_by: string | null;
 }
 
 export interface BishopricMoveItem {

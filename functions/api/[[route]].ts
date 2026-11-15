@@ -2515,6 +2515,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const body = await request.json() as Record<string, unknown>;
     delete body.updated_by;
     body.updated_by = session.name;
+    // Who added the row (only kept on tables with a created_by column). A copy
+    // of an earlier row (e.g. agenda items carried over from the prior
+    // meeting) may pass its original adder along.
+    if (typeof body.created_by !== 'string' || !body.created_by.trim()) body.created_by = session.name;
     if (tableName === 'calling-pipeline') await linkCallingMember(db, body);
     const clash = await scheduleClash(db, tableName, body);
     if (clash) return clash;
@@ -2549,6 +2553,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     delete body._base_updated_at;
     delete body.updated_at;
     delete body.updated_by;
+    delete body.created_by;
 
     if (baseUpdatedAt) {
       const conflictCheck = await checkConflict(db, tableConfig.name, recordId, baseUpdatedAt);
