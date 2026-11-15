@@ -8,7 +8,7 @@ export const VERSION_HISTORY: VersionEntry[] = [
             {
               date: 'Nov 11, 2026',
               items: [
-                'Sacrament Program: the guest view now shows just the program, with no side menu of links and no “Back to Login” button.',
+                'Sacrament Program: the guest view now shows just the program, with no side menu, top bar or “Back to Login” button. The ward’s name now shows above the program’s title, and each speaker is labeled “Talk:”.',
                 'New page: Sacrament Music (under Sacrament Meeting). A spreadsheet-style list of every Sunday in the year with Organist, Chorister, Opening, Sacrament, Rest/Special and Closing. Type in any cell, or copy rows from the ward’s music spreadsheet and paste them in; each row lands on its Sunday by date, and a combined “organist … chorister” cell is split in two. It’s the same music shown on Sacrament Planning and the agenda.',
                 'Music Coordinator: now signs in straight to the new Sacrament Music page, which is the only page in their hub. The calendar of events stays with the Ward Bulletin Specialist.',
                 'Security: updated the code-checking tools the hub is built with to fix a known security issue (it never reached the live site).',

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useTable } from '../lib/useTable';
 import type { SacramentSpeaker, SacramentMusic, SacramentTheme, Prayer } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { useWardName } from '../lib/wardName';
 
 const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -74,12 +75,14 @@ export default function SacramentProgram() {
     return items.sort((a, b) => a.pos - b.pos);
   }, [dateSpeakers, mus]);
 
+  const wardName = useWardName();
   const hasContent = !!(theme?.presiding || theme?.conducting || mus || dateSpeakers.length || isFastSunday);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Date navigation */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="text-center">
+        {wardName && <p className="text-sm font-semibold uppercase tracking-wide text-gray-500">{wardName}</p>}
         <h1 className="text-2xl font-bold text-gray-900">Sacrament Program</h1>
       </div>
 
@@ -139,6 +142,7 @@ export default function SacramentProgram() {
                   </div>
                 ) : (
                   <div key={item.speaker!.id} className="pt-2">
+                    <span className="text-gray-500 mr-2">Talk:</span>
                     <span className="font-medium text-gray-800">{item.speaker!.speaker || <span className="italic font-normal text-gray-400">Speaker TBD</span>}</span>
                     {item.speaker!.speaker_type && item.speaker!.speaker_type !== 'Adult Speaker' && (
                       <span className="text-gray-500 ml-2">({item.speaker!.speaker_type})</span>

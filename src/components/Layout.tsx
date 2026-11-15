@@ -585,8 +585,8 @@ export default function Layout() {
       </aside>}
 
       <div className="flex-1 min-w-0">
-        <header className={`border-b px-4 py-3 flex items-center gap-3 ${hideSidebar ? '' : 'lg:hidden'} ${isGuest ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}>
-          {hideSidebar ? null : isGuest ? (
+        {!hideSidebar && <header className={`border-b px-4 py-3 flex items-center gap-3 lg:hidden ${isGuest ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}>
+          {isGuest ? (
             <button onClick={logout}
               className="px-3 py-1.5 text-sm border border-amber-300 rounded text-amber-700 hover:bg-amber-100 font-medium shrink-0">
               ← Back to Login
@@ -599,7 +599,7 @@ export default function Layout() {
             </button>
           )}
           <h1 className={`text-lg font-bold ${isGuest ? 'text-amber-800' : 'text-gray-900'}`}>{appTitle}</h1>
-        </header>
+        </header>}
         <main className="p-4 lg:p-6">
           <PresenceBanner others={othersOnline} path={location.pathname} />
           <PageErrorBoundary>
