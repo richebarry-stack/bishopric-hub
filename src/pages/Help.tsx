@@ -265,7 +265,7 @@ const FULL_SECTIONS: Section[] = [
       <div className="space-y-2">
         <p>Track callings from initial discussion through completion. Statuses move in order:</p>
         <UL items={[
-          '1. Discussion → 1.5 On hold (optional) → 2. Pray about → 3. Approved and assigned',
+          '1. Discussion → 1.5 On hold (optional) → 2. Pray about → 3. Approved and assigned → 3.5 With stake (optional, while the stake handles it)',
           '4. Called & accepted → 5. Sustained → 6. Set apart',
           '7. In release discussion → 8. Need to release → 9. Need to thank at pulpit → 10. Released',
         ]} />

@@ -157,11 +157,11 @@ function orgOptions(current: string | undefined): string[] {
   return v && !ORGANIZATIONS.includes(v) ? [v, ...ORGANIZATIONS] : ORGANIZATIONS;
 }
 
-// The usual next step for each status (On hold, 4.5 and Declined are side paths).
+// The usual next step for each status (On hold, With stake, 4.5 and Declined are side paths).
 const NEXT_STATUS: Record<'Calling' | 'Release', Record<string, string>> = {
   Calling: {
     '1. Discussion': '2. Pray about', '1.5 On hold': '2. Pray about', '2. Pray about': '3. Approved and assigned',
-    '3. Approved and assigned': '4. Called & accepted', '4. Called & accepted': '5. Sustained',
+    '3. Approved and assigned': '4. Called & accepted', '3.5 With stake': '4. Called & accepted', '4. Called & accepted': '5. Sustained',
     '4.5 Call & accepted, handle in class/quorum': '5. Sustained', '5. Sustained': '6. Set apart',
   },
   Release: {
@@ -816,8 +816,8 @@ function Table({ rows, onEdit, onDelete, onAdvance, assignees }: {
   const sorted = useMemo(() => [...rows].sort((a, b) => {
     let av: string, bv: string;
     if (sortKey === 'status') {
-      av = String(CALLING_STATUSES.indexOf(a.status ?? ''));
-      bv = String(CALLING_STATUSES.indexOf(b.status ?? ''));
+      av = String(CALLING_STATUSES.indexOf(a.status ?? '')).padStart(3, '0');
+      bv = String(CALLING_STATUSES.indexOf(b.status ?? '')).padStart(3, '0');
     } else {
       av = (a[sortKey] ?? '') as string;
       bv = (b[sortKey] ?? '') as string;

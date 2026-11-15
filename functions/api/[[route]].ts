@@ -1953,7 +1953,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     const CALLING_STATUS_ORDER = [
-      '1. Discussion', '1.5 On hold', '2. Pray about', '3. Approved and assigned', '4. Called & accepted',
+      '1. Discussion', '1.5 On hold', '2. Pray about', '3. Approved and assigned', '3.5 With stake', '4. Called & accepted',
       '4.5 Call & accepted, handle in class/quorum', '5. Sustained', '6. Set apart',
       '7. In release discussion', '8. Need to release', '9. Need to thank at pulpit', '10. Released', '11. Declined',
     ];

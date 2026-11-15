@@ -119,6 +119,7 @@ export const CALLING_STATUSES = [
   '1.5 On hold',
   '2. Pray about',
   '3. Approved and assigned',
+  '3.5 With stake',
   '4. Called & accepted',
   '4.5 Call & accepted, handle in class/quorum',
   '5. Sustained',
@@ -135,7 +136,7 @@ export const CALLING_STATUSES = [
 // the calling process) and a release runs 7-10. Used to keep the Status dropdown
 // from offering the wrong entry's stages.
 export const CALLING_TYPE_STATUSES = [
-  '1. Discussion', '1.5 On hold', '2. Pray about', '3. Approved and assigned', '4. Called & accepted',
+  '1. Discussion', '1.5 On hold', '2. Pray about', '3. Approved and assigned', '3.5 With stake', '4. Called & accepted',
   '4.5 Call & accepted, handle in class/quorum', '5. Sustained', '6. Set apart', '11. Declined',
 ];
 // '2. Pray about' sits between discussion and decision for releases too, so a
@@ -150,6 +151,7 @@ export const CALLING_STATUS_COLORS: Record<string, { bg: string; text: string }>
   '1.5 On hold': { bg: 'bg-slate-200', text: 'text-slate-700' },
   '2. Pray about': { bg: 'bg-yellow-100', text: 'text-yellow-800' },
   '3. Approved and assigned': { bg: 'bg-blue-100', text: 'text-blue-800' },
+  '3.5 With stake': { bg: 'bg-indigo-100', text: 'text-indigo-800' },
   '4. Called & accepted': { bg: 'bg-green-100', text: 'text-green-800' },
   '4.5 Call & accepted, handle in class/quorum': { bg: 'bg-green-50', text: 'text-green-700' },
   '5. Sustained': { bg: 'bg-purple-100', text: 'text-purple-800' },
