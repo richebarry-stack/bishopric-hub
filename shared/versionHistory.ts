@@ -8,6 +8,7 @@ export const VERSION_HISTORY: VersionEntry[] = [
             {
               date: 'Nov 15, 2026',
               items: [
+                'Sacrament agendas: names now read First Last (“Eli Robbins” instead of “Robbins, Eli”) on the Current Sacrament Meeting agenda, its Copy and Export PDF, the Sacrament Program, and Sacrament Planning’s Agenda View and edit window. This covers speakers, prayers, and those being sustained or released. Names are still matched to the ward list the same way.',
                 'Current Sacrament Meeting: the To Be Sustained and To Be Thanked lists no longer show each calling’s organization in brackets, just the name and calling.',
                 'Sacrament Program: the Opening and Closing Prayer lines now always show. A prayer no one has been assigned to yet shows “By Invitation”.',
                 'Bishopric Dashboard: the Health Needs and Support Needs panels now show each need’s reason in small grey text after the name, the same as the Ward Council Dashboard.',

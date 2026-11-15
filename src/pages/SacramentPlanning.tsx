@@ -8,6 +8,7 @@ import MemberNameInput from '../components/MemberNameInput';
 import { SPEAKER_TYPES, NO_MEETING_TYPES } from '../lib/constants';
 import { useAuth } from '../lib/auth';
 import { resolveMemberName } from '../lib/nameUtils';
+import { toFirstLast } from '../../shared/text';
 import { toast } from '../lib/toast';
 
 const toDateKey = (d: string) => d ? d.slice(0, 10) : '';
@@ -163,7 +164,7 @@ export default function SacramentPlanning() {
                     <h3 className="font-medium text-gray-600 mb-1">Speakers</h3>
                     {dateSpeakers.length > 0 ? dateSpeakers.map(s => (
                       <p key={s.id} className="text-gray-700">
-                        {s.speaker || <span className="italic text-gray-400">TBD</span>} <span className="text-gray-400">({s.speaker_type})</span>
+                        {toFirstLast(s.speaker) || <span className="italic text-gray-400">TBD</span>} <span className="text-gray-400">({s.speaker_type})</span>
                         {s.topic && <span className="text-gray-500"> — {s.topic}</span>}
                       </p>
                     )) : <p className="text-gray-400">No speakers</p>}
@@ -171,7 +172,7 @@ export default function SacramentPlanning() {
                   <div>
                     <h3 className="font-medium text-gray-600 mb-1">Prayers</h3>
                     {datePrayers.length > 0 ? datePrayers.map(p => (
-                      <p key={p.id} className="text-gray-700">{p.opening_closing}: {p.name}</p>
+                      <p key={p.id} className="text-gray-700">{p.opening_closing}: {toFirstLast(p.name)}</p>
                     )) : <p className="text-gray-400">Not assigned</p>}
                   </div>
                 </div>
@@ -499,10 +500,10 @@ function AgendaModal(props: AgendaModalProps) {
     chorister: existingMusic?.chorister || '', organist: existingMusic?.organist || '',
   });
   const [speakerRows, setSpeakerRows] = useState<SpeakerRow[]>(
-    existingSpeakers.map(s => ({ id: s.id, speaker: s.speaker || '', speaker_type: s.speaker_type || 'Adult Speaker', topic: s.topic || '', accepted: s.accepted || '' }))
+    existingSpeakers.map(s => ({ id: s.id, speaker: toFirstLast(s.speaker), speaker_type: s.speaker_type || 'Adult Speaker', topic: s.topic || '', accepted: s.accepted || '' }))
   );
-  const [openingName, setOpeningName] = useState(openingExisting?.name || '');
-  const [closingName, setClosingName] = useState(closingExisting?.name || '');
+  const [openingName, setOpeningName] = useState(toFirstLast(openingExisting?.name));
+  const [closingName, setClosingName] = useState(toFirstLast(closingExisting?.name));
   const [announceRows, setAnnounceRows] = useState<AnnounceRow[]>(
     existingAnnouncements.map(a => ({ id: a.id, title: a.title || '', notes: a.notes || '' }))
   );
@@ -550,7 +551,7 @@ function AgendaModal(props: AgendaModalProps) {
       for (const s of existingSpeakers) if (!keepSpeakerIds.has(s.id)) await props.removeSpeaker(s.id);
       for (let i = 0; i < keepSpeakers.length; i++) {
         const r = keepSpeakers[i];
-        const data = { meeting_date: date, speaker: r.speaker, speaker_type: r.speaker_type || 'Adult Speaker', topic: r.topic, accepted: r.accepted, speaking_order: i + 1 };
+        const data = { meeting_date: date, speaker: resolveMemberName(r.speaker, wardMembers), speaker_type: r.speaker_type || 'Adult Speaker', topic: r.topic, accepted: r.accepted, speaking_order: i + 1 };
         if (r.id) await props.updateSpeaker(r.id, data, { silent: true }); else await props.createSpeaker(data, { silent: true });
       }
 
@@ -642,7 +643,7 @@ function AgendaModal(props: AgendaModalProps) {
                 <div key={i} className="rounded-md border border-gray-200 p-3 space-y-2 relative">
                   <button type="button" onClick={() => { setSpeakerRows(rows => rows.filter((_, idx) => idx !== i)); mark(); }} aria-label="Remove"
                     className="absolute top-2 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
-                  <MemberNameInput label={`Speaker ${i + 1}`} value={r.speaker} onChange={v => updateSpeakerRow(i, { speaker: v })} />
+                  <MemberNameInput label={`Speaker ${i + 1}`} format="firstLast" value={r.speaker} onChange={v => updateSpeakerRow(i, { speaker: v })} />
                   <div className="grid grid-cols-2 gap-3">
                     <Select label="Type" value={r.speaker_type} onChange={v => updateSpeakerRow(i, { speaker_type: v })} options={SPEAKER_TYPES} />
                     <Select label="Accepted" value={r.accepted} onChange={v => updateSpeakerRow(i, { accepted: v })} options={['Considering', 'Called and Accepted']} />
@@ -658,8 +659,8 @@ function AgendaModal(props: AgendaModalProps) {
         <section className="space-y-3 border-t border-gray-100 pt-4">
           <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Prayers</h3>
           <div className="grid grid-cols-2 gap-3">
-            <MemberNameInput label="Opening" value={openingName} onChange={v => { setOpeningName(v); mark(); }} />
-            <MemberNameInput label="Closing" value={closingName} onChange={v => { setClosingName(v); mark(); }} />
+            <MemberNameInput label="Opening" format="firstLast" value={openingName} onChange={v => { setOpeningName(v); mark(); }} />
+            <MemberNameInput label="Closing" format="firstLast" value={closingName} onChange={v => { setClosingName(v); mark(); }} />
           </div>
         </section>
 

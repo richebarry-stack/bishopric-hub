@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 
-export { stripBold } from '../../shared/text';
+export { stripBold, toFirstLast } from '../../shared/text';
 
 // Lightweight inline bold using **...** markers (markdown-style).
 // Used for fields where the user can bold a portion of the text, e.g. the

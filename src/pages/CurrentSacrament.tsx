@@ -7,7 +7,7 @@ import type {
 } from '../lib/api';
 // CallingPipeline is used only in the page shell (toAgendaCalling); SacramentWardBusiness for snapshot table
 import { SPEAKER_TYPES, NO_MEETING_TYPES } from '../lib/constants';
-import { renderRichText } from '../lib/richText';
+import { renderRichText, toFirstLast } from '../lib/richText';
 import { resolveMemberName } from '../lib/nameUtils';
 import { useConfirm } from '../components/ConfirmDialog';
 import MemberNameInput, { type MemberNameFormat } from '../components/MemberNameInput';
@@ -186,7 +186,7 @@ function SpeakerItem({
           <button type="button" onClick={onRemove} aria-label="Remove"
             className="absolute top-1 right-2 text-gray-300 hover:text-red-500 text-sm leading-none">×</button>
           <div className="mb-1 pr-6">
-            <MemberNameInput className={INPUT_CLS} placeholder="Speaker name" value={row.speaker}
+            <MemberNameInput className={INPUT_CLS} placeholder="Speaker name" value={row.speaker} format="firstLast"
               onChange={v => onUpdate({ speaker: v })} />
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -244,7 +244,7 @@ function CallingsList({ label, callings, script, onRemove }: {
         {callings.map((c, i) => (
           <p key={i} className="text-sm text-gray-800 flex items-start gap-1.5">
             <span className="flex-1">
-              {renderRichText(c.member)}{c.calling ? ` — ${c.calling}` : ''}
+              {renderRichText(toFirstLast(c.member))}{c.calling ? ` — ${c.calling}` : ''}
             </span>
             {onRemove && c.id !== undefined && (
               <button type="button" onClick={() => onRemove(c)} aria-label={`Not this week — remove ${c.member} from ${label}`}
@@ -428,8 +428,8 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
   const [sacramentHymn, setSacramentHymn] = useState(existingMusic?.sacrament_hymn || '');
   const [restSpecial,   setRestSpecial]   = useState(existingMusic?.rest_special   || '');
   const [closingHymn,   setClosingHymn]   = useState(existingMusic?.closing_hymn  || '');
-  const [openingPrayer, setOpeningPrayer] = useState(openingExisting?.name || '');
-  const [closingPrayer, setClosingPrayer] = useState(closingExisting?.name || '');
+  const [openingPrayer, setOpeningPrayer] = useState(toFirstLast(openingExisting?.name));
+  const [closingPrayer, setClosingPrayer] = useState(toFirstLast(closingExisting?.name));
   const [childBlessing, setChildBlessing] = useState<string | null>(existingMusic?.child_blessing ?? null);
   const [confirmation,  setConfirmation]  = useState<string | null>(existingMusic?.confirmation  ?? null);
   const [ordination,    setOrdination]    = useState<string | null>(existingMusic?.ordination    ?? null);
@@ -441,7 +441,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
     const total = existingSpeakers.length;
     return existingSpeakers.map((s, i) => ({
       id: s.id,
-      speaker:      s.speaker      || '',
+      speaker:      toFirstLast(s.speaker),
       speaker_type: s.speaker_type || 'Adult Speaker',
       topic:        s.topic        || '',
       accepted:     s.accepted     || '',
@@ -737,7 +737,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
             lines.push('To Be Thanked (Releases):');
             lines.push('The following have been released from positions in the ward. We propose that they be given a vote of thanks for their service.');
             for (const c of thanksgivings) {
-              const name = stripMd(c.member);
+              const name = toFirstLast(stripMd(c.member));
               lines.push(c.calling ? `  • ${name} has been released as ${stripMd(c.calling)}.` : `  • ${name}`);
             }
           }
@@ -747,7 +747,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
             lines.push('To Be Sustained (Callings):');
             lines.push('The following have been called to positions in the ward. We ask that if they are present that they please stand and remain standing until the sustaining vote is complete.');
             for (const c of sustainings) {
-              const name = stripMd(c.member);
+              const name = toFirstLast(stripMd(c.member));
               lines.push(c.calling ? `  • ${name} — ${stripMd(c.calling)}` : `  • ${name}`);
             }
             lines.push('We propose that they be sustained in these callings. Those in favor may manifest it by the uplifted hand. (pause) Those opposed, if any, may manifest it (pause)');
@@ -931,7 +931,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
                 autoLines={[highCouncilorThanksLine, stakeRepsLine, musicThanksLine].filter(Boolean)} />;
             }
             case 'opening_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={openingHymn}   onChange={setOpeningHymn}   readonly={ro('opening_hymn')} />;
-            case 'opening_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={openingPrayer} onChange={setOpeningPrayer} readonly={ro('opening_prayer')} memberFormat="display" />;
+            case 'opening_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={openingPrayer} onChange={setOpeningPrayer} readonly={ro('opening_prayer')} memberFormat="firstLast" />;
             case 'stake_business': return viewerMode ? null : <TextareaField key={kind} label={LABEL[kind]} value={stakeBusiness} onChange={setStakeBusiness} />;
             case 'ward_business':  return viewerMode ? null : <TextareaField key={kind} label={LABEL[kind]} value={wardBusiness} onChange={setWardBusiness} />;
             case 'sacrament_intro': return <TextareaField key={kind} label={LABEL[kind]} value={sacramentIntro} onChange={setSacramentIntro} readonly={ro('sacrament_intro')} />;
@@ -945,7 +945,7 @@ export function AgendaEditor({ date, speakers, prayers, music, themes, announcem
             case 'rest_special':   return <SimpleField   key={kind} label={LABEL[kind]} value={restSpecial}   onChange={setRestSpecial}   readonly={ro('rest_special')} />;
             case 'closing_remarks': return <TextareaField key={kind} label={LABEL[kind]} value={closingRemarks} onChange={setClosingRemarks} readonly={ro('closing_remarks')} />;
             case 'closing_hymn':   return <SimpleField   key={kind} label={LABEL[kind]} value={closingHymn}   onChange={setClosingHymn}   readonly={ro('closing_hymn')} />;
-            case 'closing_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={closingPrayer} onChange={setClosingPrayer} readonly={ro('closing_prayer')} memberFormat="display" />;
+            case 'closing_prayer': return <SimpleField   key={kind} label={LABEL[kind]} value={closingPrayer} onChange={setClosingPrayer} readonly={ro('closing_prayer')} memberFormat="firstLast" />;
             case 'announcements':
               if (viewerMode === 'music') return null;
               if (viewerMode === 'readonly') {

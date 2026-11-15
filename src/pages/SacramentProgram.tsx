@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { toFirstLast } from '../../shared/text';
 import { useTable } from '../lib/useTable';
 import type { SacramentSpeaker, SacramentMusic, SacramentTheme, Prayer } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -124,7 +125,7 @@ export default function SacramentProgram() {
             {mus?.chorister    && <Row label="Chorister"   value={mus.chorister} />}
             {mus?.organist     && <Row label="Organist"    value={mus.organist} />}
             {mus?.opening_hymn && <Row label="Opening Hymn" value={mus.opening_hymn} />}
-            <Row label="Opening Prayer" value={openingPrayer?.name?.trim() || BY_INVITATION} />
+            <Row label="Opening Prayer" value={toFirstLast(openingPrayer?.name).trim() || BY_INVITATION} />
 
             <StaticRow label="Ward and Stake Business" />
 
@@ -146,7 +147,7 @@ export default function SacramentProgram() {
                 ) : (
                   <div key={item.speaker!.id} className="pt-2">
                     <span className="text-gray-500 mr-2">Talk:</span>
-                    <span className="font-medium text-gray-800">{item.speaker!.speaker || <span className="italic font-normal text-gray-400">Speaker TBD</span>}</span>
+                    <span className="font-medium text-gray-800">{toFirstLast(item.speaker!.speaker) || <span className="italic font-normal text-gray-400">Speaker TBD</span>}</span>
                     {item.speaker!.speaker_type && item.speaker!.speaker_type !== 'Adult Speaker' && (
                       <span className="text-gray-500 ml-2">({item.speaker!.speaker_type})</span>
                     )}
@@ -157,7 +158,7 @@ export default function SacramentProgram() {
             )}
 
             {mus?.closing_hymn && <Row label="Closing Hymn" value={mus.closing_hymn} />}
-            <Row label="Closing Prayer" value={closingPrayer?.name?.trim() || BY_INVITATION} />
+            <Row label="Closing Prayer" value={toFirstLast(closingPrayer?.name).trim() || BY_INVITATION} />
           </div>
         </section>
       )}
