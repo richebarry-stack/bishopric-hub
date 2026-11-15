@@ -554,7 +554,7 @@ export default function Dashboard() {
                   : actionCallings.map(c => (
                     <div key={c.id} className="flex items-center justify-between py-1 gap-2 min-w-0">
                       <span className={`${FONT_SIZE_CLASS[cfg.callings.fontSize]} text-gray-700 truncate`}>
-                        {renderRichText(c.member)} — {c.calling}
+                        {c.member?.trim() ? <>{renderRichText(c.member)} — </> : null}{c.calling}
                       </span>
                       {cfg.callings.showStatusBadge && (
                         <div className="flex-shrink-0"><StatusBadge status={c.status} colors={CALLING_STATUS_COLORS} /></div>

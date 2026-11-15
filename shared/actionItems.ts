@@ -159,7 +159,7 @@ export function computeActionItems(
     for (const c of callings) {
       if (sameName(c.assigned_to) && CALLING_ACTION_STATUSES.has(c.status)) {
         out.push({
-          id: `calling-${c.id}`, label: `${c.calling} — ${stripBold(c.member)}`,
+          id: `calling-${c.id}`, label: stripBold(c.member || '').trim() ? `${c.calling} — ${stripBold(c.member)}` : (c.calling || ''),
           detail: c.status, link: '/calling-pipeline', source: 'Calling Pipeline',
         });
       }

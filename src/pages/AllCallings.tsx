@@ -139,7 +139,8 @@ export default function AllCallings() {
     } as unknown as Record<string, unknown>);
     // Also start a placeholder entry for finding this person's replacement.
     createCalling({
-      member: `Replacement for ${memberName}`,
+      member: '',
+      notes: `Replacement for ${memberName}`,
       calling: c.calling,
       organization: handbookOrganization(c.calling, c.organization),
       status: '1. Discussion',

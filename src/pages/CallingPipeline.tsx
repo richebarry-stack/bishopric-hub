@@ -323,7 +323,8 @@ export default function CallingPipeline() {
         // Same placeholder wording as "Consider for release" on All Callings.
         const who = stripBold(editing.member || '').trim();
         await create({
-          member: who ? `Replacement for ${who}` : '',
+          member: '',
+          notes: who ? `Replacement for ${who}` : '',
           calling: editing.calling,
           organization: editing.organization || '',
           status: '1. Discussion',
@@ -353,7 +354,8 @@ export default function CallingPipeline() {
           const who = stripBold(editing.member || '').trim();
           await create({
             ...base,
-            member: who ? `Replacement for ${who}` : '',
+            member: '',
+            notes: who ? `Replacement for ${who}` : '',
             calling: rc.calling.trim(),
             organization: rc.organization,
             assigned_to: '',
@@ -503,7 +505,7 @@ export default function CallingPipeline() {
           <h2 className="text-sm font-bold uppercase tracking-widest text-violet-700 mb-3">
             Pray About ({prayAboutRows.length})
           </h2>
-          <Table rows={prayAboutRows} {...tableProps} />
+          <Table rows={prayAboutRows} {...tableProps} initialSort="type" />
         </div>
       )}
 
@@ -733,7 +735,7 @@ export default function CallingPipeline() {
                 {findReplacement && (
                   <p className="text-xs text-gray-600 ml-6">
                     {(editing.calling || '').trim()
-                      ? <>Adds <b>{stripBold(editing.calling || '')}</b> in 1. Discussion as &ldquo;Replacement for {stripBold(editing.member || '') || '…'}&rdquo;.</>
+                      ? <>Adds <b>{stripBold(editing.calling || '')}</b> in 1. Discussion, with the note &ldquo;Replacement for {stripBold(editing.member || '') || '…'}&rdquo;.</>
                       : 'Fill in the calling above first.'}
                   </p>
                 )}
@@ -794,8 +796,10 @@ function Th({ col, label, sortKey, sortAsc, onSort }: {
   );
 }
 
-function Table({ rows, onEdit, onDelete, onAdvance, assignees }: {
+function Table({ rows, onEdit, onDelete, onAdvance, assignees, initialSort = 'member' }: {
   rows: CallingType[];
+  /** Column the table starts sorted by; ties always fall back to member name. */
+  initialSort?: SortKey;
   onEdit: (r: CallingType) => void;
   onDelete: (id: number) => void;
   onAdvance: (r: CallingType, status: string, assignee?: string) => void;
@@ -805,7 +809,7 @@ function Table({ rows, onEdit, onDelete, onAdvance, assignees }: {
   // Row whose "next status" needs an assignee picked first.
   // Positioned against the window so the table's scroll box can't clip it.
   const [assigning, setAssigning] = useState<{ id: number; left: number; top: number } | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>('member');
+  const [sortKey, setSortKey] = useState<SortKey>(initialSort);
   const [sortAsc, setSortAsc] = useState(true);
 
   const handleSort = (key: SortKey) => {
@@ -823,7 +827,8 @@ function Table({ rows, onEdit, onDelete, onAdvance, assignees }: {
       bv = (b[sortKey] ?? '') as string;
       if (sortKey === 'member') { av = stripBold(av); bv = stripBold(bv); }
     }
-    return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+    const byKey = sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+    return byKey || stripBold(a.member || '').localeCompare(stripBold(b.member || ''));
   }), [rows, sortKey, sortAsc]);
 
   return (
@@ -844,17 +849,17 @@ function Table({ rows, onEdit, onDelete, onAdvance, assignees }: {
         <tbody>
           {sorted.map(r => (
             <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => onEdit(r)}>
-              <td className="px-3 py-2 font-medium text-gray-900">{renderRichText(r.member)}</td>
-              <td className="px-3 py-2 text-gray-700">
+              <td className="px-3 py-1.5 font-medium text-gray-900">{r.member?.trim() ? renderRichText(r.member) : <span className="text-gray-300 font-normal">—</span>}</td>
+              <td className="px-3 py-1.5 text-gray-700">
                 {r.calling}
-                {r.notes?.trim() && <span className="ml-1.5 cursor-help" title={r.notes}>📝</span>}
+                {r.notes?.trim() && <p className="text-xs text-gray-500 leading-snug line-clamp-2 max-w-xs" title={r.notes}>{r.notes}</p>}
               </td>
-              <td className="px-3 py-2">
+              <td className="px-3 py-1.5">
                 {r.type === 'Release'
                   ? <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-50 text-red-700">Release</span>
                   : <span className="text-xs font-semibold px-2 py-0.5 rounded bg-green-50 text-green-700">Call</span>}
               </td>
-              <td className="px-3 py-2">
+              <td className="px-3 py-1.5">
                 <div className="flex items-center gap-1.5 whitespace-nowrap">
                   <StatusBadge status={r.status} colors={CALLING_STATUS_COLORS} />
                   {(() => {
@@ -898,14 +903,14 @@ function Table({ rows, onEdit, onDelete, onAdvance, assignees }: {
                   })()}
                 </div>
               </td>
-              <td className="px-3 py-2 text-gray-600">{r.assigned_to}</td>
-              <td className="px-3 py-2 text-gray-600">{r.organization}</td>
-              <td className="px-3 py-2 text-gray-600">
+              <td className="px-3 py-1.5 text-gray-600">{r.assigned_to}</td>
+              <td className="px-3 py-1.5 text-gray-600">{r.organization}</td>
+              <td className="px-3 py-1.5 text-gray-600">
                 {r.type === 'Release'
                   ? (r.release_recorded ? '✓R' : '')
                   : <>{r.sustain_recorded ? '✓S' : ''}{r.set_apart_recorded ? ' ✓A' : ''}</>}
               </td>
-              <td className="px-3 py-2">
+              <td className="px-3 py-1.5">
                 <button onClick={async e => { e.stopPropagation(); if (await confirm({ message: `Delete ${stripBold(r.member || '') || 'this entry'}${r.calling ? ` — ${r.calling}` : ''}?` })) onDelete(r.id); }} className="text-red-400 hover:text-red-600 text-xs">Del</button>
               </td>
             </tr>

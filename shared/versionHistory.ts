@@ -8,6 +8,9 @@ export const VERSION_HISTORY: VersionEntry[] = [
             {
               date: 'Nov 15, 2026',
               items: [
+                'Calling Pipeline: an entry opened to find someone new for a calling (from “Also find someone new for this calling” or All Callings’ “Consider for release”) now leaves Member blank and puts “Replacement for [person]” in its Notes. Existing entries were moved the same way.',
+                'Calling Pipeline: each entry’s notes now show in small grey text under the calling (up to two lines), instead of a 📝 icon you had to hover over. Rows are a little more compact.',
+                'Calling Pipeline: the Pray About list is now sorted by Call/Release (callings first) and then by member name. Clicking a column header still re-sorts it.',
                 'Sacrament agendas: names now read First Last (“Eli Robbins” instead of “Robbins, Eli”) on the Current Sacrament Meeting agenda, its Copy and Export PDF, the Sacrament Program, and Sacrament Planning’s Agenda View and edit window. This covers speakers, prayers, and those being sustained or released. Names are still matched to the ward list the same way.',
                 'Current Sacrament Meeting: the To Be Sustained and To Be Thanked lists no longer show each calling’s organization in brackets, just the name and calling.',
                 'Sacrament Program: the Opening and Closing Prayer lines now always show. A prayer no one has been assigned to yet shows “By Invitation”.',
