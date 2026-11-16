@@ -6,6 +6,12 @@ export interface VersionEntry { date: string; items: string[] }
 
 export const VERSION_HISTORY: VersionEntry[] = [
             {
+              date: 'Nov 16, 2026',
+              items: [
+                'Action Items: the clerk’s “Create church record for [baby]” item is now added only once per baby. Before, deleting it brought it back the next morning.',
+              ],
+            },
+            {
               date: 'Nov 15, 2026',
               items: [
                 'Calling Pipeline: an entry opened to find someone new for a calling (from “Also find someone new for this calling” or All Callings’ “Consider for release”) now leaves Member blank and puts “Replacement for [person]” in its Notes. Existing entries were moved the same way.',
