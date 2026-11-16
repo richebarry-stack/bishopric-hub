@@ -481,43 +481,6 @@ export async function syncTempleRecommendInterviews(db: D1Database): Promise<Job
   return { ok: true, created, updated, removed, changes };
 }
 
-/** Once a baby's blessing date has passed and its church record hasn't been marked
- * created yet, auto-creates a task for the clerk to create the record in LCR.
- * Fires only once per baby: babies.record_task_created remembers it, so deleting
- * the task doesn't bring it back the next day (it also still skips a baby whose
- * task text already exists). Never re-fires or removes the task if the baby record changes later;
- * checking "Church record created" on the Babies page is a separate manual step
- * that doesn't touch the task, and marking the task done doesn't touch the baby. */
-export async function syncClerkBabyRecordTasks(db: D1Database, todayStr: string): Promise<JobResult> {
-  const babiesResult = await db.prepare(
-    "SELECT id, name, blessing_date FROM babies WHERE blessing_date IS NOT NULL AND blessing_date != '' AND blessing_date <= ? AND church_record_created = 0 AND record_task_created = 0"
-  ).bind(todayStr).all<{ id: number; name: string; blessing_date: string }>();
-  if (babiesResult.results.length === 0) return { ok: true, created: 0, changes: [] };
-
-  const clerk = await db.prepare("SELECT name FROM users WHERE church_role = 'Clerk' LIMIT 1").first<{ name: string }>();
-  const assignedTo = clerk?.name ?? '';
-
-  const existingResult = await db.prepare("SELECT task FROM tasks WHERE task LIKE 'Create church record for %'").all<{ task: string }>();
-  const existingTaskTexts = new Set(existingResult.results.map(r => r.task));
-
-  const nowIso = new Date().toISOString();
-  const stmts: D1PreparedStatement[] = [];
-  const changes: string[] = [];
-  let created = 0;
-  for (const baby of babiesResult.results) {
-    const taskText = `Create church record for ${baby.name} (blessed ${baby.blessing_date.slice(0, 10)})`;
-    stmts.push(db.prepare('UPDATE babies SET record_task_created = 1 WHERE id = ?').bind(baby.id));
-    if (existingTaskTexts.has(taskText)) continue;
-    stmts.push(db.prepare(
-      'INSERT INTO tasks (task, assigned_to, created_date, done, share_with, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).bind(taskText, assignedTo, todayStr, 0, 'Bishopric', nowIso, nowIso));
-    changes.push(`Task added: ${taskText}`);
-    created++;
-  }
-  if (stmts.length > 0) await db.batch(stmts);
-  return { ok: true, created, changes };
-}
-
 export async function runDailyJobs(db: D1Database): Promise<Record<string, JobResult>> {
   const todayStr = new Date().toISOString().slice(0, 10);
   const results: Record<string, JobResult> = {};
@@ -552,8 +515,6 @@ export async function runDailyJobs(db: D1Database): Promise<Record<string, JobRe
   try { results.syncTempleRecommendInterviews = await syncTempleRecommendInterviews(db); }
   catch (e) { results.syncTempleRecommendInterviews = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 
-  try { results.syncClerkBabyRecordTasks = await syncClerkBabyRecordTasks(db, todayStr); }
-  catch (e) { results.syncClerkBabyRecordTasks = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 
   return results;
 }

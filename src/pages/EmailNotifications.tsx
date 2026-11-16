@@ -21,7 +21,6 @@ const JOB_LABELS: Record<string, string> = {
   syncCallingInterviews: 'Calling interview sync',
   syncOrdinanceCandidates: 'Priesthood advancement sync',
   syncTempleRecommendInterviews: 'Temple recommend interview sync',
-  syncClerkBabyRecordTasks: 'Baby record task sync',
 };
 
 // Count fields a daily job may report, in display order.

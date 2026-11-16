@@ -8,7 +8,7 @@ export const VERSION_HISTORY: VersionEntry[] = [
             {
               date: 'Nov 16, 2026',
               items: [
-                'Action Items: the clerk’s “Create church record for [baby]” item is now added only once per baby. Before, deleting it brought it back the next morning.',
+                'Action Items: the daily job no longer adds a “Create church record for [baby]” action item. My Actions already shows the clerk “Create church record: [baby]” once a baby is blessed, and it clears when “Church record created” is checked on the Babies page, so the extra item (which kept coming back after being deleted) was a duplicate.',
               ],
             },
             {
