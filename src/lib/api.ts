@@ -680,6 +680,7 @@ export interface LcrSyncRun {
   callings_released: number | null;
   callings_changed: string | null; // JSON-stringified {name, calling, action}[]
   callings_unmatched: string | null; // JSON-stringified string[]
+  callings_lcr_changed: string | null; // JSON: { name, calling, action }[] — every LCR calling change, tracked or not
   missionary_created: number | null;
   missionary_updated: number | null;
   missionary_changed: string | null; // JSON-stringified {name, section, action}[]

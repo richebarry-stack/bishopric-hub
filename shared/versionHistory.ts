@@ -8,6 +8,7 @@ export const VERSION_HISTORY: VersionEntry[] = [
             {
               date: 'Nov 16, 2026',
               items: [
+                'Automation & Notifications: each LCR sync now lists every calling change in LCR (“All calling changes in LCR”: sustained, set apart or released), including callings that aren’t on the Calling Pipeline. Before, only Calling Pipeline entries were listed, so a sustaining like a Teachers Quorum Adviser never showed. The old list is now labeled “Calling Pipeline entries changed”.',
                 'Action Items: the daily job no longer adds a “Create church record for [baby]” action item. My Actions already shows the clerk “Create church record: [baby]” once a baby is blessed, and it clears when “Church record created” is checked on the Babies page, so the extra item (which kept coming back after being deleted) was a duplicate.',
               ],
             },

@@ -2074,6 +2074,33 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     if (stmts.length > 0) await db.batch(stmts);
 
+    // Every change in LCR's full calling list since the last sync, tracked in the
+    // pipeline or not (the pipeline report above only covers tracked callings).
+    // Diffed against the previous member_callings mirror before it's replaced.
+    // Skipped when there's no previous mirror, so a first sync doesn't list everyone.
+    const lcrChanged: { name: string; calling: string; action: string }[] = [];
+    const prevMirror = (await db.prepare('SELECT ward_member_id, calling, set_apart FROM member_callings').all<{ ward_member_id: number; calling: string; set_apart: number }>()).results;
+    if (prevMirror.length > 0) {
+      const people = (await db.prepare('SELECT id, first_name, last_name FROM ward_members').all<{ id: number; first_name: string; last_name: string }>()).results;
+      const nameOf = new Map(people.map(p => [p.id, p.first_name ? `${p.last_name}, ${p.first_name}` : p.last_name]));
+      const prev = new Map(prevMirror.map(r => [`${r.ward_member_id}|${normCalling(r.calling)}`, r]));
+      const nowKeys = new Set<string>();
+      for (const row of rows) {
+        const member = matchRosterMember(row.person, roster);
+        if (!member) continue;
+        const key = `${member.id}|${normCalling(row.calling)}`;
+        if (nowKeys.has(key)) continue;
+        nowKeys.add(key);
+        const before = prev.get(key);
+        const name = nameOf.get(member.id) || row.person;
+        if (!before) lcrChanged.push({ name, calling: row.calling, action: row.set_apart ? 'sustained, set apart' : 'sustained' });
+        else if (row.set_apart && !before.set_apart) lcrChanged.push({ name, calling: row.calling, action: 'set apart' });
+      }
+      for (const [key, r] of prev) {
+        if (!nowKeys.has(key)) lcrChanged.push({ name: nameOf.get(r.ward_member_id) || 'Unknown member', calling: r.calling, action: 'released' });
+      }
+    }
+
     // Full read-only mirror of every filled calling LCR reports (not just
     // tracked ones) for the Ward Members "all callings" display — wholesale
     // replace each run since LCR's dump is always the full current picture.
@@ -2097,7 +2124,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
     await db.batch(unfilledStmts);
 
-    return json({ ok: true, created, updated, released, changed, unmatched });
+    return json({ ok: true, created, updated, released, changed, unmatched, lcr_changed: lcrChanged });
   }
 
   // Bulk missionary-status sync from missionaryrecommendations.churchofjesuschrist.org.

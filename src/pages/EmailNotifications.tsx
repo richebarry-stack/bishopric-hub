@@ -108,7 +108,8 @@ function SyncRun({ run }: { run: LcrSyncRun }) {
           <NameList label="Cleared (activated)" names={parseNames(run.stake_cleared_names)} />
           <NameList label="Unmatched stake activations" names={parseNames(run.stake_unmatched)} />
           <p>Callings: {run.callings_created ?? 0} created, {run.callings_updated ?? 0} updated, {run.callings_released ?? 0} released{parseNames(run.callings_unmatched).length > 0 ? `, ${parseNames(run.callings_unmatched).length} unmatched` : ''}</p>
-          <NameList label="Callings changed" names={parseChanged(run.callings_changed, 'calling')} />
+          <NameList label="Calling Pipeline entries changed" names={parseChanged(run.callings_changed, 'calling')} />
+          <NameList label="All calling changes in LCR" names={parseChanged(run.callings_lcr_changed, 'calling')} />
           <NameList label="Unmatched callings" names={parseNames(run.callings_unmatched)} />
           <p>Missionary status: {run.missionary_created ?? 0} created, {run.missionary_updated ?? 0} updated{parseNames(run.missionary_unmatched).length > 0 ? `, ${parseNames(run.missionary_unmatched).length} unmatched` : ''}</p>
           <NameList label="Missionary status changed" names={parseChanged(run.missionary_changed, 'section')} />
