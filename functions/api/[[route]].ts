@@ -97,6 +97,8 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'annual-duties': { name: 'annual_duties', orderBy: 'sort_order ASC, id ASC' },
   'yc-meetings': { name: 'yc_meetings', orderBy: 'date ASC' },
   'tithing-declarations': { name: 'tithing_declaration_slots', orderBy: 'date ASC, start_time ASC' },
+  // Bishopric hub only: the WC, YC and Calendar hub checks below refuse any table they don't list.
+  'speaking-topics': { name: 'speaking_topics', orderBy: 'topic COLLATE NOCASE ASC' },
 };
 
 function json(data: unknown, status = 200) {
@@ -1110,6 +1112,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       covenant_path_settings: ['both', 'bh'],
       wc_discussion_col_widths: ['both', 'bh', 'wc'],
       wc_discussion_orgs: ['both', 'bh', 'wc'],
+      speaking_invitation_settings: ['both', 'bh'],
     };
     const allowedHubs = UI_SETTING_HUBS[key];
     if (!allowedHubs || !allowedHubs.includes(session.hub || 'both')) return json({ error: 'Forbidden' }, 403);

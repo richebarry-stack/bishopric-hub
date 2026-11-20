@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useTable } from '../lib/useTable';
 import { api } from '../lib/api';
 import type { SacramentSpeaker, Prayer, WardMember, SacramentMusic, SacramentTheme, SacramentAnnouncement, SacramentAgendaNote, SacramentWardBusiness } from '../lib/api';
@@ -33,6 +34,14 @@ function formatDate(iso: string): string {
   const d = new Date(iso.slice(0, 10) + 'T12:00:00');
   if (isNaN(d.getTime())) return iso;
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function InviteLink({ name }: { name: string }) {
+  return (
+    <Link to={`/speaking-invitations?name=${encodeURIComponent(name)}`} className="inline-block mt-1.5 text-xs text-blue-600 hover:underline">
+      ✉ Create speaking invitation
+    </Link>
+  );
 }
 
 function AgendaLink({ date, children, className, onOpen }: { date: string; children: React.ReactNode; className?: string; onOpen: (date: string) => void }) {
@@ -335,6 +344,7 @@ function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey,
                     <tr key={`${r.key}-exp`} className="bg-gray-50 border-b border-gray-100">
                       <td colSpan={6} className="px-6 py-2">
                         <SpeakerDatesChips r={r} onDateClick={onDateClick} />
+                        <InviteLink name={wm ? displayName(wm) : r.label} />
                       </td>
                     </tr>
                   )}
@@ -372,7 +382,7 @@ function SpeakerTable({ rows, notes, onSaveNote, expanded, setExpanded, sortKey,
                   </button>
                 )}
               </div>
-              {isOpen && <div className="mt-2 pt-2 border-t border-gray-100"><SpeakerDatesChips r={r} onDateClick={onDateClick} /></div>}
+              {isOpen && <div className="mt-2 pt-2 border-t border-gray-100"><SpeakerDatesChips r={r} onDateClick={onDateClick} /><InviteLink name={wm ? displayName(wm) : r.label} /></div>}
             </div>
           );
         })}

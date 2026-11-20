@@ -6,6 +6,15 @@ export interface VersionEntry { date: string; items: string[] }
 
 export const VERSION_HISTORY: VersionEntry[] = [
             {
+              date: 'Nov 20, 2026',
+              items: [
+                'New page: Speaking Invitations (under Sacrament Meeting). Fill in the speaker, Sunday, talk type, length and topic, and a letter-sized invitation builds beside the form as you type. Generate PDF opens a print-ready letter you can edit, print, or save as a PDF. Send opens a ready-to-send draft in Gmail, Outlook.com, Outlook (work or school), Yahoo Mail or your default mail app, and remembers which one you used. Copy text copies the letter.',
+                'Speaking Invitations: sources can come from that Sunday’s theme (Use theme), from a shared Topic library the bishopric can add to and edit (started with 14 common topics and scriptures), or from “Ask Claude for sources”, which opens Claude.ai in a new tab with a prompt for the topic using your own Claude account. AI suggestions can be wrong or cite talks that don’t exist, so check each one before adding it.',
+                'Speaking Invitations: default talk lengths are Adult 7 minutes, Youth 3–5, Returning missionary 10 and High council 15. These, the speaking guidance and the signature can be changed in Template settings, shared by the whole bishopric.',
+                'Speaking Invitations: Save to schedule adds the speaker to Sacrament Planning for that Sunday (or updates them if they’re already there), only when you click it. Returning missionaries are saved with the Homecoming occasion and high council speakers with “High council” in their notes. Sacrament Planning (the Agenda View and the Edit Speaker window) and Speakers & Prayers now have links that open an invitation already filled in.',
+              ],
+            },
+            {
               date: 'Nov 16, 2026',
               items: [
                 'Automation & Notifications: each LCR sync now lists every calling change in LCR (“All calling changes in LCR”: sustained, set apart or released), including callings that aren’t on the Calling Pipeline. Before, only Calling Pipeline entries were listed, so a sustaining like a Teachers Quorum Adviser never showed. The old list is now labeled “Calling Pipeline entries changed”.',

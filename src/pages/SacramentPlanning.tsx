@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTable } from '../lib/useTable';
 import type { SacramentSpeaker, Prayer, SacramentMusic, SacramentTheme, SacramentAnnouncement, WardMember } from '../lib/api';
 import Modal from '../components/Modal';
@@ -166,6 +166,9 @@ export default function SacramentPlanning() {
                       <p key={s.id} className="text-gray-700">
                         {toFirstLast(s.speaker) || <span className="italic text-gray-400">TBD</span>} <span className="text-gray-400">({s.speaker_type})</span>
                         {s.topic && <span className="text-gray-500"> — {s.topic}</span>}
+                        {!isWcReadOnly && s.speaker && (
+                          <Link to={`/speaking-invitations?speakerId=${s.id}`} onClick={e => e.stopPropagation()} title="Create speaking invitation" className="ml-1.5 text-blue-600 hover:underline text-xs">✉ Invite</Link>
+                        )}
                       </p>
                     )) : <p className="text-gray-400">No speakers</p>}
                   </div>
@@ -304,7 +307,10 @@ export default function SacramentPlanning() {
             <Input label="Topic" value={editSpeaker.topic || ''} onChange={v => setEditSpeaker({ ...editSpeaker, topic: v })} />
             <Select label="Accepted" value={editSpeaker.accepted || ''} onChange={v => setEditSpeaker({ ...editSpeaker, accepted: v })} options={['Considering', 'Called and Accepted']} />
             <Input label="Speaking Order" value={String(editSpeaker.speaking_order || '')} onChange={v => setEditSpeaker({ ...editSpeaker, speaking_order: Number(v) })} type="number" />
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-2">
+              {editSpeaker.id && !isWcReadOnly && (
+                <Link to={`/speaking-invitations?speakerId=${editSpeaker.id}`} className="mr-auto text-sm text-blue-600 hover:underline">✉ Create invitation</Link>
+              )}
               <button type="button" onClick={() => setEditSpeaker(null)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
               <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">Save</button>
             </div>

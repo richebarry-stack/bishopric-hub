@@ -39,6 +39,7 @@ const YouthActivities = lazyWithReload(() => import('./pages/YouthActivities'));
 const SacramentProgram = lazyWithReload(() => import('./pages/SacramentProgram'));
 const WardCouncilMembers = lazyWithReload(() => import('./pages/WardCouncilMembers'));
 const SpeakersAndPrayers = lazyWithReload(() => import('./pages/SpeakersAndPrayers'));
+const SpeakingInvitations = lazyWithReload(() => import('./pages/SpeakingInvitations'));
 const WardMembers = lazyWithReload(() => import('./pages/WardMembers'));
 const AllCallings = lazyWithReload(() => import('./pages/AllCallings'));
 const WcDashboard = lazyWithReload(() => import('./pages/WcDashboard'));
@@ -228,6 +229,7 @@ function AppRoutes() {
         <Route path="/important-links" element={<ImportantLinks />} />
         <Route path="/youth-activities" element={<YouthActivities />} />
         <Route path="/speakers-and-prayers" element={<SpeakersAndPrayers />} />
+        <Route path="/speaking-invitations" element={<SpeakingInvitations />} />
         <Route path="/sacrament-music" element={<SacramentMusic />} />
         <Route path="/ward-members" element={<WardMembers />} />
         <Route path="/all-callings" element={<AllCallings />} />
