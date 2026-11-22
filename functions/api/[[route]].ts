@@ -2736,6 +2736,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   if (tableName === 'member-care' && method === 'GET' && !recordId) {
     await syncMemberCareFromMoveIns(db).catch(err => console.error('member-care sync failed:', err));
+    const { results } = await db.prepare(`SELECT * FROM member_care WHERE deleted = 0 ORDER BY ${tableConfig.orderBy}`).all();
+    return json(results);
+  }
+
+  // Deleting a row that came from a bishopric-meeting move-in leaves a hidden tombstone,
+  // so the move-in sync doesn't add the person straight back.
+  if (tableName === 'member-care' && method === 'DELETE' && recordId) {
+    const row = await db.prepare('SELECT move_item_id FROM member_care WHERE id = ?').bind(recordId).first<{ move_item_id: number | null }>();
+    if (row?.move_item_id) {
+      await db.prepare('UPDATE member_care SET deleted = 1, updated_at = ?, updated_by = ? WHERE id = ?')
+        .bind(new Date().toISOString(), session.name, recordId).run();
+      return json({ ok: true });
+    }
   }
 
   // A booked interview slot owns the appointment it put on the calendar: deleting the

@@ -45,17 +45,16 @@ export default function MemberCare() {
     setEditing(null);
   };
 
+  // The server keeps a hidden tombstone for move-in rows so they aren't re-added.
+  const deleteRow = async (row: Pick<MemberCareRow, 'id' | 'member_name'>): Promise<boolean> => {
+    if (!await confirm({ message: `Delete ${row.member_name} from this list? This can't be undone.` })) return false;
+    await remove(row.id);
+    return true;
+  };
+
   const handleDelete = async () => {
     if (!editing?.id) return;
-    // Rows that came from a bishopric-meeting move-in would come straight back if
-    // deleted, so they're archived instead.
-    if (editing.move_item_id) {
-      await update(editing.id, { archived: 1 });
-    } else {
-      if (!await confirm({ message: `Delete ${editing.member_name}?` })) return;
-      await remove(editing.id);
-    }
-    setEditing(null);
+    if (await deleteRow({ id: editing.id, member_name: editing.member_name || '' })) setEditing(null);
   };
 
   const card = (r: MemberCareRow) => {
@@ -68,7 +67,10 @@ export default function MemberCare() {
             <h3 className="font-medium text-gray-900 hover:text-blue-700">{r.member_name}</h3>
             <p className="text-xs text-gray-500">{r.kind}{r.added_date ? ` · added ${r.added_date.slice(0, 10)}` : ''}</p>
           </button>
-          <ProgressPill done={done} total={total} />
+          <div className="flex items-center gap-2">
+            <ProgressPill done={done} total={total} />
+            <button type="button" onClick={() => deleteRow(r)} className="text-red-400 hover:text-red-600 text-xs">Del</button>
+          </div>
         </div>
         <Checklist items={MEMBER_CARE_ITEMS} state={state} onChange={next => toggle(r, next)} />
         {r.notes && <p className="text-xs text-gray-500 mt-2 whitespace-pre-line">{r.notes}</p>}
@@ -129,7 +131,7 @@ export default function MemberCare() {
               <div>
                 {editing.id && (
                   <button type="button" onClick={handleDelete} className="px-4 py-2 text-sm text-red-600 hover:text-red-800">
-                    {editing.move_item_id ? 'Archive' : 'Delete'}
+                    Delete
                   </button>
                 )}
               </div>

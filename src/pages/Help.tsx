@@ -431,7 +431,7 @@ const FULL_SECTIONS: Section[] = [
     icon: '✚',
     content: (
       <div className="space-y-2">
-        <p>Move-ins entered on Current Bishopric Meeting (from October 2026 on) are added automatically a few minutes after they're typed; add new converts and returning members with <strong>+ Add</strong>. Each has a checklist: bishopric welcome visit, ministering assigned, introduced in ward council, calling extended, temple discussed (General Handbook 23.5). The ward council sees and updates the same list. Archive someone when they're settled.</p>
+        <p>Move-ins entered on Current Bishopric Meeting (from October 2026 on) are added automatically a few minutes after they're typed; add new converts and returning members with <strong>+ Add</strong>. Each has a checklist: bishopric welcome visit, ministering assigned, introduced in ward council, calling extended, temple discussed (General Handbook 23.5). The ward council sees and updates the same list. Archive someone when they're settled, or <strong>Del</strong> to remove them for good (a deleted move-in isn't added back).</p>
       </div>
     ),
   },
