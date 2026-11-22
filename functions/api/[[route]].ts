@@ -102,15 +102,12 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'speaking-topics': { name: 'speaking_topics', orderBy: 'topic COLLATE NOCASE ASC' },
   'homebound-sacrament': { name: 'homebound_sacrament', orderBy: 'active DESC, member_name COLLATE NOCASE ASC' },
   'interview-slots': { name: 'interview_slots', orderBy: 'date ASC, start_time ASC' },
-  // Bishop and Clerk only — see WELFARE_ROLES below.
+  // Bishopric hub only: the WC, YC and Calendar hub checks refuse any table they don't list.
   'welfare-cases': { name: 'welfare_cases', orderBy: "CASE status WHEN 'Closed' THEN 1 ELSE 0 END, next_follow_up ASC, id DESC" },
   // Shared with the Ward Council hub (WC_FULL_CRUD).
   'member-care': { name: 'member_care', orderBy: 'archived ASC, added_date DESC, id DESC' },
   'funerals': { name: 'funerals', orderBy: 'archived ASC, funeral_date DESC, id DESC' },
 };
-
-// Welfare follow-up is the most sensitive data in the hub: only these callings may read or write it.
-const WELFARE_ROLES = new Set(['Bishop', 'Clerk']);
 
 // Calendars members can book interviews on (/book-interview).
 const INTERVIEW_CALENDARS = ['Bishop', 'First Counselor', 'Second Counselor'];
@@ -2736,10 +2733,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const tableConfig = TABLES[tableName];
 
   if (!tableConfig) return json({ error: 'Unknown table' }, 404);
-
-  if (tableName === 'welfare-cases' && !WELFARE_ROLES.has(session.church_role || '')) {
-    return json({ error: 'Forbidden' }, 403);
-  }
 
   if (tableName === 'member-care' && method === 'GET' && !recordId) {
     await syncMemberCareFromMoveIns(db).catch(err => console.error('member-care sync failed:', err));

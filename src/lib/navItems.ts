@@ -1,6 +1,3 @@
-/** Callings allowed to see Welfare Follow-up (the API enforces the same list). */
-export const WELFARE_ROLES = ['Bishop', 'Clerk'];
-
 export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?: boolean; roles?: string[] }[] = [
   { path: '/', label: 'Dashboard', icon: '⌂' },
   { path: '/current-sacrament', label: 'Current Sacrament Meeting', icon: '♫' },
@@ -12,7 +9,7 @@ export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?:
   { path: '/tasks', label: 'Action Items', icon: '☑' },
   { path: '/member-needs', label: 'Member Needs', icon: '♥' },
   { path: '/member-care', label: 'New & Returning Members', icon: '✚' },
-  { path: '/welfare', label: 'Welfare Follow-up', icon: '🔒', roles: WELFARE_ROLES },
+  { path: '/welfare', label: 'Welfare Follow-up', icon: '🔒' },
   { path: '/funerals', label: 'Funerals', icon: '✿' },
   { path: '/homebound-sacrament', label: 'Homebound Sacrament', icon: '⌂' },
   { path: '/interview-booking', label: 'Interview Booking', icon: '🗓' },
@@ -143,7 +140,7 @@ export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: s
       { path: '/covenant-path',        label: 'Covenant Path',       icon: 'ti-route'           },
       { path: '/member-needs',         label: 'Member Needs',        icon: 'ti-heart'           },
       { path: '/member-care',          label: 'New & Returning Members', icon: 'ti-user-plus'   },
-      { path: '/welfare',              label: 'Welfare Follow-up',   icon: 'ti-lock', roles: WELFARE_ROLES },
+      { path: '/welfare',              label: 'Welfare Follow-up',   icon: 'ti-lock' },
       { path: '/homebound-sacrament',  label: 'Homebound Sacrament', icon: 'ti-home'            },
       { path: '/funerals',             label: 'Funerals',            icon: 'ti-flower'          },
       { path: '/missionary-pipeline',  label: 'Missionary Pipeline', icon: 'ti-compass'         },

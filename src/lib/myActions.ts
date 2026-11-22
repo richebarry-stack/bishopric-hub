@@ -39,7 +39,7 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
   const { rows: babies, isLoading: l10 } = useTable<Baby>('babies', { enabled: isClerk });
   const { rows: wcMeetings, isLoading: l12 } = useTable<WcMeeting>('wc-meetings', { enabled: canWc });
   const { rows: ordinances } = useTable<Ordinance>('ordinances', { enabled: isClerk });
-  // The API refuses welfare-cases to everyone but the Bishop and Clerk.
+  // Welfare follow-up reminders go to the Bishop only (the whole bishopric hub can view the page).
   const { rows: welfare } = useTable<WelfareCase>('welfare-cases', { enabled: isBishop });
   const { rows: interviewSlots } = useTable<InterviewSlot>('interview-slots', { enabled: getsBookings });
   // Only the bishopric hub can read the roster (see WC_READABLE in the API); without it

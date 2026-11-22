@@ -440,7 +440,7 @@ const FULL_SECTIONS: Section[] = [
     icon: '🔒',
     content: (
       <div className="space-y-2">
-        <p>Only the Bishop and Clerk can see this page. Track who is receiving help (fast offering, bishop's order, self-reliance plan, referral), its status and the next follow-up date. Keep amounts and details in the Church's own systems. Follow-ups due within a week show on the Bishop's My Actions (and in his email) as "Welfare follow-up: [name]" with no other details.</p>
+        <p>Visible to everyone in the Bishopric hub (not the Ward Council hub). Track who is receiving help (fast offering, bishop's order, self-reliance plan, referral), its status and the next follow-up date. Keep amounts and details in the Church's own systems. Follow-ups due within a week show on the Bishop's My Actions (and in his email) as "Welfare follow-up: [name]" with no other details.</p>
       </div>
     ),
   },

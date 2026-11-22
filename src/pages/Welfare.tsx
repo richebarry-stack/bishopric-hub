@@ -93,7 +93,7 @@ export default function Welfare() {
         Who the bishop is helping with temporal needs and when to follow up (General Handbook chapter 22).
       </p>
       <p className="text-xs text-gray-400 mb-4">
-        🔒 Only the Bishop and Clerk can see this page. Keep amounts and details in the Church's own systems; follow-ups due within a week show
+        🔒 Bishopric hub only — the ward council can't see this page. Keep amounts and details in the Church's own systems; follow-ups due within a week show
         in the Bishop's My Actions.
       </p>
 

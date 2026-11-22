@@ -11,7 +11,6 @@ import SecurityQuestionsSetup from './pages/SecurityQuestionsSetup';
 import ErrorBoundary from './components/ErrorBoundary';
 import ToastContainer from './components/Toast';
 import { ConfirmProvider } from './components/ConfirmProvider';
-import { WELFARE_ROLES } from './lib/navItems';
 
 const Dashboard = lazyWithReload(() => import('./pages/Dashboard'));
 const CallingPipeline = lazyWithReload(() => import('./pages/CallingPipeline'));
@@ -231,7 +230,7 @@ function AppRoutes() {
         <Route path="/current-bishopric-meeting" element={<CurrentBishopricMeeting />} />
         <Route path="/member-needs" element={<MemberNeeds />} />
         <Route path="/member-care" element={<MemberCare />} />
-        {WELFARE_ROLES.includes(user.church_role) && <Route path="/welfare" element={<Welfare />} />}
+        <Route path="/welfare" element={<Welfare />} />
         <Route path="/funerals" element={<Funerals />} />
         <Route path="/homebound-sacrament" element={<HomeboundSacrament />} />
         <Route path="/interview-booking" element={<InterviewBooking />} />
