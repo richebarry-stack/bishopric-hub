@@ -267,11 +267,12 @@ export const SHARE_WITH_OPTIONS = ['Bishopric', 'Ward Council', 'Youth Council']
 
 export const ORDINANCE_TYPES = ['Baptism', 'Confirmation', 'Deacon', 'Teacher', 'Priest'];
 
-export const ORDINANCE_STATUSES = ['Upcoming', 'Interviewed', 'Completed', 'Recorded'];
+export const ORDINANCE_STATUSES = ['Upcoming', 'Interviewed', 'Sustained', 'Completed', 'Recorded'];
 
 export const ORDINANCE_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   Upcoming: { bg: 'bg-gray-100', text: 'text-gray-700' },
   Interviewed: { bg: 'bg-blue-100', text: 'text-blue-800' },
+  Sustained: { bg: 'bg-violet-100', text: 'text-violet-800' },
   Completed: { bg: 'bg-green-100', text: 'text-green-800' },
   Recorded: { bg: 'bg-pink-100', text: 'text-pink-800' },
 };

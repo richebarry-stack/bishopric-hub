@@ -146,6 +146,24 @@ const WC_SECTIONS: Section[] = [
     ),
   },
   {
+    title: 'New & Returning Members',
+    icon: '✚',
+    content: (
+      <div className="space-y-2">
+        <p>Move-ins the bishopric records are added here automatically; add new converts and returning members with <strong>+ Add</strong>. Each has a short checklist (welcome visit, ministering assigned, introduced in ward council, calling, temple discussed) to review in ward council until it's done, then archive it.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Funerals',
+    icon: '✿',
+    content: (
+      <div className="space-y-2">
+        <p>Plan a funeral with the bishopric: date, time, viewing, family contact and a checklist (family visit, elders quorum and Relief Society notified, program, building, luncheon, printed program, grave dedication, follow-up visit). Check items off as they're done.</p>
+      </div>
+    ),
+  },
+  {
     title: 'Calendar of Events & Youth Calendar',
     icon: '⇗',
     content: (
@@ -254,6 +272,7 @@ const FULL_SECTIONS: Section[] = [
     content: (
       <div className="space-y-2">
         <p>A list view of sacrament meeting themes and conducting assignments across all weeks. Click any row to edit its theme, scripture references, conducting, and meeting link. Useful for planning months in advance.</p>
+        <p>Easter, Christmas on a Sunday and 5th Sundays are labeled automatically. Check <strong>Primary Program</strong> on the Sunday the children present; a reminder shows until one is set for the year.</p>
       </div>
     ),
   },
@@ -296,6 +315,7 @@ const FULL_SECTIONS: Section[] = [
       <div className="space-y-2">
         <p>Track baptisms and Aaronic Priesthood advancement (Deacon, Teacher, Priest) from discussion through recording.</p>
         <p>A <strong>Suggested this year</strong> box lists children turning 8 and young men turning 12, 14, or 16 this year, computed from birth dates and gender on Ward Members — click <strong>Track</strong> to add one, or <strong>Dismiss</strong> to hide it.</p>
+        <p>For a deacon, teacher or priest, set <strong>Sustain in sacrament meeting on</strong> to the Sunday he'll be presented. Saving adds the sustaining wording to that Sunday's Ward Business and moves him to <strong>Sustained</strong>; changing the Sunday moves the wording. Once an ordinance is <strong>Completed</strong>, the clerk gets a "Record in LCR" item on My Actions until it's marked <strong>Recorded</strong>.</p>
       </div>
     ),
   },
@@ -350,6 +370,7 @@ const FULL_SECTIONS: Section[] = [
       <div className="space-y-2">
         <p>Track prospective missionaries, currently serving missionaries, and recently returned missionaries.</p>
         <p>Record temple preparation status, call received, report date, release date, and current status.</p>
+        <p>Once a missionary is <strong>Released from Mission Field</strong>, open their record for a follow-up checklist: released by the stake president, homecoming talk, reports to the high council and ward council, a calling, and a current temple recommend. Progress shows next to their name.</p>
         <p>Anyone from <strong>Candidate Completing Forms</strong> up until they enter the MTC appears automatically on the dashboards' <strong>Missionaries</strong> prayer list, and drops off once they enter the MTC. Tap 🙏 on the dashboard to take someone off the list; turn it back on from their Missionary Pipeline record.</p>
       </div>
     ),
@@ -390,6 +411,54 @@ const FULL_SECTIONS: Section[] = [
     content: (
       <div className="space-y-2">
         <p>Track the bishop's individual appointments with start time, end time, title, and notes. Separate from the bishopric meeting schedule.</p>
+        <p><strong>Subscribe</strong> (on Bishop and Counselor Schedule) gives you a private link for Google, Apple or Outlook Calendar so these appointments, and Sundays you're conducting, show on your phone. Pick which schedules it includes. Anyone with the link can see the appointments, so keep it private; <strong>Make a new link</strong> turns the old one off.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Interview Booking',
+    icon: '🗓',
+    content: (
+      <div className="space-y-2">
+        <p>Offer open interview times on the Bishop's or a counselor's schedule that members can book themselves at <span className="font-mono">/book-interview</span>, without logging in. Copy the link for one person from the top of the page, or share the general link so members choose who to meet with.</p>
+        <p>Add a range (e.g. 7–9 PM in 20-minute slots), optionally repeating weekly. Times that clash with that person's calendar are skipped, and an open time is hidden from members whenever something else is on the calendar then.</p>
+        <p>A booking adds the appointment to that schedule and shows on My Actions (and by email) for that person and the executive secretaries. Members give their name, a phone or email, and a general purpose; they never see who else booked. <strong>Cancel booking</strong> removes the appointment and reopens the time (let the member know yourself).</p>
+      </div>
+    ),
+  },
+  {
+    title: 'New & Returning Members',
+    icon: '✚',
+    content: (
+      <div className="space-y-2">
+        <p>Move-ins entered on Current Bishopric Meeting (from October 2026 on) are added automatically a few minutes after they're typed; add new converts and returning members with <strong>+ Add</strong>. Each has a checklist: bishopric welcome visit, ministering assigned, introduced in ward council, calling extended, temple discussed (General Handbook 23.5). The ward council sees and updates the same list. Archive someone when they're settled.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Welfare Follow-up',
+    icon: '🔒',
+    content: (
+      <div className="space-y-2">
+        <p>Only the Bishop and Clerk can see this page. Track who is receiving help (fast offering, bishop's order, self-reliance plan, referral), its status and the next follow-up date. Keep amounts and details in the Church's own systems. Follow-ups due within a week show on the Bishop's My Actions (and in his email) as "Welfare follow-up: [name]" with no other details.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Funerals',
+    icon: '✿',
+    content: (
+      <div className="space-y-2">
+        <p>Plan a funeral with the family (General Handbook 29.5): date and time, viewing, family contact, who presides and conducts, and a checklist from the family visit to the follow-up visit afterward. The ward council hub sees the same page so the elders quorum and Relief Society can help. A warning shows if the date is a Sunday.</p>
+      </div>
+    ),
+  },
+  {
+    title: 'Homebound Sacrament',
+    icon: '⌂',
+    content: (
+      <div className="space-y-2">
+        <p>Members who receive the sacrament at home, in a care facility or in the hospital, how often, and the priesthood holders assigned (General Handbook 29.2.1.5). <strong>Mark today</strong> records when it was last administered. Bishopric only.</p>
       </div>
     ),
   },

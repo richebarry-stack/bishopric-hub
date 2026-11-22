@@ -11,6 +11,7 @@ import SecurityQuestionsSetup from './pages/SecurityQuestionsSetup';
 import ErrorBoundary from './components/ErrorBoundary';
 import ToastContainer from './components/Toast';
 import { ConfirmProvider } from './components/ConfirmProvider';
+import { WELFARE_ROLES } from './lib/navItems';
 
 const Dashboard = lazyWithReload(() => import('./pages/Dashboard'));
 const CallingPipeline = lazyWithReload(() => import('./pages/CallingPipeline'));
@@ -56,6 +57,12 @@ const MyActions = lazyWithReload(() => import('./pages/MyActions'));
 const MyNotes = lazyWithReload(() => import('./pages/MyNotes'));
 const TithingDeclarationSchedule = lazyWithReload(() => import('./pages/TithingDeclarationSchedule'));
 const TithingDeclarationPublic = lazyWithReload(() => import('./pages/TithingDeclarationPublic'));
+const BookInterviewPublic = lazyWithReload(() => import('./pages/BookInterviewPublic'));
+const InterviewBooking = lazyWithReload(() => import('./pages/InterviewBooking'));
+const MemberCare = lazyWithReload(() => import('./pages/MemberCare'));
+const Welfare = lazyWithReload(() => import('./pages/Welfare'));
+const Funerals = lazyWithReload(() => import('./pages/Funerals'));
+const HomeboundSacrament = lazyWithReload(() => import('./pages/HomeboundSacrament'));
 
 const FullScreenLoading = () => (
   <div className="min-h-dvh flex items-center justify-center bg-gray-50">
@@ -73,7 +80,7 @@ function WcGuard({ children }: { children: React.ReactNode }) {
     '/', '/my-actions', '/my-notes', '/wc-meetings', '/wc-wins', '/wc-family-needs', '/wc-discussion-topics',
     '/current-sacrament', '/calendaring',
     '/babies', '/youth-activities', '/tasks', '/wc-members', '/hub-suggestions', '/help',
-    '/yc-meetings', '/privacy',
+    '/yc-meetings', '/privacy', '/member-care', '/funerals',
   ];
   if (!wcPaths.includes(location.pathname)) {
     return <Navigate to="/" replace />;
@@ -99,6 +106,10 @@ function AppRoutes() {
   // any login gate so members can reserve a slot without an account (hub suggestion #27).
   if (location.pathname === '/declare-tithing') {
     return <TithingDeclarationPublic />;
+  }
+  // Public interview booking — same no-login pattern as tithing declaration.
+  if (location.pathname === '/book-interview') {
+    return <BookInterviewPublic />;
   }
 
   if (loading) {
@@ -182,6 +193,8 @@ function AppRoutes() {
           <Route path="/wc-meetings" element={<WcMeetings />} />
           <Route path="/wc-wins" element={<WcWins />} />
           <Route path="/wc-family-needs" element={<MemberNeeds />} />
+          <Route path="/member-care" element={<MemberCare />} />
+          <Route path="/funerals" element={<Funerals />} />
           <Route path="/wc-discussion-topics" element={<WcDiscussionTopics />} />
           <Route path="/current-sacrament" element={<CurrentSacrament />} />
           <Route path="/calendaring" element={<Calendaring />} />
@@ -217,6 +230,11 @@ function AppRoutes() {
         <Route path="/bishopric-meetings" element={<BishopricMeetings />} />
         <Route path="/current-bishopric-meeting" element={<CurrentBishopricMeeting />} />
         <Route path="/member-needs" element={<MemberNeeds />} />
+        <Route path="/member-care" element={<MemberCare />} />
+        {WELFARE_ROLES.includes(user.church_role) && <Route path="/welfare" element={<Welfare />} />}
+        <Route path="/funerals" element={<Funerals />} />
+        <Route path="/homebound-sacrament" element={<HomeboundSacrament />} />
+        <Route path="/interview-booking" element={<InterviewBooking />} />
         <Route path="/missionary-pipeline" element={<MissionaryPipeline />} />
         <Route path="/babies" element={<Babies />} />
         <Route path="/out-of-town" element={<OutOfTown />} />

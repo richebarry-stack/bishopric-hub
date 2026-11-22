@@ -2,6 +2,7 @@ import {
   computeActionItems, buildNameIndex,
   type ActionItem, type ActionItemSources, type NameIndexMember,
   type TaskRow, type CallingRow, type InterviewRow, type RotatingRow, type BabyRow, type WcMeetingRow,
+  type OrdinanceRow, type WelfareRow, type InterviewBookingRow,
 } from '../../../shared/actionItems';
 import { agedOutMemberIds } from '../../../shared/youth';
 import { VERSION_HISTORY, versionDateIso } from '../../../shared/versionHistory';
@@ -105,13 +106,16 @@ async function sendUpdatesMail(env: Env, user: UserRow, updates: { date: string;
 }
 
 async function getSources(db: D1Database, todayIso: string): Promise<ActionItemSources> {
-  const [tasks, callings, interviews, rotating, babies, wcMeetings] = await Promise.all([
+  const [tasks, callings, interviews, rotating, babies, wcMeetings, ordinances, welfare, interviewBookings] = await Promise.all([
     db.prepare('SELECT id, task, assigned_to, due_date, done, share_with FROM tasks').all<TaskRow>(),
     db.prepare('SELECT id, calling, member, status, assigned_to, type, release_recorded, sustain_recorded, set_apart_recorded FROM calling_pipeline').all<CallingRow>(),
     db.prepare('SELECT id, member, setup_assigned_to, setup_status, status, type_of_interview, ward_member_id FROM interview_pipeline').all<InterviewRow>(),
     db.prepare('SELECT id, month, plan_conduct, primary_message FROM rotating_assignments').all<RotatingRow>(),
     db.prepare('SELECT id, name, status, church_record_created FROM babies').all<BabyRow>(),
     db.prepare('SELECT id, date, opening_prayer, spiritual_thought, closing_prayer FROM wc_meetings WHERE date >= ?').bind(todayIso).all<WcMeetingRow>(),
+    db.prepare("SELECT id, member_name, ordinance_type, status FROM ordinances WHERE status = 'Completed'").all<OrdinanceRow>(),
+    db.prepare("SELECT id, member_name, status, next_follow_up FROM welfare_cases WHERE status <> 'Closed'").all<WelfareRow>(),
+    db.prepare('SELECT id, calendar, date, start_time, reserved_by, reserved_purpose, reserved_at FROM interview_slots WHERE reserved_by IS NOT NULL AND substr(date, 1, 10) >= ?').bind(todayIso).all<InterviewBookingRow>(),
   ]);
   const { results: roster } = await db.prepare('SELECT id, active, birth_date FROM ward_members').all<{ id: number; active: number; birth_date: string | null }>();
   return {
@@ -119,6 +123,7 @@ async function getSources(db: D1Database, todayIso: string): Promise<ActionItemS
     tasks: tasks.results, callings: callings.results, interviews: interviews.results,
     rotating: rotating.results, babies: babies.results,
     wcMeetings: wcMeetings.results, todayIso,
+    ordinances: ordinances.results, welfare: welfare.results, interviewBookings: interviewBookings.results,
   };
 }
 
@@ -138,6 +143,7 @@ function permissionsFor(user: UserRow) {
     canWc: isWc,
     canYc: isYc,
     isClerk: isBishopric && /clerk/i.test(user.church_role || ''),
+    churchRole: user.church_role || '',
   };
 }
 

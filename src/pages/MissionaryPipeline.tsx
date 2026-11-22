@@ -6,6 +6,10 @@ import MemberNameInput from '../components/MemberNameInput';
 import StatusBadge from '../components/StatusBadge';
 import { Input, Select, Textarea } from '../components/FormFields';
 import { MISSIONARY_STATUSES, MISSIONARY_TEMPLE_STATUSES } from '../lib/constants';
+import Checklist, { ProgressPill } from '../components/Checklist';
+import { RM_ITEMS, parseChecklist, stringifyChecklist, checklistProgress } from '../../shared/checklists';
+
+const RELEASED = 'Released from Mission Field';
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   '0-Not at this time': { bg: 'bg-red-100', text: 'text-red-700' },
@@ -105,7 +109,11 @@ export default function MissionaryPipeline() {
         <h1 className="text-2xl font-bold text-gray-900">Missionary Pipeline</h1>
         <button onClick={openNew} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>
       </div>
-      <p className="text-sm text-gray-500 mb-4">Prospective, currently serving, and recently returned missionaries.</p>
+      <p className="text-sm text-gray-500 mb-4">
+        Prospective, currently serving, and recently returned missionaries. Once someone is Released from Mission Field, open them for a
+        follow-up checklist: release, homecoming talk, reports to the high council and ward council, a calling, and a current temple recommend
+        (General Handbook 24.8).
+      </p>
 
       {isLoading ? <p className="text-gray-400 text-sm">Loading...</p> : (
         <div className="space-y-6">
@@ -145,7 +153,13 @@ export default function MissionaryPipeline() {
                     <tbody>
                       {sorted.map(r => (
                         <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => openEdit(r)}>
-                          <td className="px-3 py-2 font-medium text-gray-900">{r.who}</td>
+                          <td className="px-3 py-2 font-medium text-gray-900">
+                            {r.who}
+                            {r.status === RELEASED && (() => {
+                              const { done, total } = checklistProgress(RM_ITEMS, parseChecklist(r.rm_checklist));
+                              return <span className="ml-2 align-middle" title="Returned-missionary follow-up"><ProgressPill done={done} total={total} /></span>;
+                            })()}
+                          </td>
                           <td className="px-3 py-2">
                             <select value={r.status} onClick={e => e.stopPropagation()} onChange={e => handleStatusChange(r, e.target.value)}
                               className="rounded border border-gray-300 px-2 py-1 text-xs">
@@ -181,6 +195,13 @@ export default function MissionaryPipeline() {
             <Input label="Next Steps" value={editing.next_steps || ''} onChange={v => setEditing({ ...editing, next_steps: v })} />
             <Input label="Report Date" value={toDateOnly(editing.report_date || '')} onChange={v => setEditing({ ...editing, report_date: v })} type="date" />
             <Input label="Release Date" value={toDateOnly(editing.release_date || '')} onChange={v => setEditing({ ...editing, release_date: v })} type="date" />
+            {editing.status === RELEASED && (
+              <div className="bg-purple-50 border border-purple-100 rounded-md p-3">
+                <span className="block text-sm font-medium text-gray-700 mb-1">Returned-missionary follow-up</span>
+                <Checklist items={RM_ITEMS} state={parseChecklist(editing.rm_checklist)}
+                  onChange={next => setEditing({ ...editing, rm_checklist: stringifyChecklist(next) })} />
+              </div>
+            )}
             <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} />
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={editing.pray_for !== 0} onChange={e => setEditing({ ...editing, pray_for: e.target.checked ? 1 : 0 })} className="rounded" />

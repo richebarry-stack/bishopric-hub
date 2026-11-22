@@ -179,7 +179,96 @@ export const api = {
     reserve: (id: number, data: { name: string; contact?: string }) =>
       request<{ ok: boolean }>(`/tithing-declarations/${id}/reserve`, { method: 'POST', body: JSON.stringify(data) }),
   },
+  interviewBooking: {
+    listPublic: (calendar?: string) =>
+      request<PublicInterviewSlot[]>(`/interview-booking/public${calendar ? `?with=${encodeURIComponent(calendar)}` : ''}`),
+    reserve: (id: number, data: { name: string; contact: string; purpose: string }) =>
+      request<{ ok: boolean }>(`/interview-booking/${id}/reserve`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+  calendarFeed: {
+    get: () => request<CalendarFeed>('/calendar-feed'),
+    save: (data: { calendars: string[]; reset?: boolean }) =>
+      request<CalendarFeed>('/calendar-feed', { method: 'PUT', body: JSON.stringify(data) }),
+    remove: () => request<{ ok: boolean }>('/calendar-feed', { method: 'DELETE' }),
+  },
 };
+
+export interface CalendarFeed { token: string | null; calendars: string[] }
+
+export interface PublicInterviewSlot {
+  id: number; calendar: string; date: string; start_time: string; end_time: string; location: string; notes: string;
+}
+
+export interface InterviewSlot {
+  id: number;
+  calendar: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  location: string;
+  notes: string;
+  reserved_by: string | null;
+  reserved_contact: string | null;
+  reserved_purpose: string | null;
+  reserved_at: string | null;
+  schedule_entry_id: number | null;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+export interface MemberCare {
+  id: number;
+  member_name: string;
+  kind: string;
+  added_date: string;
+  move_item_id: number | null;
+  checklist: string;
+  notes: string;
+  archived: number;
+  created_by?: string;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+export interface WelfareCase {
+  id: number;
+  member_name: string;
+  help_type: string;
+  status: string;
+  next_follow_up: string;
+  notes: string;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+export interface Funeral {
+  id: number;
+  deceased_name: string;
+  funeral_date: string;
+  funeral_time: string;
+  viewing_time: string;
+  location: string;
+  family_contact: string;
+  conducting: string;
+  checklist: string;
+  notes: string;
+  archived: number;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+export interface HomeboundSacrament {
+  id: number;
+  member_name: string;
+  location: string;
+  frequency: string;
+  assigned_to: string;
+  last_administered: string;
+  notes: string;
+  active: number;
+  updated_at?: string;
+  updated_by?: string;
+}
 
 export interface User {
   id: number;
@@ -443,6 +532,8 @@ export interface SacramentTheme {
   is_fast_sunday: number;
   /** '' for a normal meeting, otherwise why there's none ('Stake Conference' / 'General Conference'). */
   no_meeting?: string;
+  /** 1 = the annual Primary children's sacrament meeting presentation. */
+  is_primary_program?: number;
   sacrament_intro: string;
   high_councilor: string;
   stake_reps: string;
@@ -496,6 +587,8 @@ export interface MissionaryPipeline {
   ward_member_id: number | null;
   mission_end_estimated: string | null;
   pray_for: number;
+  /** JSON checklist for returned missionaries (see shared/checklists.ts RM_ITEMS). */
+  rm_checklist?: string;
 }
 
 export interface Baby {
@@ -707,6 +800,8 @@ export interface Ordinance {
   status: string;
   target_date: string;
   completed_date: string;
+  /** Sunday the Aaronic Priesthood candidate is presented for sustaining. */
+  sustain_date?: string;
   notes: string;
   updated_at: string;
   updated_by?: string;

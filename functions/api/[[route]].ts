@@ -5,6 +5,7 @@ import {
   type CovenantAgendaEntry, type CovenantMember, type CovenantSettings,
 } from '../../shared/covenantPath';
 import { syncConduct, runDailyJobs, syncSettingApartInterviews, syncTempleRecommendInterviews } from './jobs';
+import { buildIcs, type IcsEvent } from '../../shared/ics';
 import { matchRosterMember, matchRosterMemberExact, splitLastFirstCased, toLastFirst, stripBold, type RosterMember, type RosterMemberNames } from './nameMatch';
 
 interface Env {
@@ -99,7 +100,88 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'tithing-declarations': { name: 'tithing_declaration_slots', orderBy: 'date ASC, start_time ASC' },
   // Bishopric hub only: the WC, YC and Calendar hub checks below refuse any table they don't list.
   'speaking-topics': { name: 'speaking_topics', orderBy: 'topic COLLATE NOCASE ASC' },
+  'homebound-sacrament': { name: 'homebound_sacrament', orderBy: 'active DESC, member_name COLLATE NOCASE ASC' },
+  'interview-slots': { name: 'interview_slots', orderBy: 'date ASC, start_time ASC' },
+  // Bishop and Clerk only — see WELFARE_ROLES below.
+  'welfare-cases': { name: 'welfare_cases', orderBy: "CASE status WHEN 'Closed' THEN 1 ELSE 0 END, next_follow_up ASC, id DESC" },
+  // Shared with the Ward Council hub (WC_FULL_CRUD).
+  'member-care': { name: 'member_care', orderBy: 'archived ASC, added_date DESC, id DESC' },
+  'funerals': { name: 'funerals', orderBy: 'archived ASC, funeral_date DESC, id DESC' },
 };
+
+// Welfare follow-up is the most sensitive data in the hub: only these callings may read or write it.
+const WELFARE_ROLES = new Set(['Bishop', 'Clerk']);
+
+// Calendars members can book interviews on (/book-interview).
+const INTERVIEW_CALENDARS = ['Bishop', 'First Counselor', 'Second Counselor'];
+
+// An interview slot is unavailable while its calendar has another appointment then,
+// another booked interview slot on the same calendar overlaps it, or (for the Bishop)
+// a reserved tithing declaration overlaps it. Times are zero-padded "HH:MM" text.
+const INTERVIEW_SLOT_BUSY = (s: string) => `(EXISTS (
+    SELECT 1 FROM schedule_entries e
+    WHERE substr(e.date, 1, 10) = substr(${s}.date, 1, 10)
+      AND e.calendars LIKE '%"' || ${s}.calendar || '"%'
+      AND e.start_time < ${s}.end_time AND e.end_time > ${s}.start_time
+      AND (${s}.schedule_entry_id IS NULL OR e.id != ${s}.schedule_entry_id))
+  OR EXISTS (
+    SELECT 1 FROM interview_slots o
+    WHERE o.id != ${s}.id AND o.calendar = ${s}.calendar AND o.reserved_by IS NOT NULL
+      AND substr(o.date, 1, 10) = substr(${s}.date, 1, 10)
+      AND o.start_time < ${s}.end_time AND o.end_time > ${s}.start_time)
+  OR (${s}.calendar = 'Bishop' AND EXISTS (
+    SELECT 1 FROM tithing_declaration_slots t
+    WHERE t.reserved_by IS NOT NULL AND substr(t.date, 1, 10) = substr(${s}.date, 1, 10)
+      AND t.start_time < ${s}.end_time AND t.end_time > ${s}.start_time)))`;
+
+/** Today's date and the current HH:MM in the ward's time zone. */
+function localNow(timeZone: string): { date: string; time: string } {
+  const fmt = (tz: string) => new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date());
+  let parts: Intl.DateTimeFormatPart[];
+  try { parts = fmt(timeZone); } catch { parts = fmt(DEFAULT_TIME_ZONE); }
+  const get = (t: string) => parts.find(p => p.type === t)?.value || '';
+  return { date: `${get('year')}-${get('month')}-${get('day')}`, time: `${get('hour')}:${get('minute')}` };
+}
+
+function randomToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** "First Last" / "Last, First" compare, for matching a conducting name to a user. */
+function sameName(a: string | null | undefined, b: string | null | undefined): boolean {
+  const norm = (s: string) => stripBold(s).trim().toLowerCase().replace(/\s+/g, ' ');
+  const flip = (s: string) => {
+    if (!s.includes(',')) return s;
+    const [last, first] = s.split(',').map(p => p.trim());
+    return first ? `${first} ${last}` : s;
+  };
+  const x = flip(norm(a || ''));
+  const y = flip(norm(b || ''));
+  return !!x && !!y && x === y;
+}
+
+// New & returning member care: move-ins typed on Current Bishopric Meeting (from this
+// date on) are added automatically. An item edited in the last few minutes is left
+// alone so a half-typed name doesn't get copied.
+const MEMBER_CARE_SYNC_FROM = '2026-10-01';
+async function syncMemberCareFromMoveIns(db: D1Database): Promise<void> {
+  const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const { results } = await db.prepare(
+    `SELECT id, meeting_date, item FROM bishopric_move_items
+     WHERE kind = 'move_in' AND trim(item) <> '' AND substr(meeting_date, 1, 10) >= ?
+       AND (updated_at IS NULL OR replace(updated_at, ' ', 'T') <= ?)
+       AND id NOT IN (SELECT move_item_id FROM member_care WHERE move_item_id IS NOT NULL)`
+  ).bind(MEMBER_CARE_SYNC_FROM, cutoff).all<{ id: number; meeting_date: string; item: string }>();
+  if (results.length === 0) return;
+  const now = new Date().toISOString();
+  await db.batch(results.map(r => db.prepare(
+    `INSERT OR IGNORE INTO member_care (member_name, kind, added_date, move_item_id, checklist, notes, archived, created_by, updated_at, updated_by)
+     VALUES (?, 'Move-in', ?, ?, '{}', '', 0, 'Current Bishopric Meeting', ?, 'Current Bishopric Meeting')`
+  ).bind(r.item.trim(), r.meeting_date.slice(0, 10), r.id, now)));
+}
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -356,6 +438,7 @@ async function getSession(request: Request, db: D1Database): Promise<Session | n
 const WC_FULL_CRUD = new Set([
   'wc-wins', 'wc-family-needs', 'wc-discussion-topics',
   'tasks', 'calendaring', 'youth-activities', 'babies', 'hub-suggestions',
+  'member-care', 'funerals',
 ]);
 const WC_READABLE = new Set([
   'wc-meetings',
@@ -796,6 +879,106 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ ok: true });
   }
 
+  // Public interview booking (/book-interview): open slots on the Bishop's and
+  // counselors' calendars, no login. Never returns who booked what or why.
+  if (routeParts[0] === 'interview-booking' && routeParts[1] === 'public' && method === 'GET') {
+    const tz = await getAppTimeZone(db);
+    const { date: today, time: nowTime } = localNow(tz);
+    const which = url.searchParams.get('with') || '';
+    const calendars = INTERVIEW_CALENDARS.includes(which) ? [which] : INTERVIEW_CALENDARS;
+    const { results } = await db.prepare(
+      `SELECT s.id, s.calendar, substr(s.date, 1, 10) AS date, s.start_time, s.end_time, s.location, s.notes FROM interview_slots s
+       WHERE s.reserved_by IS NULL AND s.calendar IN (${calendars.map(() => '?').join(', ')})
+         AND (substr(s.date, 1, 10) > ? OR (substr(s.date, 1, 10) = ? AND s.start_time > ?))
+         AND NOT ${INTERVIEW_SLOT_BUSY('s')}
+       ORDER BY s.date ASC, s.start_time ASC LIMIT 500`
+    ).bind(...calendars, today, today, nowTime).all();
+    return json(results);
+  }
+
+  if (routeParts[0] === 'interview-booking' && routeParts[1] && routeParts[2] === 'reserve' && method === 'POST') {
+    const id = Number(routeParts[1]);
+    if (!id) return json({ error: 'Invalid slot' }, 400);
+    const body = await request.json().catch(() => ({})) as { name?: string; contact?: string; purpose?: string };
+    const name = String(body.name || '').trim().slice(0, 120);
+    const contact = String(body.contact || '').trim().slice(0, 200);
+    const purpose = String(body.purpose || '').trim().slice(0, 60);
+    if (!name) return json({ error: 'Name is required' }, 400);
+    if (!contact) return json({ error: 'A phone number or email is required' }, 400);
+    const tz = await getAppTimeZone(db);
+    const { date: today, time: nowTime } = localNow(tz);
+    const now = new Date().toISOString();
+    // The availability checks live in the same UPDATE so a booking made a moment
+    // earlier (or a new appointment on that calendar) can't slip through.
+    const result = await db.prepare(
+      `UPDATE interview_slots SET reserved_by = ?, reserved_contact = ?, reserved_purpose = ?, reserved_at = ?, updated_at = ?, updated_by = 'Online booking'
+       WHERE id = ? AND reserved_by IS NULL
+         AND (substr(date, 1, 10) > ? OR (substr(date, 1, 10) = ? AND start_time > ?))
+         AND NOT ${INTERVIEW_SLOT_BUSY('interview_slots')}`
+    ).bind(name, contact, purpose || null, now, now, id, today, today, nowTime).run();
+    if (result.meta.changes === 0) return json({ error: 'That time is no longer available — please pick another.' }, 409);
+    const slot = await db.prepare('SELECT calendar, date, start_time, end_time, location FROM interview_slots WHERE id = ?').bind(id)
+      .first<{ calendar: string; date: string; start_time: string; end_time: string; location: string | null }>();
+    if (slot) {
+      const notes = [`Booked online${purpose ? ` — ${purpose}` : ''}`, `Contact: ${contact}`, slot.location ? `Location: ${slot.location}` : '']
+        .filter(Boolean).join('\n');
+      const entry = await db.prepare(
+        `INSERT INTO schedule_entries (calendars, date, start_time, end_time, title, notes, updated_at, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'Online booking')`
+      ).bind(JSON.stringify([slot.calendar]), slot.date.slice(0, 10), slot.start_time, slot.end_time,
+        `Interview: ${name}${purpose ? ` (${purpose})` : ''}`, notes, now).run();
+      await db.prepare('UPDATE interview_slots SET schedule_entry_id = ? WHERE id = ?').bind(entry.meta.last_row_id, id).run();
+    }
+    return json({ ok: true });
+  }
+
+  // Private calendar subscription feed (Google/Apple/Outlook "subscribe by URL"). The
+  // unguessable token in the path is the only credential, so it can be reset anytime.
+  if (routeParts[0] === 'calendar-feed' && routeParts[1] === 'ics' && routeParts[2] && method === 'GET') {
+    const token = routeParts[2].replace(/\.ics$/i, '');
+    const feed = await db.prepare(
+      'SELECT f.calendars, u.name, u.hub FROM calendar_feeds f JOIN users u ON u.id = f.user_id WHERE f.token = ?'
+    ).bind(token).first<{ calendars: string; name: string; hub: string | null }>();
+    if (!feed || !['both', 'bh'].includes(feed.hub || 'both')) return new Response('Not found', { status: 404 });
+    let calendars: string[] = [];
+    try { calendars = (JSON.parse(feed.calendars) as string[]).filter(c => INTERVIEW_CALENDARS.includes(c)); } catch { /* none */ }
+    const tz = await getAppTimeZone(db);
+    const { date: today } = localNow(tz);
+    const from = new Date(Date.parse(today + 'T00:00:00Z') - 60 * 86400000).toISOString().slice(0, 10);
+    const events: IcsEvent[] = [];
+    if (calendars.length > 0) {
+      const { results } = await db.prepare(
+        `SELECT id, calendars, substr(date, 1, 10) AS date, start_time, end_time, title, notes FROM schedule_entries
+         WHERE substr(date, 1, 10) >= ? AND (${calendars.map(() => 'calendars LIKE ?').join(' OR ')})
+         ORDER BY date, start_time LIMIT 3000`
+      ).bind(from, ...calendars.map(c => `%"${c}"%`)).all<{ id: number; calendars: string; date: string; start_time: string; end_time: string; title: string; notes: string | null }>();
+      for (const r of results) {
+        let cals: string[] = [];
+        try { cals = JSON.parse(r.calendars); } catch { /* ignore */ }
+        const shown = cals.filter(c => calendars.includes(c));
+        events.push({
+          uid: `schedule-${r.id}@bishopric-hub`, date: r.date, start: r.start_time, end: r.end_time,
+          summary: calendars.length > 1 && shown.length ? `${r.title} (${shown.join(', ')})` : r.title,
+          description: r.notes || undefined,
+        });
+      }
+    }
+    // Sundays this person is conducting sacrament meeting.
+    const { results: conducting } = await db.prepare(
+      `SELECT id, substr(meeting_date, 1, 10) AS date, conducting FROM sacrament_themes
+       WHERE substr(meeting_date, 1, 10) >= ? AND conducting IS NOT NULL AND conducting <> '' AND (no_meeting IS NULL OR no_meeting = '')`
+    ).bind(from).all<{ id: number; date: string; conducting: string }>();
+    for (const c of conducting) {
+      if (sameName(c.conducting, feed.name)) {
+        events.push({ uid: `conducting-${c.id}@bishopric-hub`, date: c.date, summary: 'Conducting sacrament meeting' });
+      }
+    }
+    const ics = buildIcs({ name: `Bishopric Hub — ${feed.name}`, timeZone: tz, events });
+    return new Response(ics, {
+      headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
+    });
+  }
+
   // All other endpoints require auth
   // (session checked below)
 
@@ -1097,6 +1280,34 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           .bind(path, label, now)
       );
       if (stmts.length > 0) await db.batch(stmts);
+      return json({ ok: true });
+    }
+    return json({ error: 'Method not allowed' }, 405);
+  }
+
+  // The caller's own calendar subscription link: which calendars it carries and its token.
+  if (routeParts[0] === 'calendar-feed' && !routeParts[1]) {
+    if (session.role === 'guest' || !['both', 'bh'].includes(session.hub || 'both')) return json({ error: 'Forbidden' }, 403);
+    const current = await db.prepare('SELECT token, calendars FROM calendar_feeds WHERE user_id = ?').bind(session.user_id)
+      .first<{ token: string; calendars: string }>();
+    const parse = (raw: string | undefined) => {
+      try { return (JSON.parse(raw || '[]') as string[]).filter(c => INTERVIEW_CALENDARS.includes(c)); } catch { return []; }
+    };
+    if (method === 'GET') return json({ token: current?.token ?? null, calendars: parse(current?.calendars) });
+    if (method === 'PUT') {
+      const body = await request.json().catch(() => ({})) as { calendars?: unknown; reset?: boolean };
+      const calendars = Array.isArray(body.calendars)
+        ? body.calendars.filter((c): c is string => typeof c === 'string' && INTERVIEW_CALENDARS.includes(c))
+        : [];
+      const token = !current || body.reset ? randomToken() : current.token;
+      await db.prepare(
+        `INSERT INTO calendar_feeds (user_id, token, calendars, created_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET token = excluded.token, calendars = excluded.calendars`
+      ).bind(session.user_id, token, JSON.stringify(calendars), new Date().toISOString()).run();
+      return json({ token, calendars });
+    }
+    if (method === 'DELETE') {
+      await db.prepare('DELETE FROM calendar_feeds WHERE user_id = ?').bind(session.user_id).run();
       return json({ ok: true });
     }
     return json({ error: 'Method not allowed' }, 405);
@@ -2525,6 +2736,34 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const tableConfig = TABLES[tableName];
 
   if (!tableConfig) return json({ error: 'Unknown table' }, 404);
+
+  if (tableName === 'welfare-cases' && !WELFARE_ROLES.has(session.church_role || '')) {
+    return json({ error: 'Forbidden' }, 403);
+  }
+
+  if (tableName === 'member-care' && method === 'GET' && !recordId) {
+    await syncMemberCareFromMoveIns(db).catch(err => console.error('member-care sync failed:', err));
+  }
+
+  // A booked interview slot owns the appointment it put on the calendar: deleting the
+  // slot, or clearing its booking, removes that appointment too.
+  if (tableName === 'interview-slots' && recordId && (method === 'DELETE' || method === 'PUT')) {
+    const slot = await db.prepare('SELECT schedule_entry_id FROM interview_slots WHERE id = ?').bind(recordId)
+      .first<{ schedule_entry_id: number | null }>();
+    if (slot?.schedule_entry_id) {
+      let clearing = method === 'DELETE';
+      if (method === 'PUT') {
+        const peek = await request.clone().json().catch(() => ({})) as Record<string, unknown>;
+        clearing = 'reserved_by' in peek && !peek.reserved_by;
+      }
+      if (clearing) {
+        await db.batch([
+          db.prepare('DELETE FROM schedule_entries WHERE id = ?').bind(slot.schedule_entry_id),
+          db.prepare('UPDATE interview_slots SET schedule_entry_id = NULL WHERE id = ?').bind(recordId),
+        ]);
+      }
+    }
+  }
 
   if (method === 'GET' && !recordId) {
     const results = await db.prepare(

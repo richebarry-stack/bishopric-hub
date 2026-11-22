@@ -67,6 +67,12 @@ export interface InterviewRow {
 export interface RotatingRow { id: number; month: string; plan_conduct: string; primary_message: string }
 export interface BabyRow { id: number; name: string; status: string; church_record_created: number }
 export interface WcMeetingRow { id: number; date: string; opening_prayer: string | null; spiritual_thought: string | null; closing_prayer: string | null }
+export interface OrdinanceRow { id: number; member_name: string; ordinance_type: string; status: string }
+export interface WelfareRow { id: number; member_name: string; status: string; next_follow_up: string | null }
+export interface InterviewBookingRow {
+  id: number; calendar: string; date: string; start_time: string;
+  reserved_by: string | null; reserved_purpose: string | null; reserved_at: string | null;
+}
 
 export interface ActionItemSources {
   tasks: TaskRow[];
@@ -82,6 +88,26 @@ export interface ActionItemSources {
   /** Roster ids that are no longer current youth (see agedOutMemberIds); youth interviews
    * linked to them are skipped. Omitted when the roster isn't available. */
   agedOutMemberIds?: Set<number>;
+  /** Ordinances tracker; completed ones are the clerk's to record in LCR. Omitted = none. */
+  ordinances?: OrdinanceRow[];
+  /** Welfare follow-ups (Bishop only). Omitted = none. */
+  welfare?: WelfareRow[];
+  /** Interview slots members booked online. Omitted = none. */
+  interviewBookings?: InterviewBookingRow[];
+}
+
+const INTERVIEW_CALENDARS = new Set(['Bishop', 'First Counselor', 'Second Counselor']);
+
+function addDaysIso(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+function fmtBookingWhen(date: string, time: string): string {
+  const [y, m, d] = date.slice(0, 10).split('-').map(Number);
+  const day = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const [hh, mm] = time.split(':').map(Number);
+  return `${day}, ${hh % 12 || 12}:${String(mm).padStart(2, '0')} ${hh >= 12 ? 'PM' : 'AM'}`;
 }
 
 export interface ActionItemPermissions {
@@ -89,6 +115,8 @@ export interface ActionItemPermissions {
   canWc: boolean;
   canYc: boolean;
   isClerk: boolean;
+  /** The recipient's calling (users.church_role): routes Bishop-only and per-calendar items. */
+  churchRole?: string;
 }
 
 /** Computes everything currently assigned to `recipientName`, matched by name against
@@ -210,6 +238,48 @@ export function computeActionItems(
             link: '/babies', source: 'Clerk',
           });
         }
+      }
+      for (const o of sources.ordinances || []) {
+        if (o.status === 'Completed') {
+          out.push({
+            id: `clerk-ordinance-${o.id}`, label: `Record in LCR: ${o.member_name} — ${o.ordinance_type}`,
+            link: '/ordinances', source: 'Clerk',
+          });
+        }
+      }
+    }
+
+    const role = permissions.churchRole || '';
+    const today = sources.todayIso || new Date().toISOString().slice(0, 10);
+    if (role === 'Bishop') {
+      // Follow-ups due within the next week (or overdue). The label stays minimal on
+      // purpose: it is also emailed, so no help type or notes.
+      const horizon = addDaysIso(today, 7);
+      for (const w of sources.welfare || []) {
+        const due = (w.next_follow_up || '').slice(0, 10);
+        if (w.status === 'Closed' || !due || due > horizon) continue;
+        out.push({
+          id: `welfare-${w.id}-${due}`, label: `Welfare follow-up: ${w.member_name}`,
+          detail: due < today ? `Overdue since ${due}` : `Due ${due}`,
+          date: due, link: '/welfare', source: 'Welfare',
+        });
+      }
+    }
+
+    // Online interview bookings go to the person whose calendar was booked and to the
+    // executive secretaries, until the interview date has passed.
+    const isExecSec = /executive secretary/i.test(role);
+    if (INTERVIEW_CALENDARS.has(role) || isExecSec) {
+      for (const b of sources.interviewBookings || []) {
+        const date = (b.date || '').slice(0, 10);
+        if (!b.reserved_by || !date || date < today) continue;
+        if (!isExecSec && b.calendar !== role) continue;
+        out.push({
+          id: `booking-${b.id}-${b.reserved_at || ''}`,
+          label: `Interview booked: ${b.reserved_by}${b.reserved_purpose ? ` (${b.reserved_purpose})` : ''}`,
+          detail: `${isExecSec ? `${b.calendar} — ` : ''}${fmtBookingWhen(date, b.start_time)}`,
+          date, link: '/interview-booking', source: 'Interview Booking',
+        });
       }
     }
   }

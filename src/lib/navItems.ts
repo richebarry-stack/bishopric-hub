@@ -1,4 +1,7 @@
-export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?: boolean }[] = [
+/** Callings allowed to see Welfare Follow-up (the API enforces the same list). */
+export const WELFARE_ROLES = ['Bishop', 'Clerk'];
+
+export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?: boolean; roles?: string[] }[] = [
   { path: '/', label: 'Dashboard', icon: '⌂' },
   { path: '/current-sacrament', label: 'Current Sacrament Meeting', icon: '♫' },
   { path: '/calendaring', label: 'Calendar Events', icon: '▣' },
@@ -8,6 +11,11 @@ export const NAV_ITEMS: { path: string; label: string; icon: string; adminOnly?:
   { path: '/sacrament-planning', label: 'Sacrament Planning', icon: '♪' },
   { path: '/tasks', label: 'Action Items', icon: '☑' },
   { path: '/member-needs', label: 'Member Needs', icon: '♥' },
+  { path: '/member-care', label: 'New & Returning Members', icon: '✚' },
+  { path: '/welfare', label: 'Welfare Follow-up', icon: '🔒', roles: WELFARE_ROLES },
+  { path: '/funerals', label: 'Funerals', icon: '✿' },
+  { path: '/homebound-sacrament', label: 'Homebound Sacrament', icon: '⌂' },
+  { path: '/interview-booking', label: 'Interview Booking', icon: '🗓' },
   { path: '/missionary-pipeline', label: 'Missionary Pipeline', icon: '✈' },
   { path: '/youth-interviews', label: 'Youth Interviews', icon: '◎' },
   { path: '/temple-interviews', label: 'Adult Temple Interviews', icon: '◈' },
@@ -48,6 +56,8 @@ export const WC_NAV_CATEGORIES: { label: string; items: { path: string; label: s
     label: 'Ward Care',
     items: [
       { path: '/wc-family-needs', label: 'Member Needs', icon: '♥' },
+      { path: '/member-care',     label: 'New & Returning Members', icon: '✚' },
+      { path: '/funerals',        label: 'Funerals',      icon: '✿' },
       { path: '/babies',          label: 'Babies',        icon: '◌' },
     ],
   },
@@ -96,7 +106,7 @@ export const CAL_NAV_ITEMS = [
 ];
 
 export const BH_DASHBOARD_ITEM = { path: '/', label: 'Dashboard', icon: 'ti-home' };
-export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: string; icon: string; adminOnly?: boolean }[] }[] = [
+export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: string; icon: string; adminOnly?: boolean; roles?: string[] }[] }[] = [
   {
     label: 'Sacrament Meeting',
     items: [
@@ -115,6 +125,7 @@ export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: s
       { path: '/assignments',          label: 'Bishopric Assignments',  icon: 'ti-list-check'      },
       { path: '/bishop-schedule',      label: 'Bishop Schedule',        icon: 'ti-calendar-time'   },
       { path: '/counselor-schedule',   label: 'Counselor Schedule',     icon: 'ti-calendar-time'   },
+      { path: '/interview-booking',    label: 'Interview Booking',      icon: 'ti-calendar-check'  },
       { path: '/tasks',                label: 'Action Items',           icon: 'ti-checklist'       },
       { path: '/out-of-town',          label: 'Out of Town',            icon: 'ti-plane-departure' },
       { path: '/tithing-declarations', label: 'Tithing Declaration',    icon: 'ti-calendar-dollar' },
@@ -131,6 +142,10 @@ export const BH_NAV_CATEGORIES: { label: string; items: { path: string; label: s
       { path: '/ordinances',           label: 'Ordinances',          icon: 'ti-droplet'         },
       { path: '/covenant-path',        label: 'Covenant Path',       icon: 'ti-route'           },
       { path: '/member-needs',         label: 'Member Needs',        icon: 'ti-heart'           },
+      { path: '/member-care',          label: 'New & Returning Members', icon: 'ti-user-plus'   },
+      { path: '/welfare',              label: 'Welfare Follow-up',   icon: 'ti-lock', roles: WELFARE_ROLES },
+      { path: '/homebound-sacrament',  label: 'Homebound Sacrament', icon: 'ti-home'            },
+      { path: '/funerals',             label: 'Funerals',            icon: 'ti-flower'          },
       { path: '/missionary-pipeline',  label: 'Missionary Pipeline', icon: 'ti-compass'         },
       { path: '/babies',               label: 'Babies',              icon: 'ti-baby-carriage'   },
     ],

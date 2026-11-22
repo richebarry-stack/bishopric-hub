@@ -6,6 +6,20 @@ export interface VersionEntry { date: string; items: string[] }
 
 export const VERSION_HISTORY: VersionEntry[] = [
             {
+              date: 'Nov 22, 2026',
+              items: [
+                'New page: Interview Booking (under Bishopric). Add open interview times on the Bishop\'s or a counselor\'s schedule, single or repeating weekly, and share a link. Members book at /book-interview without logging in, giving their name, a phone or email, and a general purpose. The booking goes onto that schedule and shows on My Actions (and by email) for that person and the executive secretaries. Members never see who else booked.',
+                'Bishop and Counselor Schedule: new Subscribe button. It gives you a private link for Google, Apple or Outlook Calendar so your appointments, and Sundays you\'re conducting, show on your phone. Choose which schedules it includes, and make a new link anytime to turn the old one off.',
+                'New page: New & Returning Members (Ward Care, also in the Ward Council hub). Move-ins entered on Current Bishopric Meeting are added automatically; add converts and returning members by hand. Each has a checklist (welcome visit, ministering, introduced in ward council, calling, temple) to review in ward council until it\'s done.',
+                'New page: Welfare Follow-up (Ward Care), visible only to the Bishop and Clerk. Track who is being helped, the type of help, status and next follow-up date, with no amounts. Follow-ups due within a week show on the Bishop\'s My Actions.',
+                'New page: Funerals (Ward Care, also in the Ward Council hub). Plan a funeral with a checklist from the family visit to the follow-up visit, following General Handbook 29.5.',
+                'New page: Homebound Sacrament (Ward Care). Members who receive the sacrament at home or in a facility, how often, and the priesthood holders assigned.',
+                'Ordinances: new Sustained stage for deacons, teachers and priests. Pick the Sunday he\'ll be presented and the sustaining wording is added to that Sunday\'s Ward Business. Completed ordinances now give the clerk a "Record in LCR" item on My Actions.',
+                'Missionary Pipeline: returned missionaries (Released from Mission Field) get a follow-up checklist: release, homecoming talk, reports to the high council and ward council, calling and temple recommend.',
+                'Sacrament Planning: Easter, Christmas on a Sunday and 5th Sundays are labeled automatically, Sundays can be marked Primary Program, and a reminder shows until the year\'s Primary Program Sunday is set.',
+              ],
+            },
+            {
               date: 'Nov 20, 2026',
               items: [
                 'New page: Speaking Invitations (under Sacrament Meeting). Fill in the speaker, Sunday, talk type, length and topic, and a letter-sized invitation builds beside the form as you type. Generate PDF opens a print-ready letter you can edit, print, or save as a PDF. Send opens a ready-to-send draft in Gmail, Outlook.com, Outlook (work or school), Yahoo Mail or your default mail app, and remembers which one you used. Copy text copies the letter.',

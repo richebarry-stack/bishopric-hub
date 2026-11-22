@@ -5,7 +5,7 @@ import { computeActionItems, buildNameIndex, type ActionItem } from '../../share
 import { agedOutMemberIds } from '../../shared/youth';
 import type {
   Task, CallingPipeline, InterviewPipeline, WardMember,
-  RotatingAssignment, Baby, WcMeeting,
+  RotatingAssignment, Baby, WcMeeting, Ordinance, WelfareCase, InterviewSlot,
 } from './api';
 
 export type { ActionItem };
@@ -28,6 +28,9 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
   const canYc = !isGuest && effectiveHub === 'yc';
   const enabled = canBishopric || canWc || canYc;
   const isClerk = canBishopric && /clerk/i.test(user?.church_role || '');
+  const churchRole = user?.church_role || '';
+  const isBishop = canBishopric && churchRole === 'Bishop';
+  const getsBookings = canBishopric && (['Bishop', 'First Counselor', 'Second Counselor'].includes(churchRole) || /executive secretary/i.test(churchRole));
 
   const { rows: tasks, isLoading: l1 } = useTable<Task>('tasks', { enabled: canWc || canYc });
   const { rows: callings, isLoading: l2 } = useTable<CallingPipeline>('calling-pipeline', { enabled: canBishopric });
@@ -35,6 +38,10 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
   const { rows: rotating, isLoading: l9 } = useTable<RotatingAssignment>('rotating-assignments', { enabled: canBishopric });
   const { rows: babies, isLoading: l10 } = useTable<Baby>('babies', { enabled: isClerk });
   const { rows: wcMeetings, isLoading: l12 } = useTable<WcMeeting>('wc-meetings', { enabled: canWc });
+  const { rows: ordinances } = useTable<Ordinance>('ordinances', { enabled: isClerk });
+  // The API refuses welfare-cases to everyone but the Bishop and Clerk.
+  const { rows: welfare } = useTable<WelfareCase>('welfare-cases', { enabled: isBishop });
+  const { rows: interviewSlots } = useTable<InterviewSlot>('interview-slots', { enabled: getsBookings });
   // Only the bishopric hub can read the roster (see WC_READABLE in the API); without it
   // name matching falls back to plain string/order matching, which is what it did before.
   const { rows: wardMembers, isLoading: l11 } = useTable<WardMember>('ward-members', { enabled: canBishopric });
@@ -50,16 +57,19 @@ export function useMyActionItems(): { items: ActionItem[]; count: number; isLoad
     const currentMonthAbbr = new Date().toLocaleDateString('en-US', { month: 'short' }).toLowerCase();
     return computeActionItems(
       user.name,
-      { canBishopric, canWc, canYc, isClerk },
+      { canBishopric, canWc, canYc, isClerk, churchRole },
       {
         tasks, callings, interviews, rotating, babies,
         wcMeetings: canWc ? wcMeetings : [], todayIso: new Date().toLocaleDateString('en-CA'),
         agedOutMemberIds: canBishopric ? agedOutMemberIds(wardMembers) : undefined,
+        ordinances: isClerk ? ordinances : [],
+        welfare: isBishop ? welfare : [],
+        interviewBookings: getsBookings ? interviewSlots : [],
       },
       nameIndex,
       currentMonthAbbr,
     );
-  }, [enabled, user, isClerk, canBishopric, canWc, canYc, tasks, callings, interviews, rotating, babies, wcMeetings, wardMembers, nameIndex]);
+  }, [enabled, user, isClerk, isBishop, getsBookings, churchRole, canBishopric, canWc, canYc, tasks, callings, interviews, rotating, babies, wcMeetings, wardMembers, nameIndex, ordinances, welfare, interviewSlots]);
 
   const isLoading = enabled && (l1 || l2 || l3 || l9 || (isClerk && l10) || (canBishopric && l11) || (canWc && l12));
 

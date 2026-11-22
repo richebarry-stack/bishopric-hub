@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useTable } from '../lib/useTable';
-import type { Ordinance, OrdinanceSuggestionDismissal, WardMember } from '../lib/api';
+import type { Ordinance, OrdinanceSuggestionDismissal, WardMember, SacramentTheme } from '../lib/api';
+import { isAaronicOffice, appendSustainingLine, removeSustainingLine } from '../../shared/ordinances';
+import { toast } from '../lib/toast';
 import Modal from '../components/Modal';
 import MemberNameInput from '../components/MemberNameInput';
 import StatusBadge from '../components/StatusBadge';
@@ -9,7 +11,20 @@ import { ORDINANCE_TYPES, ORDINANCE_STATUSES, ORDINANCE_STATUS_COLORS } from '..
 import { useConfirm } from '../components/ConfirmDialog';
 import { legalName } from '../lib/displayName';
 
-const EMPTY: Partial<Ordinance> = { member_name: '', ordinance_type: '', status: 'Upcoming', target_date: '', completed_date: '', notes: '' };
+const EMPTY: Partial<Ordinance> = { member_name: '', ordinance_type: '', status: 'Upcoming', target_date: '', completed_date: '', sustain_date: '', notes: '' };
+
+function isSunday(d: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(d || '')) return false;
+  const [y, m, day] = d.slice(0, 10).split('-').map(Number);
+  return new Date(y, m - 1, day).getDay() === 0;
+}
+
+/** Display a legal "Last, First" name as "First Last" for the pulpit. */
+function pulpitName(name: string): string {
+  if (!name.includes(',')) return name.trim();
+  const [last, first] = name.split(',').map(p => p.trim());
+  return first ? `${first} ${last}` : name.trim();
+}
 
 function toDateOnly(v: string): string {
   if (!v) return '';
@@ -52,6 +67,7 @@ function suggestionsFromRoster(members: WardMember[], existing: Ordinance[]): Su
 export default function Ordinances() {
   const { rows, isLoading, create, update, remove } = useTable<Ordinance>('ordinances');
   const { rows: wardMembers } = useTable<WardMember>('ward-members');
+  const themes = useTable<SacramentTheme>('sacrament-themes');
   const [editing, setEditing] = useState<Partial<Ordinance> | null>(null);
   const { rows: dismissals, create: createDismissal } = useTable<OrdinanceSuggestionDismissal>('ordinance-suggestion-dismissals');
   // Hides a dismissed suggestion immediately while the save is in flight.
@@ -66,12 +82,39 @@ export default function Ordinances() {
 
   const rosterHasBirthDates = useMemo(() => wardMembers.some(m => m.birth_date), [wardMembers]);
 
+  // Puts (or moves) the Aaronic Priesthood sustaining line in that Sunday's Ward Business.
+  const syncSustaining = async (name: string, office: string, date: string, previousDate: string) => {
+    const said = pulpitName(name);
+    if (previousDate && previousDate !== date) {
+      const old = themes.rows.find(t => t.meeting_date.slice(0, 10) === previousDate);
+      if (old?.ward_business) {
+        const next = removeSustainingLine(old.ward_business, said, office);
+        if (next !== old.ward_business) await themes.update(old.id, { ward_business: next }, { silent: true });
+      }
+    }
+    if (!date) return;
+    const existing = themes.rows.find(t => t.meeting_date.slice(0, 10) === date);
+    const next = appendSustainingLine(existing?.ward_business || '', said, office);
+    if (existing && next === existing.ward_business) return;
+    if (existing) await themes.update(existing.id, { ward_business: next }, { silent: true });
+    else await themes.create({ meeting_date: date, ward_business: next }, { silent: true });
+    toast.success(`Added to Ward Business for ${date}`);
+  };
+
   const handleSave = async () => {
     if (!editing) return;
     const data = { ...editing };
     delete (data as Record<string, unknown>).id;
+    const previous = editing.id ? rows.find(r => r.id === editing.id) : undefined;
+    const office = data.ordinance_type || '';
+    const sustainDate = isAaronicOffice(office) ? (data.sustain_date || '').slice(0, 10) : '';
+    if (!isAaronicOffice(office)) data.sustain_date = '';
+    if (sustainDate && (data.status === 'Upcoming' || data.status === 'Interviewed')) data.status = 'Sustained';
     if (editing.id) await update(editing.id, data as Record<string, unknown>);
     else await create(data as Record<string, unknown>);
+    if (isAaronicOffice(office) && data.member_name) {
+      await syncSustaining(data.member_name, office, sustainDate, (previous?.sustain_date || '').slice(0, 10));
+    }
     setEditing(null);
   };
 
@@ -94,7 +137,9 @@ export default function Ordinances() {
         <button onClick={() => setEditing({ ...EMPTY })} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">+ Add</button>
       </div>
       <p className="text-sm text-gray-500 mb-4">
-        Baptisms and Aaronic Priesthood advancement, tracked from discussion through recording.
+        Baptisms and Aaronic Priesthood advancement, tracked from discussion through recording. For a deacon, teacher or priest, pick the
+        Sunday he'll be presented for sustaining and it's added to that Sunday's Ward Business; once Completed, the clerk gets a
+        "Record in LCR" item in My Actions.
         Suggestions below are computed automatically from birth dates on Ward Members.
         Each December, young men who will turn 12, 14, or 16 next year (Deacon, Teacher, or Priest) are added to this tracker automatically, a month ahead of the new year.
       </p>
@@ -139,6 +184,7 @@ export default function Ordinances() {
               <div className="text-sm text-gray-500 space-y-0.5">
                 <p>{o.ordinance_type}</p>
                 {o.target_date && <p>Target: {toDateOnly(o.target_date)}</p>}
+                {o.sustain_date && <p>Sustaining: {toDateOnly(o.sustain_date)}</p>}
                 {o.completed_date && <p>Completed: {toDateOnly(o.completed_date)}</p>}
               </div>
             </div>
@@ -153,6 +199,15 @@ export default function Ordinances() {
             <Select label="Ordinance" value={editing.ordinance_type || ''} onChange={v => setEditing({ ...editing, ordinance_type: v })} options={ORDINANCE_TYPES} required />
             <Select label="Status" value={editing.status || ''} onChange={v => setEditing({ ...editing, status: v })} options={ORDINANCE_STATUSES} />
             <Input label="Target Date" value={toDateOnly(editing.target_date || '')} onChange={v => setEditing({ ...editing, target_date: v })} type="date" />
+            {isAaronicOffice(editing.ordinance_type) && (
+              <div>
+                <Input label="Sustain in sacrament meeting on" value={toDateOnly(editing.sustain_date || '')} onChange={v => setEditing({ ...editing, sustain_date: v })} type="date" />
+                <p className="text-xs text-gray-400 mt-1">
+                  Saving adds the sustaining to that Sunday's Ward Business (General Handbook 18.10.3) and moves the status to Sustained.
+                </p>
+                {editing.sustain_date && !isSunday(editing.sustain_date) && <p className="text-xs text-amber-700 mt-1">That date isn't a Sunday.</p>}
+              </div>
+            )}
             <Input label="Completed Date" value={toDateOnly(editing.completed_date || '')} onChange={v => setEditing({ ...editing, completed_date: v })} type="date" />
             <Textarea label="Notes" value={editing.notes || ''} onChange={v => setEditing({ ...editing, notes: v })} />
             <div className="flex justify-end gap-2 pt-2">

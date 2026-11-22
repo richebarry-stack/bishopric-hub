@@ -327,7 +327,7 @@ export default function Layout() {
     ? (isMusic ? MUSIC_NAV_ITEMS : CAL_NAV_ITEMS)
     : isYc
       ? ycNavItems
-      : navOrder.map(p => NAV_ITEMS.find(n => n.path === p)).filter(Boolean).filter(n => !n!.adminOnly || isAdmin) as typeof NAV_ITEMS;
+      : navOrder.map(p => NAV_ITEMS.find(n => n.path === p)).filter(Boolean).filter(n => (!n!.adminOnly || isAdmin) && (!n!.roles || n!.roles.includes(user?.church_role || ''))) as typeof NAV_ITEMS;
 
   const draggable = false;
 
@@ -426,7 +426,7 @@ export default function Layout() {
                     {cat.label}
                   </p>
                   {cat.items
-                    .filter(item => !item.adminOnly || isAdmin)
+                    .filter(item => (!item.adminOnly || isAdmin) && (!item.roles || item.roles.includes(user?.church_role || '')))
                     .map(item => (
                       <Link
                         key={item.path}

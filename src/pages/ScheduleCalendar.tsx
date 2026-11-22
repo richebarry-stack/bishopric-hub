@@ -8,6 +8,7 @@ import { Input, Textarea, Select, Checkbox } from '../components/FormFields';
 import { toast } from '../lib/toast';
 import { findReservedSlotOverlap, describeSlot } from '../lib/scheduleOverlap';
 import { useConfirm } from '../components/ConfirmDialog';
+import CalendarSubscribe from '../components/CalendarSubscribe';
 import {
   type RecurrenceFrequency,
   describeRecurrence,
@@ -451,7 +452,8 @@ export default function ScheduleCalendar({ availableCalendars, title, subtitle }
     <div>
       <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <CalendarSubscribe />
           <button onClick={goToday} className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50">Today</button>
           <button onClick={goPrev} className="border border-gray-300 text-gray-700 px-2 py-1.5 rounded-md text-sm hover:bg-gray-50">‹</button>
           <button onClick={goNext} className="border border-gray-300 text-gray-700 px-2 py-1.5 rounded-md text-sm hover:bg-gray-50">›</button>

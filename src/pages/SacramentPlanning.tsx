@@ -6,6 +6,7 @@ import Modal from '../components/Modal';
 import { Input, Select, Textarea } from '../components/FormFields';
 import MemberNameInput from '../components/MemberNameInput';
 import { SPEAKER_TYPES, NO_MEETING_TYPES } from '../lib/constants';
+import { specialSundayFlags } from '../../shared/specialSundays';
 import { useAuth } from '../lib/auth';
 import { resolveMemberName } from '../lib/nameUtils';
 import { toFirstLast } from '../../shared/text';
@@ -122,6 +123,16 @@ export default function SacramentPlanning() {
             <button onClick={goNext} className="px-2 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50">›</button>
             <span className="font-semibold text-gray-800 ml-1">{monthLabel}</span>
           </div>
+          {(() => {
+            const year = viewDate.getFullYear();
+            if (year < new Date().getFullYear()) return null;
+            const hasProgram = themes.some(t => !!t.is_primary_program && t.meeting_date.slice(0, 4) === String(year));
+            return hasProgram ? null : (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
+                No Primary Program Sunday is set for {year}. Open the Sunday it will be held and check "Primary Program" (General Handbook 12.1.6).
+              </div>
+            );
+          })()}
           <div className="space-y-4">
           {monthDates.map(date => {
             const dateSpeakers = speakers.filter(s => toDateKey(s.meeting_date) === date).sort((a, b) => (a.speaking_order || 0) - (b.speaking_order || 0));
@@ -133,7 +144,14 @@ export default function SacramentPlanning() {
               <div key={date} onClick={() => setAgendaDate(date)}
                 className="bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:border-blue-300 hover:shadow-sm transition">
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="font-bold text-gray-900 text-lg">{new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h2>
+                  <h2 className="font-bold text-gray-900 text-lg flex flex-wrap items-center gap-2">
+                    {new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    {!!dateTheme?.is_primary_program && <span className="text-xs font-medium bg-pink-100 text-pink-700 rounded-full px-2 py-0.5">Primary Program</span>}
+                    {!!dateTheme?.is_fast_sunday && <span className="text-xs font-medium bg-amber-100 text-amber-700 rounded-full px-2 py-0.5">Fast Sunday</span>}
+                    {specialSundayFlags(date).map(f => (
+                      <span key={f.key} title={f.note} className="text-xs font-medium bg-violet-100 text-violet-700 rounded-full px-2 py-0.5">{f.label}</span>
+                    ))}
+                  </h2>
                   <span className="text-xs text-blue-500">Click to edit ✎</span>
                 </div>
                 {dateTheme?.no_meeting ? (
@@ -499,6 +517,7 @@ function AgendaModal(props: AgendaModalProps) {
 
   const [theme, setTheme] = useState({ theme: existingTheme?.theme || '', presiding: existingTheme?.presiding || '', conducting: existingTheme?.conducting || '', references_text: existingTheme?.references_text || '' });
   const [isFastSunday, setIsFastSunday] = useState(!!existingTheme?.is_fast_sunday);
+  const [isPrimaryProgram, setIsPrimaryProgram] = useState(!!existingTheme?.is_primary_program);
   const [noMeeting, setNoMeeting] = useState(existingTheme?.no_meeting || '');
   const [mus, setMus] = useState({
     opening_hymn: existingMusic?.opening_hymn || '', sacrament_hymn: existingMusic?.sacrament_hymn || '',
@@ -536,8 +555,8 @@ function AgendaModal(props: AgendaModalProps) {
     setSaving(true);
     try {
       // Theme
-      const themeHas = !!(theme.theme || theme.presiding || theme.conducting || theme.references_text || isFastSunday || noMeeting);
-      const themeData = { meeting_date: date, theme: theme.theme, presiding: theme.presiding, conducting: theme.conducting, references_text: theme.references_text, is_fast_sunday: isFastSunday ? 1 : 0, no_meeting: noMeeting };
+      const themeHas = !!(theme.theme || theme.presiding || theme.conducting || theme.references_text || isFastSunday || isPrimaryProgram || noMeeting);
+      const themeData = { meeting_date: date, theme: theme.theme, presiding: theme.presiding, conducting: theme.conducting, references_text: theme.references_text, is_fast_sunday: isFastSunday ? 1 : 0, is_primary_program: !noMeeting && isPrimaryProgram ? 1 : 0, no_meeting: noMeeting };
       if (existingTheme && themeHas) await props.updateTheme(existingTheme.id, themeData, { silent: true });
       else if (existingTheme && !themeHas) await props.removeTheme(existingTheme.id);
       else if (!existingTheme && themeHas) await props.createTheme(themeData, { silent: true });
@@ -618,6 +637,15 @@ function AgendaModal(props: AgendaModalProps) {
               className="rounded border-gray-300" />
             Fast &amp; Testimony Meeting (no assigned speakers)
           </label>
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+            <input type="checkbox" checked={isPrimaryProgram}
+              onChange={e => { setIsPrimaryProgram(e.target.checked); mark(); }}
+              className="rounded border-gray-300" />
+            Primary Program (children's sacrament meeting presentation)
+          </label>
+          {specialSundayFlags(date).map(f => (
+            <p key={f.key} className="text-xs text-violet-700">{f.label}: {f.note}</p>
+          ))}
         </section>
 
         {/* Music */}
