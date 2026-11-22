@@ -196,6 +196,8 @@ const YC_SECTIONS: Section[] = [
     content: (
       <div className="space-y-2">
         <p>Agenda and notes for the ward youth council — usually meets monthly.</p>
+        <p>Pick a meeting at the top (the next one is chosen for you). Each meeting has an <strong>Agenda</strong> and <strong>Notes</strong> box, and a row for every quorum and class (Priests, Teachers, Deacons, Gatherers of Light, Messengers of Hope, Builders of Faith) with <strong>Status</strong>, <strong>Next Steps</strong> and <strong>Help Needed</strong>. Click a box to type; it saves when you click away. <strong>Copy from prior meeting</strong> carries the last meeting's agenda and group rows forward.</p>
+        <p>Below that, the next six weeks of the <strong>Youth Calendar</strong> and the <strong>Action Items</strong> shared with Youth Council (open, plus ones finished since the last meeting) show automatically. Check an item off right there.</p>
       </div>
     ),
   },
@@ -500,6 +502,9 @@ const FULL_SECTIONS: Section[] = [
     content: (
       <div className="space-y-2">
         <p>Agenda and notes for the ward youth council — bishopric, quorum/class presidencies, and advisers usually meet monthly. Available to both the Bishopric and Youth Council hubs.</p>
+        <p>Pick a meeting at the top (the next one is chosen for you). Each meeting has an <strong>Agenda</strong> and <strong>Notes</strong> box, and a row for every quorum and class (Priests, Teachers, Deacons, Gatherers of Light, Messengers of Hope, Builders of Faith) with <strong>Status</strong>, <strong>Next Steps</strong> and <strong>Help Needed</strong>. Click a box to type; it saves when you click away. <strong>Copy from prior meeting</strong> carries the last meeting's agenda and group rows forward.</p>
+        <p>Below that, the next six weeks of the <strong>Youth Calendar</strong> and the <strong>Action Items</strong> shared with Youth Council (open, plus ones finished since the last meeting) show automatically. Check an item off right there.</p>
+        <p>Bishopric members and admins can rename, add or remove groups with <strong>⚙ Manage groups</strong>.</p>
       </div>
     ),
   },

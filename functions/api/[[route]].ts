@@ -97,6 +97,7 @@ const TABLES: Record<string, { name: string; orderBy?: string }> = {
   'ordinance-suggestion-dismissals': { name: 'ordinance_suggestion_dismissals', orderBy: 'id ASC' },
   'annual-duties': { name: 'annual_duties', orderBy: 'sort_order ASC, id ASC' },
   'yc-meetings': { name: 'yc_meetings', orderBy: 'date ASC' },
+  'yc-discussion-topics': { name: 'yc_discussion_topics', orderBy: 'meeting_date DESC, organization ASC' },
   'tithing-declarations': { name: 'tithing_declaration_slots', orderBy: 'date ASC, start_time ASC' },
   // Bishopric hub only: the WC, YC and Calendar hub checks below refuse any table they don't list.
   'speaking-topics': { name: 'speaking_topics', orderBy: 'topic COLLATE NOCASE ASC' },
@@ -441,7 +442,7 @@ const WC_READABLE = new Set([
   'wc-meetings',
   'sacrament-speakers', 'prayers', 'sacrament-music', 'sacrament-themes',
   'sacrament-agenda-notes', 'sacrament-announcements', 'sacrament-ward-business',
-  'missionary-pipeline', 'yc-meetings',
+  'missionary-pipeline', 'yc-meetings', 'yc-discussion-topics',
 ]);
 
 // Church role → hub mapping (duplicated from frontend constants for backend use)
@@ -1321,10 +1322,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       wc_discussion_col_widths: ['both', 'bh', 'wc'],
       wc_discussion_orgs: ['both', 'bh', 'wc'],
       speaking_invitation_settings: ['both', 'bh'],
+      yc_discussion_orgs: ['both', 'bh', 'yc', 'wc'],
     };
     const allowedHubs = UI_SETTING_HUBS[key];
     if (!allowedHubs || !allowedHubs.includes(session.hub || 'both')) return json({ error: 'Forbidden' }, 403);
     if (method === 'PUT' && session.role === 'guest') return json({ error: 'Forbidden' }, 403);
+    // The Ward Council can read the Youth Council's group list but not change it.
+    if (method === 'PUT' && key === 'yc_discussion_orgs' && session.hub === 'wc') return json({ error: 'Forbidden' }, 403);
     if (method === 'GET') {
       const row = await db.prepare('SELECT value FROM ui_settings WHERE key = ?').bind(key).first<{ value: string }>();
       return json(row ? JSON.parse(row.value) : {});
@@ -1761,7 +1765,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
       // fall through to generic TABLES handler
     } else {
-      if (tbl !== 'youth-activities' && tbl !== 'yc-meetings' && tbl !== 'tasks') return json({ error: 'Forbidden' }, 403);
+      if (tbl !== 'youth-activities' && tbl !== 'yc-meetings' && tbl !== 'yc-discussion-topics' && tbl !== 'tasks') return json({ error: 'Forbidden' }, 403);
       // tasks: YC users only see/modify items shared with Youth Council
       if (tbl === 'tasks') {
         if (method === 'GET' && !routeParts[1]) {

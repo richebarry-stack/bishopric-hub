@@ -856,6 +856,17 @@ export interface AnnualDuty {
   updated_by?: string;
 }
 
+export interface YcDiscussionTopic {
+  id: number;
+  meeting_date: string;
+  organization: string;
+  status: string;
+  next_steps: string;
+  help_needed: string;
+  updated_at?: string;
+  updated_by?: string;
+}
+
 export interface YcMeeting {
   id: number;
   date: string;
