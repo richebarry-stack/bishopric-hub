@@ -156,9 +156,11 @@ export default function YcMeetings() {
 
   const calendar = useMemo(() => {
     if (!activeDate) return [];
-    const end = addDays(activeDate, CALENDAR_WEEKS * 7);
+    // Never show past activities: start today, and run six weeks past the meeting
+    // (or past today, when looking back at an earlier meeting).
+    const end = addDays(activeDate > TODAY ? activeDate : TODAY, CALENDAR_WEEKS * 7);
     return activities
-      .filter(a => a.date.slice(0, 10) >= activeDate && a.date.slice(0, 10) <= end)
+      .filter(a => a.date.slice(0, 10) >= TODAY && a.date.slice(0, 10) <= end)
       .sort((a, b) => a.date.localeCompare(b.date))
       .map(a => ({
         id: a.id, date: a.date.slice(0, 10), notes: a.notes,
@@ -306,7 +308,7 @@ export default function YcMeetings() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-2">
-                <h2 className="text-sm font-semibold text-gray-600">Youth Calendar — next {CALENDAR_WEEKS} weeks</h2>
+                <h2 className="text-sm font-semibold text-gray-600">Upcoming on the Youth Calendar</h2>
                 <Link to="/youth-activities" className="text-xs text-amber-700 hover:underline">Open calendar</Link>
               </div>
               {calendar.length === 0 ? <p className="text-sm text-gray-400">Nothing on the Youth Calendar yet.</p> : (
