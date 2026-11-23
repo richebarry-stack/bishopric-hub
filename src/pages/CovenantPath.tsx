@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTable } from '../lib/useTable';
 import type { CovenantAgendaRow, CovenantPathExclusion, MissionaryPipeline, PartMemberHousehold, WardMember } from '../lib/api';
 import {
-  buildCovenantPath, DEFAULT_COVENANT_SETTINGS, PB_STATUSES,
+  buildCovenantPath, DEFAULT_COVENANT_SETTINGS,
   type CovenantCategory, type CovenantItem, type CovenantSettings,
 } from '../../shared/covenantPath';
 
@@ -46,7 +46,7 @@ function AgeField({ label, value, onSave }: { label: string; value: number; onSa
  * lists from LCR. Anyone can be hidden from a list, with a reason, and restored.
  */
 export default function CovenantPath() {
-  const { rows: members, update: updateMember, isLoading } = useTable<WardMember>('ward-members');
+  const { rows: members, isLoading } = useTable<WardMember>('ward-members');
   const { rows: households } = useTable<PartMemberHousehold>('part-member-households');
   const { rows: missionaries } = useTable<MissionaryPipeline>('missionary-pipeline');
   const { rows: exclusions, create: createExclusion, remove: removeExclusion } = useTable<CovenantPathExclusion>('covenant-path-exclusions');
@@ -81,7 +81,6 @@ export default function CovenantPath() {
     return map;
   }, [exclusions]);
 
-  const memberById = useMemo(() => new Map(members.map(m => [m.id, m])), [members]);
   const lastSynced = members.map(m => (m as WardMember & { ordinances_synced_at?: string }).ordinances_synced_at || '').sort().pop();
   const pmSynced = households[0]?.synced_at;
 
@@ -100,7 +99,6 @@ export default function CovenantPath() {
   };
 
   const renderItem = (cat: CovenantCategory, it: CovenantItem, exclusion?: CovenantPathExclusion) => {
-    const member = it.memberId ? memberById.get(it.memberId) : undefined;
     const isHiding = hiding?.category === cat.id && hiding.key === it.key;
     return (
       <li key={it.key} className={`px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 ${exclusion ? 'bg-gray-50 text-gray-500' : ''}`}>
@@ -108,13 +106,6 @@ export default function CovenantPath() {
         <span className="text-xs text-gray-500">{it.detail}</span>
         {exclusion && <span className="text-xs text-gray-500 italic">Hidden{exclusion.reason ? `: ${exclusion.reason}` : ''}</span>}
         <span className="ml-auto flex items-center gap-2">
-          {cat.id === 'patriarchal-blessing' && member && !exclusion && (
-            <select value={member.pb_status || 'Not received'} aria-label={`Patriarchal blessing status for ${it.name}`}
-              onChange={e => updateMember(member.id, { pb_status: e.target.value })}
-              className="text-xs rounded-md border border-gray-300 px-1.5 py-1">
-              {PB_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          )}
           {!exclusion && (['for_bishopric', 'for_ward_council'] as const).map(field => {
             const on = !!agendaFor(cat.id, it.key)?.[field];
             const label = field === 'for_bishopric' ? 'Bishopric' : 'Ward Council';
@@ -164,7 +155,7 @@ export default function CovenantPath() {
         <h1 className="text-2xl font-bold text-gray-900">Covenant Path</h1>
         <p className="text-sm text-gray-500 mt-1">
           Members who may be ready for their next ordinance or blessing, from the nightly LCR sync
-          {lastSynced ? ` (last updated ${lastSynced.slice(0, 10)})` : ''}. Patriarchal blessings come from LCR’s Patriarchal Blessing Status report; mark Recommend issued (or a blessing LCR doesn’t show yet) by hand.
+          {lastSynced ? ` (last updated ${lastSynced.slice(0, 10)})` : ''}. Patriarchal blessings come from LCR’s Patriarchal Blessing Status report.
           Hide anyone a list doesn’t fit; they stay hidden until restored.
         </p>
       </div>

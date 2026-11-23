@@ -743,7 +743,7 @@ export interface WardMember {
   head_of_house?: string | null;
   household_position?: string | null;
   returned_missionary?: number | null;
-  /** 'Not received' | 'Recommend issued' | 'Received'. The LCR sync sets Received from LCR's Patriarchal Blessing Status report; the rest is set by hand. */
+  /** 'Received' or null. Set only by the LCR sync from LCR's Patriarchal Blessing Status report. */
   pb_status?: string | null;
   pb_date?: string | null;
   updated_at: string;

@@ -6,6 +6,12 @@ export interface VersionEntry { date: string; items: string[] }
 
 export const VERSION_HISTORY: VersionEntry[] = [
             {
+              date: 'Nov 23, 2026',
+              items: [
+                'Patriarchal blessings: the status now comes only from LCR’s Patriarchal Blessing Status report in the nightly sync, so the hand-set dropdowns on Covenant Path and Ward Members are gone. Ward Members shows a PB badge for anyone LCR shows as received.',
+              ],
+            },
+            {
               date: 'Nov 22, 2026',
               items: [
                 'New page: Interview Booking (under Bishopric). Add open interview times on the Bishop\'s or a counselor\'s schedule, single or repeating weekly, and share a link. Members book at /book-interview without logging in, giving their name, a phone or email, and a general purpose. The booking goes onto that schedule and shows on My Actions (and by email) for that person and the executive secretaries. Members never see who else booked.',

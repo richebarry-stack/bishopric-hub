@@ -2463,10 +2463,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // (baptism, priesthood office, endowment, sealing to spouse). Rows are matched by
   // last name + birth date first — far more reliable than names alone — then by
   // name. Only writes members whose values actually changed.
-  // LCR's Patriarchal Blessing Status report, posted by the LCR sync. A "Yes" marks the
-  // member Received. A "No" changes nothing: the report only lists blessings already
-  // recorded at Church headquarters, so a status set by hand (a recent blessing, or
-  // Recommend issued) is kept.
+  // LCR's Patriarchal Blessing Status report, posted by the LCR sync. The report is the
+  // only source of the status: "Yes" marks the member Received, "No" clears it.
   if (routeParts[0] === 'ward-members' && routeParts[1] === 'sync-patriarchal-blessings' && method === 'POST') {
     const body = await request.json() as { rows?: { name: string; gender?: string; age?: number | null; received: boolean }[] };
     const rows = (body.rows || []).slice(0, 3000);
@@ -2492,20 +2490,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return age == null || a === null || Math.abs(a - age) <= 1;
     };
     const unmatched: string[] = [];
-    const ids: number[] = [];
+    const updates: { id: number; status: string | null }[] = [];
     let matched = 0;
     for (const r of rows) {
       const exact = (byPreferred.get(r.name.trim().toLowerCase()) || []).filter(m => ageFits(m, r.age));
       const m = exact.length === 1 ? exact[0] : (() => { const f = matchRosterMember(r.name, roster); return f && ageFits(f, r.age) ? f : null; })();
       if (!m) { unmatched.push(r.name); continue; }
       matched++;
-      if (r.received && m.pb_status !== 'Received') ids.push(m.id);
+      const status = r.received ? 'Received' : null;
+      if ((m.pb_status || null) !== status) updates.push({ id: m.id, status });
     }
     const now = new Date().toISOString();
-    if (ids.length > 0) {
-      await db.batch(ids.map(id => db.prepare("UPDATE ward_members SET pb_status = 'Received', updated_at = ?, updated_by = ? WHERE id = ?").bind(now, session.name, id)));
+    if (updates.length > 0) {
+      await db.batch(updates.map(u => db.prepare('UPDATE ward_members SET pb_status = ?, updated_at = ?, updated_by = ? WHERE id = ?').bind(u.status, now, session.name, u.id)));
     }
-    return json({ ok: true, matched, updated: ids.length, unmatched });
+    return json({ ok: true, matched, updated: updates.length, unmatched });
   }
 
   // LCR's Part-Member Households report, posted by the LCR sync; replaces the stored list.

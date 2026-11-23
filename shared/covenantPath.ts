@@ -35,7 +35,6 @@ export interface CovenantSettings {
 
 export const DEFAULT_COVENANT_SETTINGS: CovenantSettings = { pbAge: 18, unbaptizedAge: 9, endowmentAge: 21 };
 
-export const PB_STATUSES = ['Not received', 'Recommend issued', 'Received'] as const;
 
 export interface CovenantItem {
   /** "member:<id>", "couple:<id>-<id>" or "household:<name>" — what an exclusion hides. */
@@ -143,7 +142,7 @@ export function buildCovenantPath(
   const thisMonth = today.slice(0, 7);
 
   const pb = withAge.filter(({ m, age }) => m.baptized === 1 && age !== null && age >= settings.pbAge && m.pb_status !== 'Received')
-    .map(({ m, age }) => item(m, `${age} · ${m.pb_status === 'Recommend issued' ? 'Recommend issued' : 'Not received'}`));
+    .map(({ m, age }) => item(m, `${age} · Not received`));
 
   const soon = addMonths(today, 3);
   const approachingBaptism = withAge.filter(({ m, age }) => m.baptized === 0 && age !== null && age < settings.unbaptizedAge && m.birth_date &&
