@@ -32,7 +32,7 @@ data, on its own database and web address.
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS v4 |
 | Routing | React Router v7 |
 | Data fetching | TanStack React Query v5 |
-| Backend | Cloudflare Pages Functions (single `functions/api/[[route]].ts` handler) |
+| Backend | Cloudflare Pages Functions (`functions/api/[[route]].ts` entry point, route groups in `functions/api/_lib/`) |
 | Database | Cloudflare D1 (SQLite) |
 | Auth | Session-based (HTTP-only cookie), SHA-256 password hashing |
 | Deployment | Cloudflare Pages via Wrangler CLI |
@@ -270,8 +270,11 @@ These are generated locally (or by Claude) when importing from external sources 
 bishopric-hub/
 ├── functions/
 │   └── api/
-│       └── [[route]].ts      # Cloudflare Pages Function — all API routes in one file
+│       ├── [[route]].ts      # Cloudflare Pages Function entry point: matches route groups in order
+│       ├── _lib/             # Route groups (auth, public, users, hub access, LCR sync, CRUD) and helpers
+│       └── jobs.ts           # Daily background jobs
 ├── migrations/               # D1 SQL migrations, applied in numeric order
+├── tests/                    # node --test; apiRoutes.test.ts runs the real API on an in-memory DB
 ├── src/
 │   ├── components/           # Layout, Modal, FormFields, StatusBadge, etc.
 │   ├── lib/                  # api.ts (types + fetch), auth.tsx, useTable.ts, constants.ts
