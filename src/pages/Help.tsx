@@ -274,7 +274,7 @@ const FULL_SECTIONS: Section[] = [
     content: (
       <div className="space-y-2">
         <p>A list view of sacrament meeting themes and conducting assignments across all weeks. Click any row to edit its theme, scripture references, conducting, and meeting link. Useful for planning months in advance.</p>
-        <p>Easter, Christmas on a Sunday and 5th Sundays are labeled automatically. Check <strong>Primary Program</strong> on the Sunday the children present; a reminder shows until one is set for the year.</p>
+        <p>Easter, Christmas on a Sunday and 5th Sundays are labeled automatically. Check <strong>Primary Program</strong> on the Sunday the children present, and it gets a Primary Program label.</p>
       </div>
     ),
   },

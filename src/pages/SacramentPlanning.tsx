@@ -123,16 +123,6 @@ export default function SacramentPlanning() {
             <button onClick={goNext} className="px-2 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50">›</button>
             <span className="font-semibold text-gray-800 ml-1">{monthLabel}</span>
           </div>
-          {(() => {
-            const year = viewDate.getFullYear();
-            if (year < new Date().getFullYear()) return null;
-            const hasProgram = themes.some(t => !!t.is_primary_program && t.meeting_date.slice(0, 4) === String(year));
-            return hasProgram ? null : (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
-                No Primary Program Sunday is set for {year}. Open the Sunday it will be held and check "Primary Program" (General Handbook 12.1.6).
-              </div>
-            );
-          })()}
           <div className="space-y-4">
           {monthDates.map(date => {
             const dateSpeakers = speakers.filter(s => toDateKey(s.meeting_date) === date).sort((a, b) => (a.speaking_order || 0) - (b.speaking_order || 0));

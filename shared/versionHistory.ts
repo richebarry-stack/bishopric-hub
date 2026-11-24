@@ -8,6 +8,7 @@ export const VERSION_HISTORY: VersionEntry[] = [
             {
               date: 'Nov 23, 2026',
               items: [
+                'Sacrament Planning: removed the “No Primary Program Sunday is set” reminder, since the date is usually set later in the year.',
                 'Behind the scenes: the hub’s server code is split into smaller parts, and new automatic tests check sign-in, who can see each hub’s pages (for example, Welfare is Bishopric hub only), online interview booking, schedule overlaps and calendar feeds before every release. Nothing should look different.',
                 'Patriarchal blessings: the status now comes only from LCR’s Patriarchal Blessing Status report in the nightly sync, so the hand-set dropdowns on Covenant Path and Ward Members are gone. Ward Members shows a PB badge for anyone LCR shows as received.',
               ],
