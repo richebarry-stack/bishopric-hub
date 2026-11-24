@@ -210,3 +210,22 @@ test('calendar feed: a private token serves the chosen calendars as .ics', async
   assert.notEqual(reset.token, feed.token);
   assert.equal((await api.call('GET', `/api/calendar-feed/ics/${feed.token}`)).status, 404);
 });
+
+test('ordinance sync: every member counted as updated is named in the change list', async () => {
+  const api = createApi();
+  const u = api.addUser({ hub: 'both', role: 'admin' });
+  api.DB.raw.prepare(`INSERT INTO ward_members (first_name, last_name, active, birth_date, baptized, endowed, sealed_to_spouse, household_position, ordinances_synced_at)
+    VALUES ('Ann', 'Doe', 1, '1990-01-01', 1, 0, 0, 'Spouse', '2026-01-01'), ('Cal', 'New', 1, '2010-05-05', NULL, NULL, NULL, NULL, NULL)`).run();
+  const row = (name: string, birth: string, extra: Record<string, unknown> = {}) => ({
+    name, full_name: null, birth_date: birth, baptized: true, baptism_date: null, priesthood_office: null, ordination_date: null,
+    endowed: false, endowment_date: null, sealed_to_spouse: false, sealing_date: null, ...extra,
+  });
+  const res = await api.call('POST', '/api/ward-members/sync-ordinances', { user: u, body: { rows: [
+    row('Doe, Ann', '1990-01-01', { head_of_house: 'Doe, Bob', household_position: 'Head of Household', spouse_name: null, returned_missionary: false }),
+    row('New, Cal', '2010-05-05'),
+  ] } });
+  assert.equal(res.data.updated, 2);
+  assert.equal(res.data.changed.length, 2);
+  assert.ok(res.data.changed.some((c: string) => c.startsWith('Ann Doe (') && c.includes('household details')));
+  assert.ok(res.data.changed.includes('Cal New (first ordinance record from LCR)'));
+});

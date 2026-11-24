@@ -705,15 +705,22 @@ export async function handleLcrSync(ctx: Ctx, session: Session): Promise<Respons
         `UPDATE ward_members SET ${keys.map(k => `${k} = ?`).join(', ')}, ordinances_synced_at = ?, updated_at = ? WHERE id = ?`
       ).bind(...keys.map(k => next[k]), now, now, m.id));
       updated++;
-      // First fill-in isn't a "change" worth listing — only report real changes.
-      if (m.ordinances_synced_at) {
-        const parts: string[] = [];
-        if (diff.includes('baptized') || diff.includes('baptism_date')) parts.push(`${describe('Baptized', m.baptized, m.baptism_date)} → ${describe('Baptized', next.baptized, next.baptism_date)}`);
-        if (diff.includes('priesthood_office') || diff.includes('ordination_date')) parts.push(`${m.priesthood_office || 'no office'} → ${next.priesthood_office || 'no office'}`);
-        if (diff.includes('endowed') || diff.includes('endowment_date')) parts.push(`${describe('Endowed', m.endowed, m.endowment_date)} → ${describe('Endowed', next.endowed, next.endowment_date)}`);
-        if (diff.includes('sealed_to_spouse') || diff.includes('sealing_date')) parts.push(`${describe('Sealed', m.sealed_to_spouse, m.sealing_date)} → ${describe('Sealed', next.sealed_to_spouse, next.sealing_date)}`);
-        changed.push(`${m.first_name} ${m.last_name} (${parts.join('; ')})`);
+      // Every member counted as updated is listed, so the count always matches the names.
+      const parts: string[] = [];
+      if (!m.ordinances_synced_at) {
+        parts.push('first ordinance record from LCR');
+      } else {
+        const has = (...ks: string[]) => ks.some(k => (diff as string[]).includes(k));
+        if (has('baptized', 'baptism_date')) parts.push(`${describe('Baptized', m.baptized, m.baptism_date)} → ${describe('Baptized', next.baptized, next.baptism_date)}`);
+        if (has('priesthood_office', 'ordination_date')) parts.push(`${m.priesthood_office || 'no office'} → ${next.priesthood_office || 'no office'}`);
+        if (has('endowed', 'endowment_date')) parts.push(`${describe('Endowed', m.endowed, m.endowment_date)} → ${describe('Endowed', next.endowed, next.endowment_date)}`);
+        if (has('sealed_to_spouse', 'sealing_date')) parts.push(`${describe('Sealed', m.sealed_to_spouse, m.sealing_date)} → ${describe('Sealed', next.sealed_to_spouse, next.sealing_date)}`);
+        if (has('spouse_name')) parts.push(`spouse ${m.spouse_name || 'none'} → ${(next as { spouse_name?: string | null }).spouse_name || 'none'}`);
+        if (has('sealed_to_current_spouse', 'sealed_to_prior_spouse')) parts.push('spouse sealing details');
+        if (has('head_of_house', 'household_position')) parts.push('household details');
+        if (has('returned_missionary')) parts.push((next as { returned_missionary?: number }).returned_missionary ? 'now a returned missionary' : 'no longer a returned missionary');
       }
+      changed.push(`${m.first_name} ${m.last_name} (${parts.join('; ')})`);
     }
     for (let i = 0; i < stmts.length; i += 50) await db.batch(stmts.slice(i, i + 50));
     return json({ ok: true, matched: byMember.size, updated, changed, unmatched, ambiguous });

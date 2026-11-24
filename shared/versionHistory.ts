@@ -6,6 +6,12 @@ export interface VersionEntry { date: string; items: string[] }
 
 export const VERSION_HISTORY: VersionEntry[] = [
             {
+              date: 'Nov 24, 2026',
+              items: [
+                'Automation (LCR sync history): “Ordinances changed” now names everyone counted in “Ordinances: N updated”, including members getting their first ordinance record and changes to spouse, household or returned-missionary details.',
+              ],
+            },
+            {
               date: 'Nov 23, 2026',
               items: [
                 'Sacrament Planning: removed the “No Primary Program Sunday is set” reminder, since the date is usually set later in the year.',
